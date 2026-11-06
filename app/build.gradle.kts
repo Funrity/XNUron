@@ -7,8 +7,8 @@ android {
         applicationId = "com.xnuron.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 125
-        versionName = "0.4.75"
+        versionCode = 126
+        versionName = "0.4.76"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }

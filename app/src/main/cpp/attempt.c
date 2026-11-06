@@ -619,9 +619,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
               dt = nd;
               int a1 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "security-domain", 1);
               int a2 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "chip-epoch", 0);
-              { int a3 = a64_dt_node_add_empty_prop(dt, &dtlen, dtcap, "pmgr", "voltage-states1");   /* 0.4.65: log 0.4.64: ApplePMGR.cpp:899 "voltage-states1 not found" */
-                if (a3 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added an EMPTY (0 bytes) 'voltage-states1' property to the 'pmgr' node. The IPSW tree has voltage-states0/2/9 but not 1, and ApplePMGR (ApplePMGR.cpp:899) panics '%s not found'. ASSUMPTION: the real table is chip-specific data that iBoot supplies and is unknown here; NO voltage values are invented, the property only exists and is empty\n", "voltage-states1");
-                else if (a3 != 0) LOG("[boot] WARNING: could not add 'voltage-states1' to the 'pmgr' node (%d)\n", a3); }
+              { /* 0.4.65/0.4.75: ApplePMGR.cpp:899 panics "voltage-statesN not found" one N per run (log 0.4.74: N=5 after N=1); every missing voltage-states0..15 becomes an empty property so the next runs do not stop on each index */
+                char vn[24], added[96] = ""; int na3 = 0, bad = 0;
+                for (int vi = 0; vi < 16; vi++) { snprintf(vn, sizeof vn, "voltage-states%d", vi);
+                  int a3 = a64_dt_node_add_empty_prop(dt, &dtlen, dtcap, "pmgr", vn);
+                  if (a3 == 1) { size_t l = strlen(added); snprintf(added + l, sizeof added - l, "%s%d", na3 ? "," : "", vi); na3++; } else if (a3 < 0) bad = a3; }
+                if (na3) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added EMPTY (0 bytes) 'voltage-states<N>' properties to the 'pmgr' node for N = %s (the IPSW tree lacks them; ApplePMGR.cpp:899 panics '%%s not found'). ASSUMPTION: the real tables are chip-specific data that iBoot supplies and are unknown here; NO voltage values are invented, the properties only exist and are empty\n", added);
+                if (bad) LOG("[boot] WARNING: could not add some 'voltage-states<N>' to the 'pmgr' node (%d)\n", bad); }
               { int64_t cl = -1; char lg[256]; int a4 = a64_dt_node_info(dt, dtlen, "arm-io", "clock-frequencies", &cl, lg, sizeof lg);   /* 0.4.74: log 0.4.73: method 0x814fc38 returns 0 unless arm-io has BOTH clock-frequencies and clock-frequencies-nclk */
                 if (a4 >= 0 && cl > 0) { int a5 = a64_dt_node_add_zero_prop(dt, &dtlen, dtcap, "arm-io", "clock-frequencies-nclk", (size_t)cl);
                   if (a5 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'clock-frequencies-nclk' (%lld zero bytes, same size as 'clock-frequencies') to /arm-io. AppleT802xIO::start needs both properties; the IPSW tree has only 'clock-frequencies' (all zeros). ASSUMPTION: iBoot fills both with chip data that is UNKNOWN here; NO frequency or clock-type values are invented. Expect the watchdog check (clock speed vs 24 MHz timebase) to still see 0 until the real table layout is understood\n", (long long)cl);
