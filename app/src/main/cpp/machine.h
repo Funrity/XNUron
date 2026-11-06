@@ -52,6 +52,7 @@ A64 *a64m_cpu(A64Machine *m);
 /* Value of x0 at boot (a64virt: bit0 = guest stays interactive after its self-test). */
 void a64m_set_boot_arg(A64Machine *m, uint64_t v);
 /* 0.4.72: at a stop, find `text` in the kernel image, find the code that references it and dump `before`/`after` bytes of code around the first reference (up to 2 texts). */
+void a64m_nm_add_dt_name(A64Machine *m, const char *name);   /* 0.4.79: DeviceTree property name known to exist; turns the missing-name probe on */
 void a64m_set_diag_string(A64Machine *m, unsigned idx, const char *text, uint64_t before, uint64_t after);
 void a64m_set_diag_code(A64Machine *m, uint64_t va, uint64_t len);
 void a64m_set_quiet_exc(A64Machine *m, int q);   /* skip the data-access/instruction lists of the first exception (log budget) */

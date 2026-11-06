@@ -188,6 +188,20 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "arm-io", "clock-frequencies-nclk", 8) == 0 && q == n0 + 44, "second add is a no-op");
         CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "nosuch", "y", 4) == -2, "unknown node -> -2");
     }
+    { /* 0.4.79: probe for lowercase dashed names passed to calls that are not DeviceTree property names */
+        A64Machine *m = a64m_create_system(1u << 20);
+        a64m_nm_add_dt_name(m, "present-name");
+        uint32_t code[] = { 0x94000002, 0x14000000, 0xD65F03C0 };   /* bl +8 ; b . ; ret */
+        memcpy(a64m_ram_at(m, A64M_RAM_BASE, sizeof code), code, sizeof code);
+        const char *strs[] = { "voltage-states5", "present-name", "Capital-Name", "plain", "voltage-states5", "x" };
+        for (int z = 0; z < 6; z++) {
+            uint64_t sa = A64M_RAM_BASE + 0x100 + (uint64_t)z * 0x40; strcpy((char *)a64m_ram_at(m, sa, 0x40), strs[z]);
+            a64m_set_pc(m, A64M_RAM_BASE); a64m_cpu(m)->x[1] = sa; a64m_run(m, 3, false);
+        }
+        A64 *cp = a64m_cpu(m);
+        CHECK(cp->nm_n == 1 && !strcmp(cp->nm[0], "voltage-states5"), "probe lists exactly the missing dashed name once: n=%u first=%s", cp->nm_n, cp->nm_n ? cp->nm[0] : "-");
+        a64m_destroy(m);
+    }
     { /* 0.4.64: pmgr optional bridges fix-up */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(4, 0);

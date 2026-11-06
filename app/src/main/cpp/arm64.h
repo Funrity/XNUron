@@ -115,9 +115,12 @@ typedef struct {
     uint64_t aw_val; unsigned aw_n; struct { uint64_t steps, pc, tgt, x1, x2; char kind; } aw[48];   /* diagnostic: calls with x0/x1 == value, returns with x0 == value */
     uint64_t bh_lo, bh_hi; unsigned bh_n; struct { uint64_t steps, pc, lr, lr2, off, val; uint8_t sz, wr; } bh[64];   /* diagnostic: history of accesses to a physical block */
     uint64_t watch_lo, watch_hi; unsigned watch_n; struct { uint64_t pc, addr, val; uint8_t wr, sz; } watch[24];   /* diagnostic: accesses to a physical range (boot_args) */
+    /* 0.4.79 diagnostic: strings passed (x1/x2) to calls that look like DeviceTree property names but are not in the DeviceTree */
+    int nm_on; uint32_t nm_dth[16384]; uint32_t nm_evh[8192]; uint64_t nm_seenp[4096]; unsigned nm_n, nm_calls; char nm[256][40]; uint64_t nm_pc[256];
     A64UnimplSvc on_unimpl_svc;
 } A64;
 
+void a64_nm_add_dt_name(A64 *c, const char *name);   /* 0.4.79: register a DeviceTree property name (hash set) and switch the probe on */
 void a64_init(A64 *c, uint8_t *mem, uint64_t base, uint64_t size);
 /* Switch to system mode: EL1h, all DAIF masked, MMU off (reset-like state). */
 void a64_system_init(A64 *c);

@@ -491,6 +491,19 @@ int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *nod
     uint32_t l32 = (uint32_t)len; memcpy(d + na.ins + 32, &l32, 4);
     np++; memcpy(d + na.hdr, &np, 4); *n += add; return 1;
 }
+/* 0.4.79: call cb(name) for every property name of every node of the flattened DeviceTree; returns the count, -1 malformed. */
+static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, void (*cb)(const char *, void *), void *ud) {
+    if (depth > 32 || *pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8; int cnt = 0;
+    for (uint32_t i = 0; i < np; i++) {
+        if (*pos + 36 > n) return -1;
+        char nm[33]; memcpy(nm, d + *pos, 32); nm[32] = 0; uint32_t len; memcpy(&len, d + *pos + 32, 4); len &= 0x7FFFFFFFu;
+        cb(nm, ud); cnt++; *pos += 36 + (((size_t)len + 3) & ~(size_t)3);
+    }
+    for (uint32_t i = 0; i < nc; i++) { int r = dt_names_walk(d, n, pos, depth + 1, cb, ud); if (r < 0) return -1; cnt += r; }
+    return cnt;
+}
+static void dt_names_to_machine(const char *nm, void *ud) { a64m_nm_add_dt_name((A64Machine *)ud, nm); }
 /* 0.4.23 (MODELLED): fixed pseudo-random bytes (xorshift64*, constant seed) instead of host entropy. Real iBoot uses a hardware RNG; with host entropy the kernel's
  * zone/KASLR randomisation changed every run, so a failing run could not be reproduced. Same bytes every run = same kernel behaviour = comparable logs. */
 static int host_random(void *buf, size_t n) {
@@ -728,6 +741,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           LOG("[boot] MODELLED: %d more /arm-io DeviceTree nodes became unknown zero blocks (%d skipped: empty/huge range or overlapping one already modelled). ASSUMPTION: their real registers are UNKNOWN here; reads return 0, writes are ignored\n", addedn, skipped);
           LOG("[boot] MODELLED: 'dapf' blocks ('dapf-aop' and %d more) read back the last value written to a register (0 if none). Reason (the kernel's own code, AppleDAPF.cpp:158): it writes 0x80000001 to +0x0 and requires to read the same value back. ASSUMPTION: this is only a read-back, the real DAPF filter behaviour is NOT modelled\n", ndapf); }
     }
+    { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
+      if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
+      else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
     free(dt);
     strcpy((char *)b + 112, "-v serial=3 debug=0x14e");
     a64m_mark_attempt(m, mo.lowest_vm, kphys);

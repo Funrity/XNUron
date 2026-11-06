@@ -255,6 +255,31 @@ static uint8_t *ptr(A64 *c, uint64_t a, uint64_t n) {
     if (o > c->size || n > c->size - o) return NULL;
     return c->mem + o;
 }
+
+/* 0.4.79 diagnostic: DeviceTree-property-name probe. Names are compared by FNV-1a hash (collisions are practically irrelevant for a diagnostic). */
+static uint32_t nm_fnv(const char *s) { uint32_t h = 2166136261u; while (*s) { h ^= (uint8_t)*s++; h *= 16777619u; } return h ? h : 1; }
+void a64_nm_add_dt_name(A64 *c, const char *name) {
+    uint32_t h = nm_fnv(name); unsigned k = h & 16383;
+    for (unsigned t = 0; t < 16384; t++, k = (k + 1) & 16383) { if (c->nm_dth[k] == h) break; if (!c->nm_dth[k]) { c->nm_dth[k] = h; break; } }
+    c->nm_on = 1;
+}
+static int nm_has(const uint32_t *tab, unsigned mask, uint32_t h) { unsigned k = h & mask; for (unsigned t = 0; t <= mask; t++, k = (k + 1) & mask) { if (tab[k] == h) return 1; if (!tab[k]) return 0; } return 0; }
+static void nm_probe(A64 *c, uint64_t va, uint64_t pc) {
+    if (MMU_ON(c) && (va >> 40) != 0xffffffull) return;   /* kernel virtual addresses only (physical when the MMU is off) */
+    int inimg = c->cov && va - c->cov_base < c->cov_len;
+    if (inimg) { unsigned k = (unsigned)((va >> 2) & 4095); for (unsigned t = 0; t < 4096; t++, k = (k + 1) & 4095) { if (c->nm_seenp[k] == va) return; if (!c->nm_seenp[k]) { c->nm_seenp[k] = va; break; } } }
+    uint64_t pa; if (a64_virt_to_phys(c, va, &pa)) return;
+    uint64_t room = 4096 - (pa & 0xfff); if (room > 47) room = 47;
+    uint8_t *p = ptr(c, pa, room); if (!p) return;
+    char b[48]; unsigned n = 0, mark = 0;
+    while (n < room && p[n]) { unsigned char ch = p[n]; if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '#' || ch == ',' || ch == '.' || ch == '_' || ch == '-')) return; if (ch == '-' || ch == ',' || ch == '#') mark = 1; b[n] = (char)ch; n++; }
+    if (n < 4 || n >= 40 || n == room || !mark || !((b[0] >= 'a' && b[0] <= 'z') || b[0] == '#')) return;
+    b[n] = 0; uint32_t h = nm_fnv(b);
+    if (nm_has(c->nm_evh, 8191, h)) return;
+    { unsigned k = h & 8191; for (unsigned t = 0; t < 8192; t++, k = (k + 1) & 8191) if (!c->nm_evh[k]) { c->nm_evh[k] = h; break; } }
+    if (nm_has(c->nm_dth, 16383, h)) return;
+    if (c->nm_n < 256) { memcpy(c->nm[c->nm_n], b, n + 1); c->nm_pc[c->nm_n] = pc; c->nm_n++; }
+}
 static const A64Dev *find_dev(const A64 *c, uint64_t a, unsigned n) {
     for (int k = 0; k < c->ndev; k++) {
         const A64Dev *d = &c->devs[k];
@@ -1176,6 +1201,7 @@ static int step(A64 *c) {
             if (to < c->cov_len && !(c->callseen[to >> 5] & (1u << ((to >> 2) & 7)))) { c->callseen[to >> 5] |= (uint8_t)(1u << ((to >> 2) & 7)); c->callring[c->call_total++ % 160] = tg; }
         }
     }
+    if (c->nm_on && ((i & 0xfc000000u) == 0x94000000u || (i & 0xfffffc1fu) == 0xd63f0000u || (i & 0xfffff800u) == 0xd73f0800u)) { nm_probe(c, c->x[1], pc); nm_probe(c, c->x[2], pc); }
     if (c->pp2_pc && pc == c->pp2_pc && !c->pp2_hit && c->x[c->pp2_reg & 31] == c->pp2_val) { c->pp2_hit = 1; memcpy(c->pp2_x, c->x, sizeof c->x); c->pp2_sp = c->sp; }
     if (c->pp_pc && pc == c->pp_pc && !c->pp_hit && c->x[c->pp_reg & 31] == c->pp_val) { c->pp_hit = 1; memcpy(c->pp_x, c->x, sizeof c->x); c->pp_sp = c->sp; }
     if (c->tr_pc) { if (!c->tr_on && pc == c->tr_pc) c->tr_on = 1; if (c->tr_on && c->tr_n < 400) c->tr_pcs[c->tr_n++] = pc; }

@@ -267,6 +267,7 @@ static uint64_t g_dt_phys, g_diag_va[6], g_diag_len[6], g_ddv[3], g_ddl[3]; stat
 void a64m_set_diag_code(A64Machine *m, uint64_t va, uint64_t len) { (void)m; if (!va) { g_diag_n = 0; return; } if (g_diag_n < 6) { g_diag_va[g_diag_n] = va; g_diag_len[g_diag_n] = len; g_diag_n++; } }
 void a64m_set_pc_probe2(A64Machine *m, uint64_t pc, unsigned reg, uint64_t val) { m->cpu.pp2_pc = pc; m->cpu.pp2_reg = reg; m->cpu.pp2_val = val; m->cpu.pp2_hit = 0; }
 void a64m_set_pc_probe(A64Machine *m, uint64_t pc, unsigned reg, uint64_t val) { m->cpu.pp_pc = pc; m->cpu.pp_reg = reg; m->cpu.pp_val = val; m->cpu.pp_hit = 0; }
+void a64m_nm_add_dt_name(A64Machine *m, const char *name) { a64_nm_add_dt_name(&m->cpu, name); }
 void a64m_set_diag_table(A64Machine *m, uint64_t va, uint64_t stride, uint64_t n) { (void)m; g_tbl_va = va; g_tbl_stride = stride; g_tbl_n = n; }
 void a64m_set_diag_data(A64Machine *m, uint64_t va, uint64_t len) { a64m_set_diag_data2(m, 0, va, len); }
 void a64m_set_diag_data2(A64Machine *m, unsigned idx, uint64_t va, uint64_t len) { (void)m; if (idx < 3) { g_ddv[idx] = va; g_ddl[idx] = len; } }
@@ -286,6 +287,14 @@ static void dump_refs(A64Machine *m) {
     { unsigned tot = m->cpu.call_total, n = tot < 40 ? tot : 40;   /* 0.4.20: 160 lines cut the log (20000 chars) before the watches */
       a64m_log(m, "[stop] the last %u of %u functions called for the FIRST time (bl targets), oldest first, 8 per line:\n", n, tot);
       for (unsigned q = 0; q < n; q += 8) { char l2[200]; int o2 = 0; for (unsigned r = q; r < q + 8 && r < n; r++) o2 += snprintf(l2 + o2, sizeof l2 - (size_t)o2, " %llx", (unsigned long long)m->cpu.callring[(tot - n + r) % 160]); a64m_log(m, "[stop] %s\n", l2); } }
+    if (m->cpu.nm_on) {   /* 0.4.79 */
+        a64m_log(m, "[stop] DeviceTree names probe (HEURISTIC): %u lowercase dashed strings passed as x1/x2 to calls look like DT property names but are NOT in the DeviceTree (first %u, in order of first use; pc = call site; some may be other registry keys, not DT properties):\n", m->cpu.nm_n, m->cpu.nm_n);
+        char l3[220]; int o3 = 0;
+        for (unsigned q = 0; q < m->cpu.nm_n; q++) {
+            o3 += snprintf(l3 + o3, sizeof l3 - (size_t)o3, " %s@%llx", m->cpu.nm[q], (unsigned long long)m->cpu.nm_pc[q]);
+            if (o3 > 150 || q + 1 == m->cpu.nm_n) { a64m_log(m, "[stop]%s\n", l3); o3 = 0; l3[0] = 0; }
+        }
+    }
     if (!g_ref_n) return;
     uint64_t lo = m->cpu.cov_base, len = m->cpu.cov_len;
     for (unsigned t = 0; t < g_ref_n; t++) {
