@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
     }
     { /* 0.4.79: probe for lowercase dashed names passed to calls that are not DeviceTree property names */
         A64Machine *m = a64m_create_system(1u << 20);
-        a64m_nm_add_dt_name(m, "present-name");
+        a64m_nm_add_dt_name(m, "present-name"); a64m_set_coverage(m, A64M_RAM_BASE, 0x1000);   /* strings count only inside the kernel image range */
         uint32_t code[] = { 0x94000002, 0x14000000, 0xD65F03C0 };   /* bl +8 ; b . ; ret */
         memcpy(a64m_ram_at(m, A64M_RAM_BASE, sizeof code), code, sizeof code);
         const char *strs[] = { "voltage-states5", "present-name", "Capital-Name", "plain", "voltage-states5", "x" };
