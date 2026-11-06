@@ -741,6 +741,16 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           LOG("[boot] MODELLED: %d more /arm-io DeviceTree nodes became unknown zero blocks (%d skipped: empty/huge range or overlapping one already modelled). ASSUMPTION: their real registers are UNKNOWN here; reads return 0, writes are ignored\n", addedn, skipped);
           LOG("[boot] MODELLED: 'dapf' blocks ('dapf-aop' and %d more) read back the last value written to a register (0 if none). Reason (the kernel's own code, AppleDAPF.cpp:158): it writes 0x80000001 to +0x0 and requires to read the same value back. ASSUMPTION: this is only a read-back, the real DAPF filter behaviour is NOT modelled\n", ndapf); }
     }
+    { /* 0.4.80 diagnostic (changes nothing): log 0.4.79 shows the watchdog panic again (clock speed 0). Which frequency properties does the IPSW tree really carry, and are they zero placeholders? */
+      static const char *const pn[] = { "timebase-frequency", "clock-frequency", "bus-frequency", "fixed-frequency", "memory-frequency", "peripheral-frequency", "bus-frequency-min", "bus-frequency-max", "cpu-frequency", "usbphy-frequency", "soc-generation" };
+      static const char *const nd[] = { "cpu0", "arm-io", "device-tree" };
+      char ln[900]; size_t lo = 0; ln[0] = 0;
+      for (unsigned z = 0; z < sizeof nd / sizeof nd[0]; z++) for (unsigned y = 0; y < sizeof pn / sizeof pn[0]; y++) {
+          char w[160]; int pl = a64_dt_node_prop_words(dt, dtlen, nd[z], pn[y], w, sizeof w);
+          if (pl >= 0 && lo < sizeof ln - 200) lo += (size_t)snprintf(ln + lo, sizeof ln - lo, " %s/%s(%d)=%s", nd[z], pn[y], pl, pl ? w : "-");
+      }
+      { char w[160]; int pl = a64_dt_node_prop_words(dt, dtlen, "arm-io", "clock-frequencies", w, sizeof w); if (pl >= 0 && lo < sizeof ln - 200) lo += (size_t)snprintf(ln + lo, sizeof ln - lo, " arm-io/clock-frequencies(%d) first words=%s", pl, w); }
+      LOG("[boot] diagnostic (changes nothing): frequency-like DeviceTree properties:%s\n", lo ? ln : " none found"); }
     { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
