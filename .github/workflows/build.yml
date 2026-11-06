@@ -5,23 +5,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack xnuron.zip
-        run: unzip -q xnuron.zip
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v3
         with: { gradle-version: 8.7 }
       - name: Tools for host tests
         run: sudo apt-get update && sudo apt-get install -y clang lld llvm zlib1g-dev
-      - name: Host tests
-        working-directory: xnuron
+      - name: Host tests (core, instructions, differential, system mode, loaders, JNI)
         run: |
           export LD64=$(ls /usr/lib/llvm-*/bin/ld64.lld | head -1)
           tests/run_all.sh
-      - name: Build APK
-        working-directory: xnuron
-        run: gradle assembleDebug
+      - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: xnuron-apk
-          path: xnuron/app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk

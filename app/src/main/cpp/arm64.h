@@ -1,0 +1,143 @@
+/*
+ * XNUron - ARM64 (AArch64) interpreter core.  Written from scratch.
+ *
+ * Two operating modes:
+ *   A64_MODE_USER   (default)  EL0 user-mode emulation with high-level-emulated
+ *                              system calls (Linux: x8 + "svc #0", XNU/BSD:
+ *                              x16 + "svc #0x80").  Any guest error is a fatal
+ *                              emulator fault (a64_run returns -1).
+ *   A64_MODE_SYSTEM            EL0/EL1 system emulation: exception vectors,
+ *                              ESR/ELR/SPSR/VBAR, ERET, banked SP, DAIF,
+ *                              IRQ delivery, generic virtual timer, system
+ *                              registers, MMIO devices.  Guest errors become
+ *                              architectural exceptions, like on real hardware.
+ *
+ * NOT implemented (explicit limits, see docs/FEASIBILITY.md):
+ *   MMU / address translation (the guest sees physical addresses; enabling
+ *   SCTLR_EL1.M is reported as an emulator fault instead of being ignored),
+ *   EL2/EL3, AArch32, FP/SIMD (undefined instruction), LSE atomics, pointer
+ *   authentication (PAC instructions behave as unsigned identity), caches/TLB
+ *   (maintenance ops are NOPs), multiple cores, Apple-specific system
+ *   registers (SPRR/GXF/APRR), and everything an Apple SoC provides.
+ */
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void (*A64Out)(void *ud, const char *buf, size_t len);
+typedef uint64_t (*A64MmioRead)(void *ud, uint64_t off, unsigned size);
+typedef void (*A64MmioWrite)(void *ud, uint64_t off, unsigned size, uint64_t val);
+/* Called when user-mode HLE meets a syscall it does not implement. */
+typedef void (*A64UnimplSvc)(void *ud, bool bsd, uint64_t num);
+
+typedef struct {
+    uint64_t base, size;
+    A64MmioRead read;
+    A64MmioWrite write;
+    void *ud;
+    const char *name;
+} A64Dev;
+
+enum { A64_MODE_USER = 0, A64_MODE_SYSTEM = 1 };
+enum { A64_RUN_HALTED = 0, A64_RUN_LIMIT = 1, A64_RUN_IDLE = 2, A64_RUN_FAULT = -1 };
+
+#define A64_MAX_DEVS 400   /* 0.4.58: was 16 (8 before); every /arm-io node of the DeviceTree can become an unknown block */
+#define A64_PC_HIST 48
+#define A64_TIMER_HZ 24000000ull   /* CNTFRQ_EL0; 1 executed instruction == 1 tick */
+
+typedef struct {
+    uint64_t x[31];          /* X0..X30 */
+    uint64_t sp, pc;         /* sp = currently selected stack pointer */
+    bool n, z, c, v;         /* NZCV flags */
+    uint8_t *mem;            /* flat guest RAM */
+    uint64_t base, size;     /* guest address of mem[0], and its length */
+    bool halted;
+    int exit_code;
+    int fault;               /* 0 = none; non-zero = fatal emulator fault */
+    uint64_t steps;          /* instructions executed (also the time base) */
+    A64Out out;              /* write(1/2, ...) goes here (user mode HLE) */
+    void *ud;
+    char err[360];
+
+    /* ---- system mode state ---- */
+    int mode;                /* A64_MODE_* */
+    int el;                  /* current exception level, 0 or 1 */
+    int spsel;               /* PSTATE.SP: 1 = use SP_EL1 at EL1 */
+    unsigned daif;           /* D=8 A=4 I=2 F=1 (1 = masked) */
+    uint64_t sp_bank[2];     /* SP_EL0, SP_EL1 (the active one lives in sp) */
+    uint64_t elr_el1, spsr_el1, esr_el1, far_el1, vbar_el1;
+    uint64_t sctlr_el1, tcr_el1, ttbr0_el1, ttbr1_el1, mair_el1, cpacr_el1;
+    uint64_t tpidr_el0, tpidr_el1, tpidrro_el0, contextidr_el1;
+    uint64_t fpcr, fpsr;
+    uint64_t vr[32][2];      /* SIMD&FP registers V0..V31 (little-endian 128 bit) */
+    /* MMU (stage 1, EL1&0): software TLB at 4 KiB granularity, keyed by virtual page (bit 63 = valid) */
+    uint64_t tlb_tag[256], tlb_pa[256];
+    bool if_valid; uint64_t if_pg, if_pa;        /* last instruction-fetch page */
+    uint64_t pac_key[10];    /* PAC key registers (stored, but signatures are not computed: see exec) */
+    uint64_t actlr_el1, amair_el1, par_el1, cntkctl_el1, csselr_el1;
+    uint64_t cntv_ctl, cntv_cval;
+    uint64_t cntp_ctl, cntp_cval;   /* EL1 physical timer (CNTP_*_EL0): registers + ISTATUS only; its interrupt is NOT delivered (Apple routes it as FIQ, not modelled) */
+    uint64_t cnt_skip;       /* virtual time added by idle fast-forward */
+    bool irq_line;           /* level of the external IRQ input */
+    bool idle;               /* executed WFI with nothing to wake it */
+    uint64_t idle_ticks;     /* ticks until the timer fires (0 = never) */
+    bool pan;                                  /* PSTATE.PAN: tracked and saved/restored, NOT enforced (no permission checks) */
+    bool excl_valid; uint64_t excl_addr;
+    A64Dev devs[A64_MAX_DEVS]; int ndev;
+    /* Apple implementation-defined registers (op0=3, CRn=15): when enabled they read as zero and ignore
+     * writes (NOT their real behaviour); each access is reported through on_impl_reg. */
+    bool stub_impl_regs; uint64_t (*on_impl_reg)(void *ud, unsigned key, bool write, uint64_t val); void *impl_ud;
+    char trap_note[120];     /* last decoded cause of a trapped system-register access */
+    uint64_t exc0_q[8][8]; uint8_t exc0_qok[8];   /* 64 bytes behind x0..x7 at the first exception (kernel pointers only) */
+    uint64_t pp_pc, pp_val, pp_x[31], pp_sp; unsigned pp_reg; int pp_hit;
+    uint64_t pp2_pc, pp2_val, pp2_x[31], pp2_sp; unsigned pp2_reg; int pp2_hit;   /* second pc probe */   /* pc probe: registers captured the first time pc == pp_pc and x[pp_reg] == pp_val */
+    uint64_t fiq_count;      /* CNTP FIQs delivered (MODELLED, diagnostics) */
+    uint64_t exc_count;      /* exceptions taken (diagnostics) */
+    struct { uint32_t esr; int kind; uint64_t elr, far, steps; } exc_first[8];   /* the first exceptions taken (diagnostics) */
+    uint64_t exc0_x[31], exc0_sp; bool exc0_valid; uint64_t exc0_pc[A64_PC_HIST]; unsigned exc0_pcn;       /* registers at the very first exception */
+    int exc_first_n; uint64_t exc_last_step; unsigned exc_burst;
+    uint64_t pc_hist[A64_PC_HIST]; unsigned pc_hist_i;
+    #define A64_ACC_HIST 40
+    struct A64Acc { uint64_t pc, va, val; uint8_t wr, sz; } acc[A64_ACC_HIST], exc0_acc[A64_ACC_HIST]; unsigned acc_i, exc0_acc_n;   /* ring of the latest data accesses (diagnostic) */
+    uint64_t at_n, at_va, at_par;   /* AT instructions executed: count and the last (va, PAR_EL1) */
+    uint64_t mpidr; uint64_t exc0_chain[8][2]; unsigned exc0_chain_n; uint64_t tp_log[6][2]; unsigned tp_n;   /* frame chain at first exception; first TPIDR_EL1 writes (pc,value) */
+    struct { uint64_t lo, hi; unsigned n; struct { uint64_t pc, addr, val; uint8_t sz; } e[8]; } swb[2];   /* diagnostic: first stores to two more kernel globals */
+    uint64_t xab_pa; unsigned xab_n; int xab_w;   /* diagnostic: first access that hit no RAM and no device (physical address) */
+    uint8_t *cov, *callseen; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
+    uint64_t tr_pc; unsigned tr_n; int tr_on; uint64_t tr_pcs[400];   /* diagnostic: the 400 pcs executed from the first execution of tr_pc on */
+    uint64_t ctr_pc; int ctr_mode; unsigned ctr_total; unsigned ctr_n; uint64_t ctr[40][8];   /* diagnostic: x0..x6 and lr at each entry of one function */
+    uint64_t vw_val; unsigned vw_n; struct { uint64_t pc, va, pa, lr, x[4]; uint8_t sz; } vw[8];   /* diagnostic: stores of a given value */
+    uint64_t sw_lo, sw_hi; unsigned sw_n; struct { uint64_t pc, addr, val; uint8_t sz; } sw[16]; uint64_t sw_x[4][31];   /* diagnostic: first stores to a physical range (kernel global) */
+    uint64_t aw_val; unsigned aw_n; struct { uint64_t steps, pc, tgt, x1, x2; char kind; } aw[48];   /* diagnostic: calls with x0/x1 == value, returns with x0 == value */
+    uint64_t bh_lo, bh_hi; unsigned bh_n; struct { uint64_t steps, pc, lr, lr2, off, val; uint8_t sz, wr; } bh[64];   /* diagnostic: history of accesses to a physical block */
+    uint64_t watch_lo, watch_hi; unsigned watch_n; struct { uint64_t pc, addr, val; uint8_t wr, sz; } watch[24];   /* diagnostic: accesses to a physical range (boot_args) */
+    A64UnimplSvc on_unimpl_svc;
+} A64;
+
+void a64_init(A64 *c, uint8_t *mem, uint64_t base, uint64_t size);
+/* Switch to system mode: EL1h, all DAIF masked, MMU off (reset-like state). */
+void a64_system_init(A64 *c);
+int  a64_add_device(A64 *c, const A64Dev *d);   /* 0 ok, -1 table full/overlap */
+
+/* returns A64_RUN_HALTED, _LIMIT (step limit hit), _IDLE (WFI, nothing can
+ * wake the core until a device raises IRQ or time advances), _FAULT (c->err). */
+int a64_run(A64 *c, uint64_t max_steps);
+/* Add virtual time (used by hosts that sleep while the guest idles). */
+void a64_advance_time(A64 *c, uint64_t ticks);
+uint64_t a64_counter(const A64 *c);
+/* True when an interrupt is currently asserted towards the core. */
+bool a64_irq_asserted(const A64 *c);
+/* Debug helper: translates va through the guest page tables exactly like a load would (no side effects).
+ * With the MMU off, pa = va. Returns 0 on success, -1 if the address is not mapped. */
+int a64_virt_to_phys(A64 *c, uint64_t va, uint64_t *pa);
+void a64_walk_trace(A64 *c, uint64_t va, char *out, size_t cap);   /* debug text for panic reports */
+/* Formats the last executed PCs (oldest first) for fault diagnostics. */
+size_t a64_format_pc_history(const A64 *c, char *buf, size_t cap);
+
+#ifdef __cplusplus
+}
+#endif
