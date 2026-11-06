@@ -478,7 +478,7 @@ int a64_dt_node_add_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *no
     np++; memcpy(d + na.hdr, &np, 4); *n += 36; return 1;
 }
 /* 0.4.74: add a property of `len` zero bytes to the first node with this name; 1 added, 0 exists, -1 no room, -2 no node. */
-int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len) {
+int a64_dt_node_add_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, const void *data, size_t len) {
     DtNodeAt na; memset(&na, 0, sizeof na); na.node = node; size_t pos = 0;
     if (dt_nodeat_walk(d, *n, &pos, 0, &na) < 0) return -1;
     if (!na.found) return -2;
@@ -488,10 +488,11 @@ int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *nod
     if (*n + add > cap) return -1;
     memmove(d + na.ins + add, d + na.ins, *n - na.ins);
     memset(d + na.ins, 0, add); strncpy((char *)d + na.ins, prop, 31);
-    uint32_t l32 = (uint32_t)len; memcpy(d + na.ins + 32, &l32, 4);
+    uint32_t l32 = (uint32_t)len; memcpy(d + na.ins + 32, &l32, 4); if (data && len) memcpy(d + na.ins + 36, data, len);
     np++; memcpy(d + na.hdr, &np, 4); *n += add; return 1;
 }
 /* 0.4.79: call cb(name) for every property name of every node of the flattened DeviceTree; returns the count, -1 malformed. */
+int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len) { return a64_dt_node_add_prop(d, n, cap, node, prop, NULL, len); }
 static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, void (*cb)(const char *, void *), void *ud) {
     if (depth > 32 || *pos + 8 > n) return -1;
     uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8; int cnt = 0;
@@ -639,6 +640,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
                   if (a3 == 1) { size_t l = strlen(added); snprintf(added + l, sizeof added - l, "%s%d", na3 ? "," : "", vi); na3++; } else if (a3 < 0) bad = a3; }
                 if (na3) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'voltage-states<N>' properties of ONE all-zero 8-byte entry to the 'pmgr' node for N = %s (the IPSW tree lacks them; ApplePMGR.cpp:899 panics '%%s not found'; an EMPTY table makes the kernel index entry count-1 = -1 and fault, 0.4.76). The 8-byte entry stride is taken from the kernel's own code (index<<3 at 0x81713a0), what the two words mean is NOT known. ASSUMPTION: the real tables are chip-specific data that iBoot supplies; NO voltage/frequency values are invented, the entry is zeros\n", added);
                 if (bad) LOG("[boot] WARNING: could not add some 'voltage-states<N>' to the 'pmgr' node (%d)\n", bad); }
+              { static const uint32_t f24 = 24000000u;   /* 0.4.82: log 0.4.81 */
+                int a6 = a64_dt_node_add_prop(dt, &dtlen, dtcap, "cpu0", "fixed-frequency", &f24, 4);
+                if (a6 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'fixed-frequency' = 24000000 (u32) to the 'cpu0' node. The IPSW tree carries none of the cpu frequency properties (bus-/memory-/peripheral-/fixed-/clock-frequency: iBoot fills them); the kernel's frequency globals (dump at 0xfffffff00914e128) are 0 except the timebase = 24 MHz, and the watchdog (AppleS5L8960XWatchDogTimer.cpp:55) panics 'clock speed 0 does not match absolute time'. ASSUMPTION: the watchdog's clock is the fixed oscillator and equals the timebase (24 MHz) - the kernel's own check demands exactly that, and 24 MHz is the timebase this emulator models. Bus/memory/peripheral/cpu frequencies stay absent (unknown, NOT invented)\n");
+                else if (a6 != 0) LOG("[boot] WARNING: could not add 'fixed-frequency' to 'cpu0' (%d)\n", a6); }
               { int64_t cl = -1; char lg[256]; int a4 = a64_dt_node_info(dt, dtlen, "arm-io", "clock-frequencies", &cl, lg, sizeof lg);   /* 0.4.74: log 0.4.73: method 0x814fc38 returns 0 unless arm-io has BOTH clock-frequencies and clock-frequencies-nclk */
                 if (a4 >= 0 && cl > 0) { int a5 = a64_dt_node_add_zero_prop(dt, &dtlen, dtcap, "arm-io", "clock-frequencies-nclk", (size_t)cl);
                   if (a5 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'clock-frequencies-nclk' (%lld zero bytes, same size as 'clock-frequencies') to /arm-io. AppleT802xIO::start needs both properties; the IPSW tree has only 'clock-frequencies' (all zeros). ASSUMPTION: iBoot fills both with chip data that is UNKNOWN here; NO frequency or clock-type values are invented. Expect the watchdog check (clock speed vs 24 MHz timebase) to still see 0 until the real table layout is understood\n", (long long)cl);

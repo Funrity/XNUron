@@ -202,6 +202,13 @@ int main(int argc, char **argv) {
         CHECK(cp->nm_n == 1 && !strcmp(cp->nm[0], "voltage-states5"), "probe lists exactly the missing dashed name once: n=%u first=%s", cp->nm_n, cp->nm_n ? cp->nm[0] : "-");
         a64m_destroy(m);
     }
+    { /* 0.4.82: property with data */
+        uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(1, 1); PROP("name", 5, "root"); NODE(1, 0); PROP("name", 5, "cpu0");
+        uint32_t v = 24000000u; int r = a64_dt_node_add_prop(dt, &q, sizeof dt, "cpu0", "fixed-frequency", &v, 4);
+        char w[40]; int pl = a64_dt_node_prop_words(dt, q, "cpu0", "fixed-frequency", w, sizeof w);
+        CHECK(r == 1 && pl == 4 && !strcmp(w, "16e3600"), "added property keeps its data: r=%d len=%d words=%s", r, pl, w);
+    }
     { /* 0.4.64: pmgr optional bridges fix-up */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(4, 0);
