@@ -273,7 +273,7 @@ static void nm_probe(A64 *c, uint64_t va, uint64_t pc) {
     uint64_t room = 4096 - (pa & 0xfff); if (room > 47) room = 47;
     uint8_t *p = ptr(c, pa, room); if (!p) return;
     char b[48]; unsigned n = 0, mark = 0;
-    while (n < room && p[n]) { unsigned char ch = p[n]; if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '#' || ch == ',' || ch == '.' || ch == '_' || ch == '-')) return; if (ch == '-' || ch == '#') mark = 1; if (ch == ',') return; b[n] = (char)ch; n++; }
+    while (n < room && p[n]) { unsigned char ch = p[n]; if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '#' || ch == ',' || ch == '.' || ch == '_' || ch == '-')) return; if (ch == '-' || ch == '#') mark = 1; if (ch == ',' || ch == '.') return; b[n] = (char)ch; n++; }
     if (n < 4 || n >= 40 || n == room || !mark || !((b[0] >= 'a' && b[0] <= 'z') || b[0] == '#')) return;
     b[n] = 0; uint32_t h = nm_fnv(b);
     if (nm_has(c->nm_evh, 8191, h)) return;

@@ -290,9 +290,9 @@ static void dump_refs(A64Machine *m) {
     if (m->cpu.nm_on) {   /* 0.4.79 */
         a64m_log(m, "[stop] DeviceTree names probe (HEURISTIC): %u lowercase dashed strings passed as x1/x2 to calls look like DT property names but are NOT in the DeviceTree (first %u, in order of first use; pc = call site; some may be other registry keys, not DT properties):\n", m->cpu.nm_n, m->cpu.nm_n);
         char l3[220]; int o3 = 0;
-        for (unsigned q = 0; q < m->cpu.nm_n; q++) {
+        for (unsigned q = 0; q < m->cpu.nm_n && q < 48; q++) {   /* 0.4.81: at most 48 names, the log is cut at 20000 characters and the probe list swallowed the exception list in 0.4.80 */
             o3 += snprintf(l3 + o3, sizeof l3 - (size_t)o3, " %s@%llx", m->cpu.nm[q], (unsigned long long)m->cpu.nm_pc[q]);
-            if (o3 > 150 || q + 1 == m->cpu.nm_n) { a64m_log(m, "[stop]%s\n", l3); o3 = 0; l3[0] = 0; }
+            if (o3 > 150 || q + 1 == m->cpu.nm_n || q + 1 == 48) { a64m_log(m, "[stop]%s\n", l3); o3 = 0; l3[0] = 0; }
         }
     }
     if (!g_ref_n) return;
