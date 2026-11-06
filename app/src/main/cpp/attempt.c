@@ -477,6 +477,20 @@ int a64_dt_node_add_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *no
     memset(d + na.ins, 0, 36); strncpy((char *)d + na.ins, prop, 31);   /* length field stays 0 */
     np++; memcpy(d + na.hdr, &np, 4); *n += 36; return 1;
 }
+/* 0.4.74: add a property of `len` zero bytes to the first node with this name; 1 added, 0 exists, -1 no room, -2 no node. */
+int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len) {
+    DtNodeAt na; memset(&na, 0, sizeof na); na.node = node; size_t pos = 0;
+    if (dt_nodeat_walk(d, *n, &pos, 0, &na) < 0) return -1;
+    if (!na.found) return -2;
+    uint32_t np; memcpy(&np, d + na.hdr, 4); size_t p = na.hdr + 8;
+    for (uint32_t i = 0; i < np; i++) { uint32_t l; memcpy(&l, d + p + 32, 4); l &= 0x7FFFFFFFu; if (!strncmp((const char *)d + p, prop, 32)) return 0; p += 36 + (((size_t)l + 3) & ~(size_t)3); }
+    size_t add = 36 + ((len + 3) & ~(size_t)3);
+    if (*n + add > cap) return -1;
+    memmove(d + na.ins + add, d + na.ins, *n - na.ins);
+    memset(d + na.ins, 0, add); strncpy((char *)d + na.ins, prop, 31);
+    uint32_t l32 = (uint32_t)len; memcpy(d + na.ins + 32, &l32, 4);
+    np++; memcpy(d + na.hdr, &np, 4); *n += add; return 1;
+}
 /* 0.4.23 (MODELLED): fixed pseudo-random bytes (xorshift64*, constant seed) instead of host entropy. Real iBoot uses a hardware RNG; with host entropy the kernel's
  * zone/KASLR randomisation changed every run, so a failing run could not be reproduced. Same bytes every run = same kernel behaviour = comparable logs. */
 static int host_random(void *buf, size_t n) {
@@ -608,6 +622,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
               { int a3 = a64_dt_node_add_empty_prop(dt, &dtlen, dtcap, "pmgr", "voltage-states1");   /* 0.4.65: log 0.4.64: ApplePMGR.cpp:899 "voltage-states1 not found" */
                 if (a3 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added an EMPTY (0 bytes) 'voltage-states1' property to the 'pmgr' node. The IPSW tree has voltage-states0/2/9 but not 1, and ApplePMGR (ApplePMGR.cpp:899) panics '%s not found'. ASSUMPTION: the real table is chip-specific data that iBoot supplies and is unknown here; NO voltage values are invented, the property only exists and is empty\n", "voltage-states1");
                 else if (a3 != 0) LOG("[boot] WARNING: could not add 'voltage-states1' to the 'pmgr' node (%d)\n", a3); }
+              { int64_t cl = -1; char lg[256]; int a4 = a64_dt_node_info(dt, dtlen, "arm-io", "clock-frequencies", &cl, lg, sizeof lg);   /* 0.4.74: log 0.4.73: method 0x814fc38 returns 0 unless arm-io has BOTH clock-frequencies and clock-frequencies-nclk */
+                if (a4 >= 0 && cl > 0) { int a5 = a64_dt_node_add_zero_prop(dt, &dtlen, dtcap, "arm-io", "clock-frequencies-nclk", (size_t)cl);
+                  if (a5 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'clock-frequencies-nclk' (%lld zero bytes, same size as 'clock-frequencies') to /arm-io. AppleT802xIO::start needs both properties; the IPSW tree has only 'clock-frequencies' (all zeros). ASSUMPTION: iBoot fills both with chip data that is UNKNOWN here; NO frequency or clock-type values are invented. Expect the watchdog check (clock speed vs 24 MHz timebase) to still see 0 until the real table layout is understood\n", (long long)cl);
+                  else if (a5 != 0) LOG("[boot] WARNING: could not add 'clock-frequencies-nclk' to /arm-io (%d)\n", a5); } }
               if (a1 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, iBoot does this): added /chosen 'security-domain' = 1 (the production security domain: ApSecurityDomain 1 of retail iOS firmware). AppleImage4 requires it.\n");
               if (a2 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, iBoot does this): added /chosen 'chip-epoch' = 0 (the name AppleImage4 looks up for CEPO, read from the kernel's own table). ASSUMPTION: the real value is a chip property that iBoot supplies; it is not in the IPSW and is unknown here, 0 is a placeholder. Nothing is verified against it in this emulator.\n");
               if (a1 < 0 || a2 < 0) LOG("[boot] DeviceTree: could not add the missing /chosen properties (tree malformed or no room)\n");

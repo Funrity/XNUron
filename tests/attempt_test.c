@@ -178,6 +178,16 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "nosuch", "y") == -2, "unknown node -> -2");
         size_t q2 = n0 + 10; CHECK(a64_dt_node_add_empty_prop(dt, &q2, sizeof dt, "pmgr", "z") == -1, "truncated tree -> -1");
     }
+    { /* 0.4.74: zero-filled property of a given length */
+        uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(1, 1); PROP("name", 5, "root"); NODE(2, 0); PROP("name", 7, "arm-io"); PROP("clock-frequencies", 8, ((uint32_t[2]){0, 0}));
+        size_t n0 = q; int r = a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "arm-io", "clock-frequencies-nclk", 8);
+        CHECK(r == 1 && q == n0 + 36 + 8, "add zero prop: r=%d size %zu -> %zu (want 1, +44)", r, n0, q);
+        int64_t pl = -1; char lg[600]; int ni = a64_dt_node_info(dt, q, "arm-io", "clock-frequencies-nclk", &pl, lg, sizeof lg);
+        CHECK(ni == 1 && pl == 8 && strstr(lg, "clock-frequencies(8)"), "added property has length 8 next to the old one: ni=%d pl=%lld log=%s", ni, (long long)pl, lg);
+        CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "arm-io", "clock-frequencies-nclk", 8) == 0 && q == n0 + 44, "second add is a no-op");
+        CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "nosuch", "y", 4) == -2, "unknown node -> -2");
+    }
     { /* 0.4.64: pmgr optional bridges fix-up */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(4, 0);
