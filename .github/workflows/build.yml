@@ -1,5 +1,15 @@
 name: Build APK
-on: [push, workflow_dispatch]
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # to publish the APK as a GitHub release
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -15,8 +25,25 @@ jobs:
         run: |
           export LD64=$(ls /usr/lib/llvm-*/bin/ld64.lld | head -1)
           tests/run_all.sh
-      - run: gradle assembleDebug
+      - name: Build APK
+        run: gradle assembleDebug
+      - name: Name the APK
+        id: ver
+        run: |
+          v=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          cp app/build/outputs/apk/debug/*.apk "XNUron-$v.apk"
       - uses: actions/upload-artifact@v4
         with:
-          name: xnuron-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: xnuron-apk-${{ steps.ver.outputs.name }}
+          path: XNUron-${{ steps.ver.outputs.name }}.apk
+      - name: Publish release (main only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.ver.outputs.name }}
+        run: |
+          gh release delete "v$V" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v$V" "XNUron-$V.apk" --target "$GITHUB_SHA" --prerelease \
+            --title "XNUron $V" \
+            --notes "Автоматическая сборка коммита ${GITHUB_SHA::7}. Экспериментальный эмулятор: iOS не запускается, подробности в README."
