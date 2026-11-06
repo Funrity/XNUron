@@ -614,7 +614,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         else LOG("[boot] DeviceTree: no cpu node with a 'state' property found, boot CPU not marked\n");
         char ch[1600]; size_t eb = 0; int ne = a64_dt_entropy(dt, dtlen, host_random, &eb, ch, sizeof ch);
         { /* 0.4.38 (MODELLED): properties AppleImage4 requires in /chosen that iBoot creates at run time and that the IPSW DeviceTree does not have */
-          size_t dtcap = dtlen + 256; uint8_t *nd = realloc(dt, dtcap);
+          size_t dtcap = dtlen + 2048; uint8_t *nd = realloc(dt, dtcap);
           if (nd) {
               dt = nd;
               int a1 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "security-domain", 1);

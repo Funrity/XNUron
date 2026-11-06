@@ -522,3 +522,6 @@ CI падал не на коде эмулятора, а на тестовых с
 - Лог 0.4.73 разобран: метод `0xfffffff00814fc38` (его вызывает `AppleT802xIO::start`) возвращает 0, если у узла `arm-io` нет **обоих** свойств `clock-frequencies` и `clock-frequencies-nclk`. В IPSW есть только `clock-frequencies` (384 байта, все нули); отсюда «clock frequencies not published in device tree».
 - MODELLED: в `arm-io` добавляется `clock-frequencies-nclk` той же длины, заполненное нулями. ASSUMPTION: настоящие значения подставляет iBoot, здесь они неизвестны; частоты и типы часов НЕ выдуманы. Ожидается, что проверка watchdog (частота против таймбазы 24 МГц) всё ещё увидит 0 — дальше нужно понять раскладку таблицы.
 - Тест на `a64_dt_node_add_zero_prop`.
+
+## 0.4.75
+- Лог 0.4.74: `could not add 'clock-frequencies-nclk' (-1)` — не хватило запаса в буфере DeviceTree (+256 байт, а свойство 384+36). Запас увеличен до 2048 байт. Остальное без изменений (стоп тот же: watchdog `clock speed 0`).
