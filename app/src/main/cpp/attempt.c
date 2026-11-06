@@ -757,6 +757,11 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       { int64_t pl2 = -1; char nl[700]; int r2 = a64_dt_node_info(dt, dtlen, "cpu0", "timebase-frequency", &pl2, nl, sizeof nl); if (r2 >= 0 && lo < sizeof ln - 750) lo += (size_t)snprintf(ln + lo, sizeof ln - lo, " cpu0 properties: %s;", nl); else if (lo < sizeof ln - 100) lo += (size_t)snprintf(ln + lo, sizeof ln - lo, " cpu0 node lookup=%d;", r2); }
       { char w[160]; int pl = a64_dt_node_prop_words(dt, dtlen, "arm-io", "clock-frequencies", w, sizeof w); if (pl >= 0 && lo < sizeof ln - 200) lo += (size_t)snprintf(ln + lo, sizeof ln - lo, " arm-io/clock-frequencies(%d) first words=%s", pl, w); }
       LOG("[boot] diagnostic (changes nothing): frequency-like DeviceTree properties:%s\n", lo ? ln : " none found"); }
+    { /* 0.4.83 diagnostic (changes nothing): log 0.4.82 passed the watchdog; ApplePMGR.cpp:1303 now panics "ECPU0 request ECPU.<n> > <m>" - what do the REAL voltage-states tables of the IPSW tree look like (length, first words)? */
+      char ln2[1500]; size_t l2 = 0; ln2[0] = 0;
+      for (int vi = 0; vi < 16; vi++) { char vn[24], w[120]; snprintf(vn, sizeof vn, "voltage-states%d", vi); int pl = a64_dt_node_prop_words(dt, dtlen, "pmgr", vn, w, sizeof w);
+        if (pl > 8 && l2 < sizeof ln2 - 200) l2 += (size_t)snprintf(ln2 + l2, sizeof ln2 - l2, " %s(%d)=%s;", vn, pl, w); }
+      LOG("[boot] diagnostic (changes nothing): pmgr voltage-states tables of the IPSW tree (length in bytes, first words; the added zero ones are not listed):%s\n", l2 ? ln2 : " none"); }
     { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }

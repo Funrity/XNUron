@@ -92,7 +92,7 @@ typedef struct {
      * writes (NOT their real behaviour); each access is reported through on_impl_reg. */
     bool stub_impl_regs; uint64_t (*on_impl_reg)(void *ud, unsigned key, bool write, uint64_t val); void *impl_ud;
     char trap_note[120];     /* last decoded cause of a trapped system-register access */
-    uint64_t exc0_q[8][8]; uint8_t exc0_qok[8];   /* 64 bytes behind x0..x7 at the first exception (kernel pointers only) */
+    uint64_t exc0_q[8][16]; uint8_t exc0_qok[8];   /* 64 bytes behind x0..x7 at the first exception (kernel pointers only) */
     uint64_t pp_pc, pp_val, pp_x[31], pp_sp; unsigned pp_reg; int pp_hit;
     uint64_t pp2_pc, pp2_val, pp2_x[31], pp2_sp; unsigned pp2_reg; int pp2_hit;   /* second pc probe */   /* pc probe: registers captured the first time pc == pp_pc and x[pp_reg] == pp_val */
     uint64_t fiq_count;      /* CNTP FIQs delivered (MODELLED, diagnostics) */

@@ -464,7 +464,8 @@ static void dump_exceptions(A64Machine *m) {
                 const uint64_t *q8 = c->exc0_q[r]; int okw = c->exc0_qok[r];
                 if (okw) {
                     a64m_log(m, "[stop]  x%d points to the 64-bit words %llx %llx %llx %llx %llx %llx %llx %llx\n", r, (unsigned long long)q8[0], (unsigned long long)q8[1], (unsigned long long)q8[2], (unsigned long long)q8[3], (unsigned long long)q8[4], (unsigned long long)q8[5], (unsigned long long)q8[6], (unsigned long long)q8[7]);
-                    for (int q = 0; q < 8; q++) { char tb[260]; if (q8[q] >= 0xffffffe000000000ull && text_at(m, q8[q], tb, sizeof tb) >= 4) a64m_log(m, "[stop]    x%d[%d] points to the text \"%s\"\n", r, q, tb); }
+                    a64m_log(m, "[stop]  x%d, words 8..15: %llx %llx %llx %llx %llx %llx %llx %llx\n", r, (unsigned long long)q8[8], (unsigned long long)q8[9], (unsigned long long)q8[10], (unsigned long long)q8[11], (unsigned long long)q8[12], (unsigned long long)q8[13], (unsigned long long)q8[14], (unsigned long long)q8[15]);
+                    for (int q = 0; q < 16; q++) { char tb[260]; if (q8[q] >= 0xffffffe000000000ull && text_at(m, q8[q], tb, sizeof tb) >= 4) a64m_log(m, "[stop]    x%d[%d] points to the text \"%s\"\n", r, q, tb); }
                 }
             }
         }
