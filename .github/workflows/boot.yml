@@ -26,8 +26,14 @@ jobs:
           C=app/src/main/cpp; LZ=$C/lzfse
           gcc -O2 -w -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
             $LZ/lzfse_decode.c $LZ/lzfse_decode_base.c $LZ/lzfse_fse.c $LZ/lzvn_decode_base.c -lm -lz -lpthread
+      - name: IPSW cache (only to save download time; the file comes from Apple's public server)
+        uses: actions/cache@v4
+        with:
+          path: ipsw.zip
+          key: ipsw-${{ inputs.device }}-${{ inputs.kernel_size }}
       - name: Find and download the IPSW (public Apple download, not stored in the repository)
         run: |
+          [ -s ipsw.zip ] && { echo "cached"; exit 0; }
           url=$(python3 tools/find_ipsw.py "${{ inputs.device }}" "${{ inputs.kernel_size }}")
           echo "IPSW: $url"
           curl -sSL --fail -o ipsw.zip "$url"; ls -l ipsw.zip
@@ -36,7 +42,6 @@ jobs:
           set +e
           ./boot_cli ipsw.zip "${{ inputs.max_msteps }}" > boot.log 2> boot.err
           cat boot.err; wc -c boot.log
-          rm -f ipsw.zip
       - uses: actions/upload-artifact@v4
         with: { name: boot-log, path: "boot.log\nboot.err" }
       - name: Publish the log as a release asset
