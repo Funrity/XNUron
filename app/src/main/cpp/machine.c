@@ -780,6 +780,8 @@ void a64m_msgbuf_sync(A64Machine *m) {
     else { mb_emit(m, b + m->mb.last, m->mb.size - m->mb.last); mb_emit(m, b, x); }
     m->mb.last = x;
 }
+static double g_t0 = 0;   /* 0.4.91: wall clock at the first a64m_run, for the speed line */
+static double mono_s(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; }
 static void finish(A64Machine *m, A64MState st) {
     if (m->attempt) a64m_msgbuf_sync(m);
     m->state = st;
@@ -791,6 +793,7 @@ static void finish(A64Machine *m, A64MState st) {
         a64m_log(m, "\n[emu] EMULATOR FAULT: %s\n[emu] last PCs: %s\n[emu] el=%d steps=%llu exceptions=%llu esr_el1=0x%llx elr_el1=0x%llx far_el1=0x%llx\n",
                  m->cpu.err, hist, m->cpu.el, (unsigned long long)m->cpu.steps, (unsigned long long)m->cpu.exc_count,
                  (unsigned long long)m->cpu.esr_el1, (unsigned long long)m->cpu.elr_el1, (unsigned long long)m->cpu.far_el1);
+        { double dt = g_t0 ? mono_s() - g_t0 : 0; if (dt > 0.001) a64m_log(m, "[emu] speed: %.1f s wall clock since the first run call, %.2f million guest instructions per second on average (includes time spent drawing/idle in the app)\n", dt, (double)m->cpu.steps / dt / 1e6); }
         if (m->attempt) {
             const A64 *c = &m->cpu; uint64_t pc = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 1) % A64_PC_HIST];
             uint32_t insn = 0; read_word(m, pc, &insn);
@@ -823,6 +826,7 @@ static void finish(A64Machine *m, A64MState st) {
 }
 
 A64MState a64m_run(A64Machine *m, uint64_t max_steps, bool realtime) {
+    if (g_t0 == 0) g_t0 = mono_s();
     if (m->state == A64M_POWEROFF || m->state == A64M_FAULT || m->state == A64M_STOPPED) return m->state;
     uint64_t done = 0;
     m->state = A64M_RUNNING;
