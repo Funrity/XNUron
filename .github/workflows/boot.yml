@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ipsw.zip
-          key: ipsw-${{ inputs.device }}-${{ inputs.kernel_size }}
+          key: ipsw-kc-${{ inputs.kernel_size }}
       - name: Find and download the IPSW (public Apple download, not stored in the repository)
         run: |
           [ -s ipsw.zip ] && { echo "cached"; exit 0; }
