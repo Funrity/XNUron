@@ -35,6 +35,7 @@ int a64_dt_find_pa(uint8_t *d, size_t n, uint64_t want, char *name, size_t ncap,
 int a64_dt_pmgr_optional_bridges(uint8_t *d, size_t n, uint32_t *nbr, uint32_t *oldm, uint32_t *newm, uint32_t *nmiss);   /* mark bridges without bridge-settings-<i> as optional in the 'pmgr' node, in place */
 int a64_dt_node_add_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop);   /* add a zero-length property to the first node with this name; 1 added, 0 exists, -1 no room, -2 no node */
 int a64_dt_node_add_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, const void *data, size_t len);   /* 0.4.82: add a property with data (NULL = zeros); 1 added, 0 exists, -1 no room, -2 no node */
+int a64_dt_node_fill_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, const void *data, size_t len);   /* 0.4.85: fill an existing zero-length property; 1 filled, 0 absent/not empty, -1 no room, -2 no node */
 int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len);   /* 0.4.74: add a zero-filled property of len bytes; 1 added, 0 exists, -1 no room, -2 no node */
 int a64_dt_node_prop_words(uint8_t *d, size_t n, const char *node, const char *prop, char *out, size_t cap);   /* 0.4.69: property data as hex u32 words */
 int a64_dt_node_info(uint8_t *d, size_t n, const char *node, const char *prop, int64_t *plen, char *log, size_t logcap);   /* property length of the first node with this name + all its property names */

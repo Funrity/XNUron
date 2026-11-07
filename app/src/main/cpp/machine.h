@@ -34,6 +34,10 @@ extern "C" {
 /* 0.4.51: size of the IPSW-attempt framebuffer (MODELLED) and of the pixel buffer the app uses; the demo display (270x480) is shown 2x */
 #define A64M_VID_W 540
 #define A64M_VID_H 960
+/* 0.4.85: the size of the IPSW attempt's framebuffer is a setting; A64M_VID_W/H are the defaults */
+void a64m_set_video_size(int w, int h);   /* clamped to 128..2400, even; applies to the next attempt */
+int a64m_video_w(void);
+int a64m_video_h(void);
 
 typedef struct A64Machine A64Machine;
 typedef struct { char name[28]; char compat[28]; uint64_t pa, size; } A64SocNode;   /* a DeviceTree node under /arm-io with its physical range (diagnostics only) */

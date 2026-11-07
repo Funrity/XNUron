@@ -13,8 +13,8 @@ import android.view.View;
 public class EmuView extends View {
     public interface TouchListener { void onTouch(int x, int y, boolean down); }
 
-    private final Bitmap bmp;
-    private final int[] pixels;
+    private Bitmap bmp;
+    private int[] pixels;
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Rect dst = new Rect();
@@ -34,6 +34,13 @@ public class EmuView extends View {
     }
 
     public int[] pixels() { return pixels; }
+    /** 0.4.85: the framebuffer size is a setting; call before the next run. */
+    public void resize(int w, int h) {
+        if (bmp != null && bmp.getWidth() == w && bmp.getHeight() == h) return;
+        pixels = new int[w * h];
+        bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        hasFrame = false;
+    }
     public void setTouchListener(TouchListener l) { listener = l; }
 
     /** Called with a fresh frame in pixels(). */

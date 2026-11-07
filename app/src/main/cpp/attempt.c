@@ -492,6 +492,27 @@ int a64_dt_node_add_prop(uint8_t *d, size_t *n, size_t cap, const char *node, co
     np++; memcpy(d + na.hdr, &np, 4); *n += add; return 1;
 }
 /* 0.4.79: call cb(name) for every property name of every node of the flattened DeviceTree; returns the count, -1 malformed. */
+/* 0.4.85: give an EXISTING zero-length property of the first node with this name `len` bytes of data (NULL = zeros). 1 filled, 0 absent or not empty, -1 no room/malformed, -2 no node. */
+int a64_dt_node_fill_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, const void *data, size_t len) {
+    DtNodeAt na; memset(&na, 0, sizeof na); na.node = node; size_t pos = 0;
+    if (dt_nodeat_walk(d, *n, &pos, 0, &na) < 0) return -1;
+    if (!na.found) return -2;
+    uint32_t np; memcpy(&np, d + na.hdr, 4); size_t p = na.hdr + 8;
+    for (uint32_t i = 0; i < np; i++) {
+        if (p + 36 > *n) return -1;
+        uint32_t l; memcpy(&l, d + p + 32, 4); uint32_t flag = l & 0x80000000u; l &= 0x7FFFFFFFu;
+        if (!strncmp((const char *)d + p, prop, 32)) {
+            if (l != 0) return 0;
+            size_t add = (len + 3) & ~(size_t)3;
+            if (*n + add > cap) return -1;
+            memmove(d + p + 36 + add, d + p + 36, *n - (p + 36));
+            memset(d + p + 36, 0, add); if (data && len) memcpy(d + p + 36, data, len);
+            uint32_t nl = (uint32_t)len | flag; memcpy(d + p + 32, &nl, 4); *n += add; return 1;
+        }
+        p += 36 + (((size_t)l + 3) & ~(size_t)3);
+    }
+    return 0;
+}
 int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len) { return a64_dt_node_add_prop(d, n, cap, node, prop, NULL, len); }
 static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, void (*cb)(const char *, void *), void *ud) {
     if (depth > 32 || *pos + 8 > n) return -1;
@@ -635,10 +656,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
               int a2 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "chip-epoch", 0);
               { /* 0.4.65/0.4.75: ApplePMGR.cpp:899 panics "voltage-statesN not found" one N per run (log 0.4.74: N=5 after N=1); every missing voltage-states0..15 becomes an empty property so the next runs do not stop on each index */
                 char vn[24], added[96] = ""; int na3 = 0, bad = 0;
+                char filled[96] = ""; int nfill = 0;
                 for (int vi = 0; vi < 16; vi++) { snprintf(vn, sizeof vn, "voltage-states%d", vi);
+                  if (a64_dt_node_fill_empty_prop(dt, &dtlen, dtcap, "pmgr", vn, NULL, 8) == 1) { size_t l = strlen(filled); snprintf(filled + l, sizeof filled - l, "%s%d", nfill ? "," : "", vi); nfill++; continue; }   /* 0.4.85: an existing but EMPTY table */
                   int a3 = a64_dt_node_add_zero_prop(dt, &dtlen, dtcap, "pmgr", vn, 8);
                   if (a3 == 1) { size_t l = strlen(added); snprintf(added + l, sizeof added - l, "%s%d", na3 ? "," : "", vi); na3++; } else if (a3 < 0) bad = a3; }
                 if (na3) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'voltage-states<N>' properties of ONE all-zero 8-byte entry to the 'pmgr' node for N = %s (the IPSW tree lacks them; ApplePMGR.cpp:899 panics '%%s not found'; an EMPTY table makes the kernel index entry count-1 = -1 and fault, 0.4.76). The 8-byte entry stride is taken from the kernel's own code (index<<3 at 0x81713a0), what the two words mean is NOT known. ASSUMPTION: the real tables are chip-specific data that iBoot supplies; NO voltage/frequency values are invented, the entry is zeros\n", added);
+                if (nfill) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): the IPSW tree has EMPTY (0 bytes) 'voltage-states<N>' tables for N = %s; an empty table gives a perf domain with 0 states and ApplePMGR.cpp:1303 panics 'ECPU0 ... request ECPU.0 > 0' (log 0.4.84, code decoded: needs state count > requested index 0). They now hold ONE entry {0,0} (8 zero bytes), like the first entry of the real tables (voltage-states0 = {0,0},{1,0},{2,0}). ASSUMPTION: iBoot fills the real voltages/states; NO values are invented\n", filled);
                 if (bad) LOG("[boot] WARNING: could not add some 'voltage-states<N>' to the 'pmgr' node (%d)\n", bad); }
               { static const uint32_t f24 = 24000000u;   /* 0.4.82: log 0.4.81 */
                 int a6 = a64_dt_node_add_prop(dt, &dtlen, dtcap, "cpu0", "fixed-frequency", &f24, 4);
@@ -700,9 +724,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         if (top + 0x20000 > A64M_RAM_BASE + ram) { free(dt); a64m_abort(m, "step 7 - no room for the DeviceTree above the kernel"); return m; }
     }
     /* 0.4.28 (MODELLED): iBoot hands the kernel a linear framebuffer in boot_args.Video {baseAddr(40) display(48) rowBytes(56) width(64) height(72) depth(80)}.
-       Here: 540x960 (0.4.51; was 270x480), 32 bpp BGRX, rowBytes 2160, at the very top of RAM, excluded from memSize so the kernel does not hand those pages out as free memory.
+       Here: 540x960 by default (0.4.51; was 270x480), the size is a setting since 0.4.85, 32 bpp BGRX, rowBytes 2160, at the very top of RAM, excluded from memSize so the kernel does not hand those pages out as free memory.
        Real iBoot gives the panel size (1125x2436) and has drawn the logo already; this one starts black, everything on it is drawn by the kernel itself. */
-    const uint32_t fbw = A64M_VID_W, fbh = A64M_VID_H, fbrb = A64M_VID_W * 4; uint64_t fbsz = ((uint64_t)fbrb * fbh + 0x3FFFull) & ~0x3FFFull;
+    const uint32_t fbw = (uint32_t)a64m_video_w(), fbh = (uint32_t)a64m_video_h(), fbrb = fbw * 4; uint64_t fbsz = ((uint64_t)fbrb * fbh + 0x3FFFull) & ~0x3FFFull;
     uint64_t fbpa = A64M_RAM_BASE + ram - fbsz;
     v = fbpa - kphys; memcpy(b + 24, &v, 8);   /* memSize counts from physBase (the kernel computes end = physBase + memSize; 0.3.37 trace); the framebuffer lies above it */
     { uint64_t vd[6] = { fbpa, 0, fbrb, fbw, fbh, 32 }; memcpy(b + 40, vd, sizeof vd); a64m_set_video(m, fbpa, fbw, fbh, fbrb);

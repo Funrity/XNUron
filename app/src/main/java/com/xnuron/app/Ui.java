@@ -39,6 +39,11 @@ final class Ui {
     static int scheme(Context c) {
         try { return c.getSharedPreferences("xnuron", Context.MODE_PRIVATE).getInt("scheme", 0); } catch (RuntimeException e) { return 0; }
     }
+    /** 0.4.85: framebuffer of the IPSW attempt: 0 = 270x480, 1 = 540x960 (default), 2 = 1080x1920. Applies to the next start. */
+    static int resolution(Context c) {
+        try { int r = c.getSharedPreferences("xnuron", Context.MODE_PRIVATE).getInt("res", 1); return r < 0 || r > 2 ? 1 : r; } catch (RuntimeException e) { return 1; }
+    }
+    static final int[][] RES = { { 270, 480 }, { 540, 960 }, { 1080, 1920 } };
     static void save(Context c, String key, Object v) {
         try {
             android.content.SharedPreferences.Editor e = c.getSharedPreferences("xnuron", Context.MODE_PRIVATE).edit();

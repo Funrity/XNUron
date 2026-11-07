@@ -34,6 +34,8 @@ public final class Native {
     public static native long frame(long h, int[] pixels);
     public static native int fbWidth();
     public static native int fbHeight();
+    /** 0.4.85: size of the next IPSW attempt's framebuffer (clamped natively). */
+    public static native void setVideoSize(int w, int h);
     public static native void touch(long h, int x, int y, boolean down);
 
     public static native String inspect(byte[] data, int[] flags);

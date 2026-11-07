@@ -111,29 +111,32 @@ JNI(jstring, readLogKind)(JNIEnv *env, jclass, jlong h, jint kind, jintArray off
 }
 JNI(jstring, readLog)(JNIEnv *env, jclass c, jlong h, jintArray offset) { return Java_com_xnuron_app_Native_readLogKind(env, c, h, 0, offset); }
 
-/* Copies the guest framebuffer into pixels[540*960] (ARGB). Returns frame counter or -1.
-   0.4.51: the IPSW attempt's video is 540x960; the demo machine's 270x480 display is shown doubled (nearest neighbour). */
+/* Copies the guest framebuffer into pixels[w*h] (ARGB), w x h = the video size setting (default 540x960). Returns frame counter or -1.
+   0.4.51: the IPSW attempt's video is w x h; the demo machine's 270x480 display is scaled to it (nearest neighbour). 0.4.85: the size is a setting. */
 JNI(jlong, frame)(JNIEnv *env, jclass, jlong h, jintArray pixels) {
     A64Machine *m = reinterpret_cast<A64Machine *>(h);
-    if (env->GetArrayLength(pixels) < A64M_VID_W * A64M_VID_H) return -1;
-    std::vector<uint32_t> tmp(A64M_VID_W * A64M_VID_H);
-    int64_t f = a64m_frame(m, tmp.data(), A64M_VID_W, A64M_VID_H);
+    const int W = a64m_video_w(), H = a64m_video_h();
+    if (env->GetArrayLength(pixels) < W * H) return -1;
+    static std::vector<uint32_t> tmp, small;
+    tmp.resize((size_t)W * H);
+    int64_t f = a64m_frame(m, tmp.data(), W, H);
     if (f < 0) {
-        std::vector<uint32_t> small(A64M_FB_W * A64M_FB_H);
+        small.resize((size_t)A64M_FB_W * A64M_FB_H);
         f = a64m_frame(m, small.data(), A64M_FB_W, A64M_FB_H);
         if (f >= 0)
-            for (int y = 0; y < A64M_VID_H; y++)
-                for (int x = 0; x < A64M_VID_W; x++)
-                    tmp[(size_t)y * A64M_VID_W + x] = small[(size_t)(y * A64M_FB_H / A64M_VID_H) * A64M_FB_W + (size_t)(x * A64M_FB_W / A64M_VID_W)];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                    tmp[(size_t)y * W + x] = small[(size_t)((int64_t)y * A64M_FB_H / H) * A64M_FB_W + (size_t)((int64_t)x * A64M_FB_W / W)];
     }
-    if (f >= 0) env->SetIntArrayRegion(pixels, 0, A64M_VID_W * A64M_VID_H, reinterpret_cast<jint *>(tmp.data()));
+    if (f >= 0) env->SetIntArrayRegion(pixels, 0, W * H, reinterpret_cast<jint *>(tmp.data()));
     return (jlong)f;
 }
-JNI(jint, fbWidth)(JNIEnv *, jclass) { return A64M_VID_W; }
-JNI(jint, fbHeight)(JNIEnv *, jclass) { return A64M_VID_H; }
+JNI(jint, fbWidth)(JNIEnv *, jclass) { return a64m_video_w(); }
+JNI(jint, fbHeight)(JNIEnv *, jclass) { return a64m_video_h(); }
+JNI(void, setVideoSize)(JNIEnv *, jclass, jint w, jint h) { a64m_set_video_size(w, h); }
 
 JNI(void, touch)(JNIEnv *, jclass, jlong h, jint x, jint y, jboolean down) {
-    a64m_touch(reinterpret_cast<A64Machine *>(h), x * A64M_FB_W / A64M_VID_W, y * A64M_FB_H / A64M_VID_H, down);   /* view is 540x960, the demo touch device 270x480 */
+    a64m_touch(reinterpret_cast<A64Machine *>(h), (int)((int64_t)x * A64M_FB_W / a64m_video_w()), (int)((int64_t)y * A64M_FB_H / a64m_video_h()), down);   /* the demo touch device is 270x480 */
 }
 
 static std::string finish_inspect(A64Inspect &r, const char *rep, jint *flags) {

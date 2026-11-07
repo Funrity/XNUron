@@ -414,6 +414,7 @@ public class MainActivity extends Activity {
         final int src = effectiveSource();
         kernelText.setLength(0); emuText.setLength(0); kernelOffset[0] = 0; emuOffset[0] = 0;
         kernelView.setText(""); refreshEmuView(); lastFrame = -1;
+        { int[] rs = Ui.RES[Ui.resolution(this)]; Native.setVideoSize(rs[0], rs[1]); emu.resize(Native.fbWidth(), Native.fbHeight()); }   // 0.4.85: resolution setting, applies from this start
         emu.clear("No display output");
         run.setEnabled(false);
         autoSwitchedToDisplay = false;
@@ -584,6 +585,16 @@ public class MainActivity extends Activity {
             dlg.dismiss();
             recreate();
         }));
+
+        box.addView(label("Screen resolution"));
+        box.addView(choices(new String[] { "270\u00d7480", "540\u00d7960", "1080\u00d71920" }, Ui.resolution(this), i -> {
+            Ui.save(this, "res", i);
+            dlg.dismiss();
+        }));
+        TextView resNote = t.text(this, 12f, t.onSurfaceVariant, false);
+        resNote.setText("Size of the framebuffer handed to the guest in boot_args (MODELLED; a real iPhone XS panel is 1125\u00d72436). Applies to the next Start. Bigger = sharper but slower.");
+        resNote.setPadding(t.dp(4), t.dp(8), t.dp(4), 0);
+        box.addView(resNote);
 
         box.addView(label("Colours"));
         final boolean canDyn = Build.VERSION.SDK_INT >= 31;

@@ -267,6 +267,11 @@ static uint64_t g_dt_phys, g_diag_va[6], g_diag_len[6], g_ddv[3], g_ddl[3]; stat
 void a64m_set_diag_code(A64Machine *m, uint64_t va, uint64_t len) { (void)m; if (!va) { g_diag_n = 0; return; } if (g_diag_n < 6) { g_diag_va[g_diag_n] = va; g_diag_len[g_diag_n] = len; g_diag_n++; } }
 void a64m_set_pc_probe2(A64Machine *m, uint64_t pc, unsigned reg, uint64_t val) { m->cpu.pp2_pc = pc; m->cpu.pp2_reg = reg; m->cpu.pp2_val = val; m->cpu.pp2_hit = 0; }
 void a64m_set_pc_probe(A64Machine *m, uint64_t pc, unsigned reg, uint64_t val) { m->cpu.pp_pc = pc; m->cpu.pp_reg = reg; m->cpu.pp_val = val; m->cpu.pp_hit = 0; }
+static int g_vw = A64M_VID_W, g_vh = A64M_VID_H;
+static int vclamp(int v, int d) { if (v < 128 || v > 2400) return d; return v & ~1; }
+void a64m_set_video_size(int w, int h) { g_vw = vclamp(w, A64M_VID_W); g_vh = vclamp(h, A64M_VID_H); }
+int a64m_video_w(void) { return g_vw; }
+int a64m_video_h(void) { return g_vh; }
 void a64m_nm_add_dt_name(A64Machine *m, const char *name) { a64_nm_add_dt_name(&m->cpu, name); }
 void a64m_set_diag_table(A64Machine *m, uint64_t va, uint64_t stride, uint64_t n) { (void)m; g_tbl_va = va; g_tbl_stride = stride; g_tbl_n = n; }
 void a64m_set_diag_data(A64Machine *m, uint64_t va, uint64_t len) { a64m_set_diag_data2(m, 0, va, len); }

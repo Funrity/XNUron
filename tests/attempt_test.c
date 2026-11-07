@@ -209,6 +209,18 @@ int main(int argc, char **argv) {
         char w[40]; int pl = a64_dt_node_prop_words(dt, q, "cpu0", "fixed-frequency", w, sizeof w);
         CHECK(r == 1 && pl == 4 && !strcmp(w, "16e3600"), "added property keeps its data: r=%d len=%d words=%s", r, pl, w);
     }
+    { /* 0.4.85: fill an existing EMPTY property; video size setting */
+        uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(1, 1); PROP("name", 5, "root"); NODE(3, 0); PROP("name", 5, "pmgr"); PROP("voltage-states9", 0, ""); PROP("x", 4, ((uint32_t[1]){7}));
+        size_t n0 = q; int r = a64_dt_node_fill_empty_prop(dt, &q, sizeof dt, "pmgr", "voltage-states9", NULL, 8);
+        char w[40]; int pl = a64_dt_node_prop_words(dt, q, "pmgr", "voltage-states9", w, sizeof w); char w2[40]; int pl2 = a64_dt_node_prop_words(dt, q, "pmgr", "x", w2, sizeof w2);
+        CHECK(r == 1 && q == n0 + 8 && pl == 8 && !strcmp(w, "0 0") && pl2 == 4 && !strcmp(w2, "7"), "empty property filled, the next one is intact: r=%d size %zu->%zu len=%d words=%s next=%s", r, n0, q, pl, w, w2);
+        CHECK(a64_dt_node_fill_empty_prop(dt, &q, sizeof dt, "pmgr", "voltage-states9", NULL, 8) == 0, "a non-empty property is left alone");
+        CHECK(a64_dt_node_fill_empty_prop(dt, &q, sizeof dt, "pmgr", "nosuch", NULL, 8) == 0 && a64_dt_node_fill_empty_prop(dt, &q, sizeof dt, "nonode", "x", NULL, 8) == -2, "absent property 0, absent node -2");
+        a64m_set_video_size(1080, 1920); CHECK(a64m_video_w() == 1080 && a64m_video_h() == 1920, "video size setting");
+        a64m_set_video_size(5, 99999); CHECK(a64m_video_w() == A64M_VID_W && a64m_video_h() == A64M_VID_H, "nonsense video size falls back to the default");
+        a64m_set_video_size(A64M_VID_W, A64M_VID_H);
+    }
     { /* 0.4.64: pmgr optional bridges fix-up */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(4, 0);
