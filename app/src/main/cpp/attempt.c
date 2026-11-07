@@ -525,6 +525,25 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
     for (uint32_t i = 0; i < nc; i++) { int r = dt_names_walk(d, n, pos, depth + 1, cb, ud); if (r < 0) return -1; cnt += r; }
     return cnt;
 }
+/* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
+typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "mtr", "aging", "sensor" }; for (size_t i = 0; i < 3; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, const char *parent, DtGrep *g) {
+    if (depth > 32 || *pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
+    char me[40] = "?"; size_t save = *pos;
+    for (uint32_t i = 0; i < np; i++) { if (*pos + 36 > n) return -1; uint32_t len; memcpy(&len, d + *pos + 32, 4); len &= 0x7FFFFFFFu;
+        if (!memcmp(d + *pos, "name\0", 5) && len < 39) { memcpy(me, d + *pos + 36, len); me[len] = 0; } *pos += 36 + (((size_t)len + 3) & ~(size_t)3); }
+    *pos = save;
+    if (dt_has_kw(me) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "[node %s/%s] ", parent, me); g->hits++; }
+    for (uint32_t i = 0; i < np; i++) {
+        char nm[33]; memcpy(nm, d + *pos, 32); nm[32] = 0; uint32_t len; memcpy(&len, d + *pos + 32, 4); len &= 0x7FFFFFFFu;
+        if (dt_has_kw(nm) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%s/%s(%u) ", me, nm, len); g->hits++; }
+        *pos += 36 + (((size_t)len + 3) & ~(size_t)3);
+    }
+    for (uint32_t i = 0; i < nc; i++) { if (dt_grep_walk(d, n, pos, depth + 1, me, g) < 0) return -1; }
+    return 0;
+}
 static void dt_names_to_machine(const char *nm, void *ud) { a64m_nm_add_dt_name((A64Machine *)ud, nm); }
 /* 0.4.23 (MODELLED): fixed pseudo-random bytes (xorshift64*, constant seed) instead of host entropy. Real iBoot uses a hardware RNG; with host entropy the kernel's
  * zone/KASLR randomisation changed every run, so a failing run could not be reproduced. Same bytes every run = same kernel behaviour = comparable logs. */
@@ -787,6 +806,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       for (int vi = 0; vi < 16; vi++) { char vn[24], w[120]; snprintf(vn, sizeof vn, "voltage-states%d", vi); int pl = a64_dt_node_prop_words(dt, dtlen, "pmgr", vn, w, sizeof w);
         if (pl > 8 && l2 < sizeof ln2 - 200) l2 += (size_t)snprintf(ln2 + l2, sizeof ln2 - l2, " %s(%d)=%s;", vn, pl, w); }
       LOG("[boot] diagnostic (changes nothing): pmgr voltage-states tables of the IPSW tree (length in bytes, first words; the added zero ones are not listed):%s\n", l2 ? ln2 : " none"); }
+    { static char gb[3000]; DtGrep g = { gb, sizeof gb, 0, 0 }; size_t gp = 0; gb[0] = 0; dt_grep_walk(dt, dtlen, &gp, 0, "", &g);
+      LOG("[boot] diagnostic (changes nothing): DeviceTree nodes/properties with 'mtr', 'aging' or 'sensor' in the name (%d): %s\n", g.hits, gb); }
     { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
