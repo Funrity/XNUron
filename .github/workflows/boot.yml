@@ -1,0 +1,41 @@
+name: Boot attempt (headless)
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_size:
+        description: "compressed size of kernelcache.release.iphone11 in the IPSW (bytes), from the app log"
+        default: "16875356"
+      device:
+        description: "ipsw.me device identifier"
+        default: "iPhone11,4"
+      max_msteps:
+        description: "step limit, millions"
+        default: "4000"
+permissions:
+  contents: read
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+      - name: Build the headless runner (same C sources as the APK)
+        run: |
+          C=app/src/main/cpp; LZ=$C/lzfse
+          gcc -O2 -w -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
+            $LZ/lzfse_decode.c $LZ/lzfse_decode_base.c $LZ/lzfse_fse.c $LZ/lzvn_decode_base.c -lm -lz -lpthread
+      - name: Find and download the IPSW (public Apple download, not stored in the repository)
+        run: |
+          url=$(python3 tools/find_ipsw.py "${{ inputs.device }}" "${{ inputs.kernel_size }}")
+          echo "IPSW: $url"
+          curl -sSL --fail -o ipsw.zip "$url"; ls -l ipsw.zip
+      - name: Run
+        run: |
+          set +e
+          ./boot_cli ipsw.zip "${{ inputs.max_msteps }}" > boot.log 2> boot.err
+          cat boot.err; wc -c boot.log
+          rm -f ipsw.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: boot-log, path: "boot.log\nboot.err" }
