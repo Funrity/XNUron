@@ -12,7 +12,7 @@ on:
         description: "step limit, millions"
         default: "4000"
 permissions:
-  contents: read
+  contents: write   # to publish the log as a release asset (the session can download release assets)
 jobs:
   boot:
     runs-on: ubuntu-latest
@@ -39,3 +39,10 @@ jobs:
           rm -f ipsw.zip
       - uses: actions/upload-artifact@v4
         with: { name: boot-log, path: "boot.log\nboot.err" }
+      - name: Publish the log as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete boot-log --yes --cleanup-tag 2>/dev/null || true
+          gh release create boot-log boot.log boot.err --target "$GITHUB_SHA" --prerelease --title "Headless boot log" \
+            --notes "Лог headless-запуска попытки загрузки (коммит ${GITHUB_SHA::7}). Не прошивка и не загрузка iOS."
