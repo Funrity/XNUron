@@ -835,6 +835,19 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
+    if (g_xref[0] && g_xref[2]) { /* 0.4.128: strings referenced (ADRP+ADD) by that window, in address order: which DT properties / boot-args does the root selection read? */
+      uint64_t lo = (g_xref[0] < g_xref[2] ? g_xref[0] : g_xref[2]) - 0x600, hi = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x600; char sl[1500]; size_t sn = 0; int nsr = 0;
+      sn += (size_t)snprintf(sl, sizeof sl, "[boot] diagnostic (changes nothing): strings referenced by the root-selection code 0x%llx..0x%llx:", (unsigned long long)lo, (unsigned long long)hi);
+      for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+        for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint64_t pc = g->vmaddr + o; if (pc < lo || pc >= hi) continue;
+            uint32_t w1, w2; memcpy(&w1, kern + mo.slice_off + g->fileoff + o, 4); memcpy(&w2, kern + mo.slice_off + g->fileoff + o + 4, 4);
+            if ((w1 & 0x9f000000u) != 0x90000000u || (w2 & 0xffc00000u) != 0x91000000u || (w1 & 31) != ((w2 >> 5) & 31)) continue;
+            int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
+            uint64_t tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
+            for (int r = 0; r < mo.nseg; r++) { const A64Seg *h = &mo.seg[r]; if (tgt >= h->vmaddr && tgt < h->vmaddr + h->filesize && mo.slice_off + h->fileoff + (tgt - h->vmaddr) < klen) {
+                const uint8_t *sp = kern + mo.slice_off + h->fileoff + (tgt - h->vmaddr); size_t L = 0; while (L < 70 && tgt - h->vmaddr + L < h->filesize && sp[L] >= 32 && sp[L] < 127) L++;
+                if (L >= 3 && sp[L] == 0 && sn + L + 30 < sizeof sl) { sn += (size_t)snprintf(sl + sn, sizeof sl - sn, " @%llx=[%.*s]", (unsigned long long)(pc & 0xfffff), (int)L, sp); nsr++; } break; } } } }
+      LOG("%s (%d)\n", sl, nsr); }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     free(kern);
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
