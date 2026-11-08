@@ -975,7 +975,12 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
     free(dt);
-    strcpy((char *)b + 112, rd_on ? "-v serial=3 debug=0x14e rd=md0" : "-v serial=3 debug=0x14e");
+    /* 0.4.132 FIX: boot_args.CommandLine is at offset 0x6c = 108 (right behind deviceTreeLength at 104), not 112. Decoded from the kernel's own
+       PE_parse_boot_argn_internal (0.4.131 dump: it reads [bootArgs + 0x6c]). Up to 0.4.131 the string was written 4 bytes too far, so the kernel
+       always saw an EMPTY command line: none of '-v serial=3 debug=0x14e' (nor rd=md0) ever reached it. The old 'serial=3 debug=0x14e' is NOT
+       restored here: it never took effect, so its behaviour is untested; only what this experiment needs is passed. */
+    strcpy((char *)b + 108, rd_on ? "-v rd=md0" : "-v");
+    LOG("[boot] boot_args.CommandLine (offset 108) = \"%s\"\n", (const char *)b + 108);
     a64m_mark_attempt(m, mo.lowest_vm, kphys);
     a64m_set_pc(m, entry_p); a64m_set_boot_arg(m, ba);
     if (dt_virt) { a64m_set_dt_phys(m, dtp); /* 0.4.14: code/caller/refs/data windows dropped (the log is cut at 20000 characters; they are known now) */   /* 0.4.13: first_avail reaches avail_end BEFORE pmap_startup (0x7b53ed0): the loop that consumes every page stores from pc 0x7b53e50 inside this function */   /* 0.3.41 panic: "Invalid waitq" - the function that panicked (return address 0x7ab26ec) */
