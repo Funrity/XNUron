@@ -601,6 +601,7 @@ int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, si
     if (!z || (size_t)(z - a) + 1 > cap) return 0;
     memcpy(out, a, (size_t)(z - a)); out[z - a] = 0; return 1;
 }
+static uint64_t g_xref[4];   /* 0.4.126 diagnostic: code addresses referencing 'RAMDisk' (0,1) and 'root-matching' (2,3) */
 static const char *g_pick_name;
 static bool pick_exact(const char *n) { return g_pick_name && !strcmp(n, g_pick_name); }
 static bool pick_manifest(const char *n) { return !strcmp(n, "BuildManifest.plist"); }
@@ -815,6 +816,19 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             size_t a = i, e = i + kl; while (a > 0 && i - a < 60 && kern[a - 1] >= 32 && kern[a - 1] < 127) a--; while (e < klen && e - i < 80 && kern[e] >= 32 && kern[e] < 127) e++;
             if (e - a > 150) continue; ll += (size_t)snprintf(line + ll, sizeof line - ll, " [%.*s]", (int)(e - a), kern + a); hits++; if (ll > 560) break; i = e; }
         LOG("%s (%d)\n", line, hits); } }
+    { /* 0.4.126 diagnostic (changes nothing): code that references the strings 'RAMDisk' and 'root-matching' (ADRP+ADD pairs); the first hit of each gets a code dump window */
+      static const char *const xs[] = { "RAMDisk", "root-matching" };
+      for (int xi = 0; xi < 2; xi++) { size_t kl = strlen(xs[xi]) + 1; uint64_t sva = 0;
+        for (size_t i = 0; i + kl <= klen && !sva; i++) if (!memcmp(kern + i, xs[xi], kl) && (i == 0 || kern[i - 1] == 0)) {
+            for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; uint64_t off = i - mo.slice_off; if (i >= mo.slice_off && off >= g->fileoff && off < g->fileoff + g->filesize) { sva = g->vmaddr + (off - g->fileoff); break; } } }
+        char hl[400]; size_t hn = 0; int nh = 0; hn += (size_t)snprintf(hl, sizeof hl, "[boot] diagnostic (changes nothing): string '%s' at virtual 0x%llx; ADRP+ADD references from:", xs[xi], (unsigned long long)sva);
+        for (int q = 0; q < mo.nseg && sva && nh < 4; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+          for (uint64_t o = 0; o + 8 <= g->filesize && nh < 4; o += 4) { uint32_t w1, w2; memcpy(&w1, kern + mo.slice_off + g->fileoff + o, 4); memcpy(&w2, kern + mo.slice_off + g->fileoff + o + 4, 4);
+            if ((w1 & 0x9f000000u) != 0x90000000u || (w2 & 0xffc00000u) != 0x91000000u || (w1 & 31) != ((w2 >> 5) & 31)) continue;
+            int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
+            uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
+            if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
+        LOG("%s (%d)\n", hl, nh); } }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     free(kern);
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
@@ -957,7 +971,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         /* kernel globals the region-slide code reads: region physical start (+1496) and the old base (+1096) in the page at 0xfffffff0077de000 */
         /* 0.4.22: log 0.4.21: V=0xfffffff00914dc30 (an OSMetaClass*) is stored into the 1 KiB block at ffffffe00055e400 by a copy routine (0x79fd570/0x79fd59c, called twice from lr 0x8009ffc), whose source is the next block (…55e800). That block is later used as the OSSymbolPool buckets. Dump the function around lr 0x8009ffc (it builds the OSMetaClass records) and the copy routine, and list who calls that function. */
         a64m_set_diag_code(m, 0, 0); a64m_set_quiet_exc(m, 1);
-        a64m_set_diag_code(m, 0xfffffff007b9d680ull, 0x140);   /* 0.4.118: function that writes 0xC5ACCE55 to base+0xfb0 of each debug block (first exception ELR 0x7b9d704/0x7b9d73c) */  /* 0.4.72: log 0.4.71 (Kernel tab): 'AppleT802xIO::start: clock frequencies not published in device tree' -> the code that decides that, and the one that reads clock-frequencies */
+        for (int xi = 0; xi < 4; xi += 2) if (g_xref[xi]) a64m_set_diag_code(m, g_xref[xi] - 0x1c0, 0x400);   /* 0.4.118: function that writes 0xC5ACCE55 to base+0xfb0 of each debug block (first exception ELR 0x7b9d704/0x7b9d73c) */  /* 0.4.72: log 0.4.71 (Kernel tab): 'AppleT802xIO::start: clock frequencies not published in device tree' -> the code that decides that, and the one that reads clock-frequencies */
            /* 0.4.111: waitReg32 panic at pmgr 0x23b000000+0x98000 (waits bit4 == 0): callers 0x817c7f8, 0x8ce46dc */ /* 0.4.108: caller of MTRGetPolynom (return 0x8ce4348): source of the float args (v0,v1) */ /* 0.4.107: MTRROCalibrate body: where do its float args (v0,v1) come from (inf/NaN = equal floats?) */ /* 0.4.104: AppleMTRPolynomT8020.cpp:1203 MTRROCalibrate REQUIRE ret == kIOReturnSuccess, panic call near lr 0x8cdff1c */   /* 0.4.101: loop tail of calculateCPUEnergyAccumulatorsTuning, target of the b.eq at 0x8ce4ebc (0x8ce5294) */   /* 0.4.94 (headless run of 0.4.93): AppleT8020PMGR.cpp:568 "ifane-max for freqHz=%llu not found", panic call at lr 0x8ce5104 */   /* 0.4.91: log 0.4.90: ApplePMGRMTRSensor.cpp:131 "propery mtr_0 missing" - panic call at lr 0x8ce17ac, its caller 0x8ce91e0: dump how the property name/size is used */   /* 0.4.87: log 0.4.86 - ECPU state count is still 0 though no table is empty; dump the function that handles perfDomain->voltageStateCount */   /* 0.4.84: log 0.4.83: ApplePMGR.cpp:1303 "ECPU0 1 request ECPU.0 > 0" is raised from the call at 0xfffffff008172708 (return address 0x817270c, in initDriver): dump the code before it to see what is compared. Valid for this kernelcache only. */
         /* 0.4.81: code window of 0.4.77 dropped (decoded: perf-state loop) */ //   /* 0.4.77: log 0.4.76: data abort at 0xfffffff0081713a0 (ldr w8,[x0,x8], x0=0, index (0-1)<<3 = 0x7fffffff8): code takes entry count-1 of an EMPTY property (our empty voltage-states<N>) -> dump the function (called from ApplePMGR path, 0xfffffff008ce3b74) to learn the entry size/layout. Valid for this kernelcache only. */
         /* 0.4.45: log 0.4.44 (0x200000000 as unknown block): the function at 0x7babec0 reads two words (+0x680, +0x684) from several blocks 0x40000 apart (0x200000000, 0x200040000, ...) and panics "Inconsistent memory configuration" if they differ, so it looks like per-channel memory-controller registers that must agree. Cover 1 MiB (the channels at +0x40000, +0x80000, +0xc0000) with the same unknown block: all read 0, so they agree. */
