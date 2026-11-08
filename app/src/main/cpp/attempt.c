@@ -808,6 +808,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         memcpy(dst, kern + mo.slice_off + s->fileoff, s->filesize);
         LOG("[boot] step 6: %-16s %9llu bytes at physical 0x%llx (virtual 0x%llx)\n", s->name, (unsigned long long)s->filesize, (unsigned long long)pa, (unsigned long long)s->vmaddr);
     }
+    { /* 0.4.125 diagnostic (changes nothing): where does the kernel itself mention the RAM disk / root device? Strings with a few characters of context. */
+      static const char *const kws[] = { "RAMDisk", "md0", "rd=", "rootdev", "root-matching", "mdev", "AppleRAMDisk", "Apple_HFS", "root_device", "bsd root" };
+      for (size_t ki = 0; ki < sizeof kws / sizeof *kws; ki++) { size_t kl = strlen(kws[ki]); int hits = 0; char line[700]; size_t ll = 0; ll += (size_t)snprintf(line, sizeof line, "[boot] diagnostic (changes nothing): kernel strings containing '%s':", kws[ki]);
+        for (size_t i = 0; i + kl <= klen && hits < 8; i++) if (!memcmp(kern + i, kws[ki], kl)) {
+            size_t a = i, e = i + kl; while (a > 0 && i - a < 60 && kern[a - 1] >= 32 && kern[a - 1] < 127) a--; while (e < klen && e - i < 80 && kern[e] >= 32 && kern[e] < 127) e++;
+            if (e - a > 150) continue; ll += (size_t)snprintf(line + ll, sizeof line - ll, " [%.*s]", (int)(e - a), kern + a); hits++; if (ll > 560) break; i = e; }
+        LOG("%s (%d)\n", line, hits); } }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     free(kern);
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
