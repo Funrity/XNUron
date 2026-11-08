@@ -42,7 +42,7 @@ jobs:
           set +e
           ./boot_cli ipsw.zip "${{ inputs.max_msteps }}" > boot.log 2> boot.err
           cat boot.err; wc -c boot.log
-      - name: IPSW report (read-only: names, sizes, whether firmware images carry a KBAG)
+      - name: "IPSW report (read-only; names, sizes, KBAG presence)"
         run: python3 tools/ipsw_report.py ipsw.zip > ipsw.txt 2>&1 || true
       - uses: actions/upload-artifact@v4
         with: { name: boot-log, path: "boot.log\nboot.err" }
