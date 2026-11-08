@@ -95,13 +95,14 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
+    if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
@@ -110,6 +111,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off;
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
+    for (int k = 0; k < d->lk_n; k++) if (d->lk_w[k] == off) { d->lk_v[k] = (uint32_t)v & 0x1f; d->lk_set[k] = 1; }
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " w+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)v); }
 }
@@ -150,6 +152,13 @@ int a64m_unknown_set_readback(A64Machine *m, uint64_t pa) {
     return -1;
 }
 /* 0.4.110 MODELLED / ASSUMPTION: a written 32-bit register of this block reads back with bits 7:4 (current state) = bits 3:0 (requested state), as the power-state registers of Apple's PMGR are generally described (target 3:0, actual 7:4); unwritten registers read 0. Needed because ApplePMGR::waitReg32 waits for (reg & 0xf0) == 0xf0 after requesting state 0xf. The real hardware's delay and failure behaviour are NOT modelled. */
+/* 0.4.135 MODELLED / ASSUMPTION: after a 32-bit write of v to register `w_off` of the block, the register `r_off` reads (v << 10) | (v << 5) (v masked to 5 bits);
+   before any write it reads 0. Decoded from the kernel's _mccEnableCacheMode: it writes the cache mode to mem-controller +0x1c00 and then polls +0x1c04 of
+   each of the 4 channels (0x40000 apart) until bits 14:10 and bits 9:5 both equal the mode. Real hardware behaviour (delay, rejection) is NOT modelled. Up to 8 links per block. */
+int a64m_unknown_set_modelink(A64Machine *m, uint64_t pa, uint64_t w_off, uint64_t r_off) {
+    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa) { struct Unk *d = &g_unk[k]; if (d->lk_n >= 8) return -1; d->lk_w[d->lk_n] = w_off; d->lk_r[d->lk_n] = r_off; d->lk_set[d->lk_n] = 0; d->lk_n++; return 0; }
+    return -1;
+}
 int a64m_unknown_set_psmirror(A64Machine *m, uint64_t pa) {
     for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa) { g_unk[k].ps = 1; return 0; }
     return -1;

@@ -255,6 +255,18 @@ int main(int argc, char **argv) {
         CHECK(a64_plist_first_path(pl, strlen(pl), "UpdateRamDisk", o, sizeof o) == 0, "missing key reports 0");
         CHECK(a64_plist_first_path(pl, strlen(pl), "RestoreRamDisk", o, 5) == 0, "too small output buffer reports 0");
     }
+    { /* 0.4.135: mode link (memory controller cache mode request/status) */
+        A64Machine *m = a64m_create_system(1u << 20);
+        CHECK(a64m_add_unknown_mmio_named(m, 0x200000000ull, 0x100000, "mem") == 0, "mem block added");
+        CHECK(a64m_unknown_set_modelink(m, 0x200000000ull, 0x1c00, 0x1c04) == 0 && a64m_unknown_set_modelink(m, 0x200000000ull, 0x1c00, 0x41c04) == 0, "links added");
+        CHECK(a64m_unknown_set_modelink(m, 0x300000000ull, 0x1c00, 0x1c04) == -1, "link on an unknown address is refused");
+        /* x0 = 0x200000000 + 0x1000 + 0xc00; w1 = 5; str w1,[x0]; ldr w2,[x0,#4]; x3 = x0 + 0x40000; ldr w4,[x3,#4]; ldr w5,[x0,#8]; b . */
+        uint32_t code[] = { 0xD2C00040, 0x91400400, 0x91300000, 0x528000A1, 0xB9000001, 0xB9400402, 0x91410003, 0xB9400464, 0xB9400805, 0x14000000 };
+        memcpy(a64m_ram_at(m, A64M_RAM_BASE, sizeof code), code, sizeof code);
+        a64m_run(m, 80, false);
+        CHECK(a64m_cpu(m)->x[2] == 0x14a0 && a64m_cpu(m)->x[4] == 0x14a0 && a64m_cpu(m)->x[5] == 0, "mode link: status reads 0x%llx / 0x%llx (want 0x14a0), unrelated register reads 0x%llx (want 0)", (unsigned long long)a64m_cpu(m)->x[2], (unsigned long long)a64m_cpu(m)->x[4], (unsigned long long)a64m_cpu(m)->x[5]);
+        a64m_destroy(m);
+    }
     { /* 0.4.110: power-state mirror (ApplePMGR::waitReg32 waits for (reg & 0xf0) == 0xf0 after writing 0xf) */
         A64Machine *m = a64m_create_system(1u << 20);
         CHECK(a64m_add_unknown_mmio_named(m, 0x23b000000ull, 0x100000, "pmgr") == 0 && a64m_unknown_set_psmirror(m, 0x23b000000ull) == 0, "psmirror block added");
