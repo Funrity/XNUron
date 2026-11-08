@@ -583,11 +583,14 @@ int a64_dt_patch_u64x2(uint8_t *d, size_t n, const char *prop, uint64_t a, uint6
 }
 
 /* 0.4.122: BuildManifest.plist (XML text, `n` bytes, no NUL needed): the <string> after the first '<key>Path</key>' that follows the first
-   '<key>`key`</key>'; copied to out. 1 found, 0 not found. */
+   '<key>`key`</key>' whose value is a <dict>; copied to out. 1 found, 0 not found. */
 int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, size_t cap) {
     char pat[96]; snprintf(pat, sizeof pat, "<key>%s</key>", key);
-    const char *e = p + n, *k = NULL;
-    for (const char *q = p; q + strlen(pat) <= e; q++) if (!memcmp(q, pat, strlen(pat))) { k = q; break; }
+    const char *e = p + n, *k = NULL; size_t pl = strlen(pat);
+    /* 0.4.124: the key also occurs as <key>K</key><string>Production</string> (policy lists); only the occurrence whose value is a <dict> is the entry */
+    for (const char *q = p; q + pl <= e; q++) if (!memcmp(q, pat, pl)) {
+        const char *v = q + pl; while (v < e && (*v == ' ' || *v == '\t' || *v == '\n' || *v == '\r')) v++;
+        if (v + 6 <= e && !memcmp(v, "<dict>", 6)) { k = q; break; } }
     if (!k) return 0;
     static const char pk[] = "<key>Path</key>"; const char *pp = NULL;
     for (const char *q = k; q + sizeof pk - 1 <= e; q++) if (!memcmp(q, pk, sizeof pk - 1)) { pp = q + sizeof pk - 1; break; }

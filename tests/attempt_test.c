@@ -249,7 +249,7 @@ int main(int argc, char **argv) {
         uint64_t a, b; memcpy(&a, d + 8 + 36 + 16 + 36, 8); memcpy(&b, d + 8 + 36 + 16 + 44, 8);
         CHECK(a == 0x1122334455ull && b == 0x6677ull, "RAMDisk data is {0x%llx, 0x%llx}", (unsigned long long)a, (unsigned long long)b);
         CHECK(a64_dt_patch_u64x2(d, sizeof d, "Nothing", 1, 2) == 0, "unknown property is not patched");
-        const char *pl = "<dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>048-16246-204.dmg</string></dict></dict></dict><key>Path</key><string>other</string>";
+        const char *pl = "<dict><key>RestoreRamDisk</key>\n<string>Production</string></dict><dict><key>RestoreRamDisk</key>\n<dict><key>Info</key><dict><key>Path</key><string>048-16246-204.dmg</string></dict></dict></dict><key>Path</key><string>other</string>";
         char o[64] = "";
         CHECK(a64_plist_first_path(pl, strlen(pl), "RestoreRamDisk", o, sizeof o) == 1 && !strcmp(o, "048-16246-204.dmg"), "path found: '%s'", o);
         CHECK(a64_plist_first_path(pl, strlen(pl), "UpdateRamDisk", o, sizeof o) == 0, "missing key reports 0");
