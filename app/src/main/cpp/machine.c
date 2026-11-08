@@ -95,13 +95,14 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[64]; uint32_t ps_val[64]; int ps; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
+    if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
@@ -109,11 +110,13 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off;
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
+    if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 64) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " w+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)v); }
 }
 /* 0.4.53: blocks with a label (the DeviceTree node name) so the log says which one was touched; 0.4.58: up to 360, each with a log budget (`cap` accesses) */
 static int add_unknown(A64Machine *m, uint64_t pa, uint64_t size, const char *label, unsigned cap) {
     int slot = -1; for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].pa == pa) slot = k;   /* a stale entry of a destroyed machine that got the same address */
+    if (slot < 0) for (int k = 0; k < g_unk_n; k++) if (!g_unk[k].m) { slot = k; break; }   /* free slot of a destroyed machine */
     if (slot < 0) { if (g_unk_n >= 360) return -1; slot = g_unk_n++; }
     struct Unk *d = &g_unk[slot], keep = *d; memset(d, 0, sizeof *d); d->m = m; d->pa = pa; d->cap = cap; if (label) snprintf(d->label, sizeof d->label, "'%.38s'", label);
     A64Dev dev = { pa, size, unk_r, unk_w, d, "unknown-soc" };
@@ -144,6 +147,11 @@ int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val
 /* 0.4.61: the block's first 4 KiB behave as plain read-back registers (a read returns the last 32-bit value written at that offset, 0 if none) */
 int a64m_unknown_set_readback(A64Machine *m, uint64_t pa) {
     for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa) { g_unk[k].rb = 1; return 0; }
+    return -1;
+}
+/* 0.4.110 MODELLED / ASSUMPTION: a written 32-bit register of this block reads back with bits 7:4 (current state) = bits 3:0 (requested state), as the power-state registers of Apple's PMGR are generally described (target 3:0, actual 7:4); unwritten registers read 0. Needed because ApplePMGR::waitReg32 waits for (reg & 0xf0) == 0xf0 after requesting state 0xf. The real hardware's delay and failure behaviour are NOT modelled. */
+int a64m_unknown_set_psmirror(A64Machine *m, uint64_t pa) {
+    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa) { g_unk[k].ps = 1; return 0; }
     return -1;
 }
 int a64m_add_unknown_mmio(A64Machine *m, uint64_t pa, uint64_t size) { return a64m_add_unknown_mmio_named(m, pa, size, NULL); }
@@ -258,6 +266,8 @@ A64Machine *a64m_create_user(uint64_t base, uint64_t size) {
 }
 void a64m_destroy(A64Machine *m) {
     if (!m) return;
+    for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m) memset(&g_unk[k], 0, sizeof g_unk[k]);   /* 0.4.110: drop the unknown-block entries of this machine (a later machine can get the same address and would inherit them) */
+    for (unsigned k = 0; k < 24; k++) if (g_rr[k].m == m) g_rr[k].label[0] = 0;
     pthread_mutex_destroy(&m->lock); free(m->cpu.cov); free(m->cpu.callseen); free(m->ram); for (int s = 0; s < 3; s++) free(m->slog[s]); free(m);
 }
 A64 *a64m_cpu(A64Machine *m) { return &m->cpu; }

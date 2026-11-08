@@ -241,6 +241,17 @@ int main(int argc, char **argv) {
         CHECK(a64m_cpu(m)->x[2] == 0x1234 && a64m_cpu(m)->x[3] == 0, "read-back: +8 gave 0x%llx (want 0x1234), unwritten +4 gave 0x%llx (want 0)", (unsigned long long)a64m_cpu(m)->x[2], (unsigned long long)a64m_cpu(m)->x[3]);
         a64m_destroy(m);
     }
+    { /* 0.4.110: power-state mirror (ApplePMGR::waitReg32 waits for (reg & 0xf0) == 0xf0 after writing 0xf) */
+        A64Machine *m = a64m_create_system(1u << 20);
+        CHECK(a64m_add_unknown_mmio_named(m, 0x23b000000ull, 0x100000, "pmgr") == 0 && a64m_unknown_set_psmirror(m, 0x23b000000ull) == 0, "psmirror block added");
+        CHECK(a64m_unknown_set_psmirror(m, 0x300000000ull) == -1, "psmirror on an unknown address is refused");
+        /* x0 = 0x23b000000; x0 += 0x80000 + 0x2d8 ; w1 = 0xf; str w1,[x0]; ldr w2,[x0]; ldr w3,[x0,#4]; b . */
+        uint32_t code[] = { 0xD2C00040, 0xF2A76000, 0x91400000 | (0x80u << 10) | (0u << 5), 0x910B6000, 0x528001E1, 0xB9000001, 0xB9400002, 0xB9400403, 0x14000000 };
+        memcpy(a64m_ram_at(m, A64M_RAM_BASE, sizeof code), code, sizeof code);
+        a64m_run(m, 60, false);
+        CHECK(a64m_cpu(m)->x[2] == 0xff && a64m_cpu(m)->x[3] == 0, "psmirror: written 0xf reads 0x%llx (want 0xff), neighbour reads 0x%llx (want 0)", (unsigned long long)a64m_cpu(m)->x[2], (unsigned long long)a64m_cpu(m)->x[3]);
+        a64m_destroy(m);
+    }
     { /* 0.4.57: all /arm-io nodes with a physical range, and the stop report naming the node that owns the first unmapped access */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(2, 2); PROP("name", 7, "arm-io"); PROP("ranges", 24, ((uint64_t[3]){0, 0x200000000ull, 0x40000000ull}));
