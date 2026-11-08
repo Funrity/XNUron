@@ -68,6 +68,7 @@ void a64m_set_value_watch(A64Machine *m, uint64_t v);   /* record the first 8 st
 void a64m_set_store_watch2(A64Machine *m, int i, uint64_t pa, uint64_t len);
 int a64m_add_unknown_mmio_named(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, the log names the block */
 int a64m_unknown_set_readback(A64Machine *m, uint64_t pa);
+int a64m_unknown_lastreads(A64Machine *m, char *out, size_t cap);
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val);   /* MODELLED fixed read value at an offset of an unknown block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */
 int a64m_unknown_summary(A64Machine *m, char *out, size_t cap);   /* touched blocks: name reads/writes last-offset */

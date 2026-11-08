@@ -96,11 +96,14 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
 static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[4], rv_val[4]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; char ac[170]; } g_unk[360]; static int g_unk_n;
+/* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
+static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
+    if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s", d->label[0] ? d->label : "'?'"); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
@@ -126,6 +129,12 @@ int a64m_unknown_summary(A64Machine *m, char *out, size_t cap) {
     for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && (g_unk[k].reads || g_unk[k].writes)) {
         cnt++; if (n + 260 < cap) n += (size_t)snprintf(out + n, cap - n, " %s=%ur/%uw(last+0x%llx; first:%s)", g_unk[k].label[0] ? g_unk[k].label : "'mem'", g_unk[k].reads, g_unk[k].writes, (unsigned long long)g_unk[k].last_off, g_unk[k].ac);
     }
+    return cnt;
+}
+int a64m_unknown_lastreads(A64Machine *m, char *out, size_t cap) {
+    size_t n = 0; int cnt = 0; if (cap) out[0] = 0;
+    for (unsigned k = 0; k < 24; k++) { unsigned i = (g_rr_n + k) % 24; if (g_rr[i].m != m || !g_rr[i].label[0]) continue;
+        cnt++; if (n + 90 < cap) n += (size_t)snprintf(out + n, cap - n, " %s+0x%llx=0x%llx", g_rr[i].label, (unsigned long long)g_rr[i].off, (unsigned long long)g_rr[i].val); }
     return cnt;
 }
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val) {
@@ -628,6 +637,7 @@ static void dump_watch(A64Machine *m) {
         for (int k = 0; k < g_soc_n; k++) if (c->xab_pa >= g_soc[k].pa && c->xab_pa - g_soc[k].pa < g_soc[k].size)
             a64m_log(m, "[stop] that address belongs to DeviceTree node '%s' (compatible '%s', base 0x%llx, size 0x%llx; offset +0x%llx)\n", g_soc[k].name, g_soc[k].compat, (unsigned long long)g_soc[k].pa, (unsigned long long)g_soc[k].size, (unsigned long long)(c->xab_pa - g_soc[k].pa));
     }
+    { static char lr[3000]; int c2 = a64m_unknown_lastreads(m, lr, sizeof lr); if (c2) a64m_log(m, "[stop] last %d reads from unknown SoC blocks (block+offset=value, oldest first; memory controller polling left out):%s\n", c2, lr); }
     { static char sm[3000]; int cnt = a64m_unknown_summary(m, sm, sizeof sm); if (cnt) a64m_log(m, "[stop] MODELLED unknown SoC blocks the kernel touched (%d; reads/writes, last offset):%s\n", cnt, sm); }
     if (c->at_n) a64m_log(m, "[stop] AT (address translation) instructions executed: %llu, last: va=0x%llx PAR_EL1=0x%llx\n", (unsigned long long)c->at_n, (unsigned long long)c->at_va, (unsigned long long)c->at_par);
     a64m_log(m, "[stop] TPIDR_EL1 writes by the guest: %u%s", c->tp_n, c->tp_n ? " (pc=value):" : " (never written)");
