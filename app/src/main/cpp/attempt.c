@@ -527,7 +527,7 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 }
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
-static int dt_has_kw(const char *s) { static const char *const kw[] = { "coresight", "impl-reg", "debug", "uttdbg", "reg-private" }; for (size_t i = 0; i < 5; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "nvme", "nand", "ans-", "ans3", "ans2", "sep-", "-sep", "storage", "nvram" }; for (size_t i = 0; i < 9; i++) if (strstr(s, kw[i])) return 1; return 0; }
 /* 0.4.117 diagnostic: every property (name, length, first 8 words) of the nodes called `target`, comma separated */
 static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, const char *target, char *out, size_t cap, size_t *len) {
     if (depth > 32 || *pos + 8 > n) return -1;
@@ -842,8 +842,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
           if (a64m_add_unknown_mmio_named(m, base, 0x40000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
       LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x40000-byte blocks (size NOT in the DT; 0.4.116 used 0x10000, the kernel then wrote base+0x20fb0; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
-    { static char db[5000]; static const char *const tg[] = { "cpu0", "cpu-debug-interface" };   /* 0.4.117: where is 0x210030000 described? */
-      for (int ti = 0; ti < 2; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
+    { static char db[5000]; static const char *const tg[] = { "ans", "sep", "nvme-mmu0", "nand" };   /* 0.4.117: where is 0x210030000 described? */
+      for (int ti = 0; ti < 4; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
     { /* 0.4.80 diagnostic (changes nothing): log 0.4.79 shows the watchdog panic again (clock speed 0). Which frequency properties does the IPSW tree really carry, and are they zero placeholders? */
       static const char *const pn[] = { "timebase-frequency", "clock-frequency", "bus-frequency", "fixed-frequency", "memory-frequency", "peripheral-frequency", "bus-frequency-min", "bus-frequency-max", "cpu-frequency", "usbphy-frequency", "soc-generation" };
       static const char *const nd[] = { "cpu0", "arm-io", "device-tree" };
@@ -865,7 +865,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     { char w[1800]; int r = a64_dt_node_prop_words(dt, dtlen, "pmgr", "energy-counters", w, sizeof w);
       LOG("[boot] diagnostic (changes nothing): pmgr/energy-counters (%d): %s\n", r, r >= 0 ? w : "(absent)"); }
     { static char gb[6000]; DtGrep g = { gb, sizeof gb, 0, 0 }; size_t gp = 0; gb[0] = 0; dt_grep_walk(dt, dtlen, &gp, 0, "", &g);
-      LOG("[boot] diagnostic (changes nothing): DeviceTree nodes/properties with 'coresight', 'impl-reg', 'debug', 'uttdbg' or 'reg-private' in the name (0.4.115: first 6 words of each property shown; the kernel wrote 0xC5ACCE55 to physical 0x210010fb0, which has no device) (%d): %s\n", g.hits, gb); }
+      LOG("[boot] diagnostic (changes nothing): DeviceTree nodes/properties with 'nvme', 'nand', 'ans-', 'ans3', 'ans2', 'sep-', 'storage' or 'nvram' in the name (0.4.119: first 6 words of each property; the kernel waits for IOMedia Apple_HFS, which storage does the DT describe?) (%d): %s\n", g.hits, gb); }
     { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
