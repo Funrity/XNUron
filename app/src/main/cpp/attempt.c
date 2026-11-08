@@ -829,6 +829,12 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
             if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
         LOG("%s (%d)\n", hl, nh); } }
+    if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
+      uint64_t lo = (g_xref[0] < g_xref[2] ? g_xref[0] : g_xref[2]) - 0x1c0, hi = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0;
+      for (uint64_t a = lo; a < hi; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a); int okd = 0;
+        for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
+            for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
+        if (okd) LOG("%s\n", dl); } }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     free(kern);
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
