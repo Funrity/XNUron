@@ -95,7 +95,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[4], rv_val[4]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
@@ -138,7 +138,7 @@ int a64m_unknown_lastreads(A64Machine *m, char *out, size_t cap) {
     return cnt;
 }
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val) {
-    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa && g_unk[k].rv_n < 4) { struct Unk *d = &g_unk[k]; d->rv_off[d->rv_n] = off; d->rv_val[d->rv_n++] = val; return 0; }
+    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa && g_unk[k].rv_n < 16) { struct Unk *d = &g_unk[k]; d->rv_off[d->rv_n] = off; d->rv_val[d->rv_n++] = val; return 0; }
     return -1;
 }
 /* 0.4.61: the block's first 4 KiB behave as plain read-back registers (a read returns the last 32-bit value written at that offset, 0 if none) */
