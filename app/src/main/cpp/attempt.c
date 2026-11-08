@@ -817,6 +817,14 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     { /* 0.4.112 (MODELLED, ASSUMPTION): decoded kernel code 0x8ce4604..0x8ce46dc (0.4.111 headless dump): to enable, it sets the low nibble of pmgr 0x23b000000+0x98000 to 0xf and then ApplePMGR::waitReg32 waits for (reg & 0x10) == 0, i.e. bit 4 is a busy/pending flag that clears. A fixed read value 0x0f (low nibble 0xf, bit 4 clear) satisfies that. */
       int bad = a64m_unknown_set_read(m, 0x23b000000ull, 0x98000, 0x0f) != 0; bad += a64m_unknown_set_read(m, 0x23b000000ull, 0x98004, 0x0f) != 0;   /* 0.4.113: the same function has a second branch for +0x98004 (the only two branches it has) */
       LOG("[boot] MODELLED (ASSUMPTION 0.4.112): pmgr 0x23b000000+0x98000 and +0x98004 read 0x0f: the kernel waits for bit 4 (busy) of this register to clear after setting its low nibble to 0xf. Real timing/behaviour UNKNOWN%s\n", bad ? " (WARNING: could not be set)" : ""); }
+    { /* 0.4.116 (MODELLED, ASSUMPTION): headless log 0.4.114: the kernel wrote 0xC5ACCE55 (CoreSight lock access key) to physical 0x210010fb0, no RAM/device. The DT 'cpuN/reg-private' = {lo, hi} (cpu0 = 0x210010000, ... 6 cores) are the per-core debug blocks. The DT gives NO size: 0x10000 is an ASSUMPTION. Reads 0, writes ignored. */
+      int nc = 0, bad = 0; char pa[400] = "";
+      for (int ci = 0; ci < 16; ci++) { char cn[16], w[64]; snprintf(cn, sizeof cn, "cpu%d", ci);
+          int pl = a64_dt_node_prop_words(dt, dtlen, cn, "reg-private", w, sizeof w); unsigned lo = 0, hi = 0;
+          if (pl != 8 || sscanf(w, "%x %x", &lo, &hi) != 2) continue;
+          uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
+          if (a64m_add_unknown_mmio_named(m, base, 0x10000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
+      LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x10000-byte blocks (size NOT in the DT; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
     { /* 0.4.80 diagnostic (changes nothing): log 0.4.79 shows the watchdog panic again (clock speed 0). Which frequency properties does the IPSW tree really carry, and are they zero placeholders? */
       static const char *const pn[] = { "timebase-frequency", "clock-frequency", "bus-frequency", "fixed-frequency", "memory-frequency", "peripheral-frequency", "bus-frequency-min", "bus-frequency-max", "cpu-frequency", "usbphy-frequency", "soc-generation" };
       static const char *const nd[] = { "cpu0", "arm-io", "device-tree" };
