@@ -527,7 +527,7 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 }
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
-static int dt_has_kw(const char *s) { static const char *const kw[] = { "ifane", "energy", "tuning" }; for (size_t i = 0; i < 3; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "coresight", "impl-reg", "debug", "uttdbg", "reg-private" }; for (size_t i = 0; i < 5; i++) if (strstr(s, kw[i])) return 1; return 0; }
 static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, const char *parent, DtGrep *g) {
     if (depth > 32 || *pos + 8 > n) return -1;
     uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
@@ -538,7 +538,9 @@ static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, cons
     if (dt_has_kw(me) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "[node %s/%s] ", parent, me); g->hits++; }
     for (uint32_t i = 0; i < np; i++) {
         char nm[33]; memcpy(nm, d + *pos, 32); nm[32] = 0; uint32_t len; memcpy(&len, d + *pos + 32, 4); len &= 0x7FFFFFFFu;
-        if (dt_has_kw(nm) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%s/%s(%u) ", me, nm, len); g->hits++; }
+        if (dt_has_kw(nm) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%s/%s(%u)=", me, nm, len);
+            for (uint32_t b = 0; b < len && b < 24 && b + 4 <= len; b += 4) { uint32_t w; memcpy(&w, d + *pos + 36 + b, 4); g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%x,", w); }
+            if (g->len + 2 < g->cap) g->out[g->len++] = ' ', g->out[g->len] = 0; g->hits++; }
         *pos += 36 + (((size_t)len + 3) & ~(size_t)3);
     }
     for (uint32_t i = 0; i < nc; i++) { if (dt_grep_walk(d, n, pos, depth + 1, me, g) < 0) return -1; }
@@ -835,8 +837,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       LOG("[boot] diagnostic (changes nothing): pmgr/ifane-max (%d): %s\n", r, r >= 0 ? w : "(absent)"); }
     { char w[1800]; int r = a64_dt_node_prop_words(dt, dtlen, "pmgr", "energy-counters", w, sizeof w);
       LOG("[boot] diagnostic (changes nothing): pmgr/energy-counters (%d): %s\n", r, r >= 0 ? w : "(absent)"); }
-    { static char gb[3000]; DtGrep g = { gb, sizeof gb, 0, 0 }; size_t gp = 0; gb[0] = 0; dt_grep_walk(dt, dtlen, &gp, 0, "", &g);
-      LOG("[boot] diagnostic (changes nothing): DeviceTree nodes/properties with 'ifane', 'energy' or 'tuning' in the name (%d): %s\n", g.hits, gb); }
+    { static char gb[6000]; DtGrep g = { gb, sizeof gb, 0, 0 }; size_t gp = 0; gb[0] = 0; dt_grep_walk(dt, dtlen, &gp, 0, "", &g);
+      LOG("[boot] diagnostic (changes nothing): DeviceTree nodes/properties with 'coresight', 'impl-reg', 'debug', 'uttdbg' or 'reg-private' in the name (0.4.115: first 6 words of each property shown; the kernel wrote 0xC5ACCE55 to physical 0x210010fb0, which has no device) (%d): %s\n", g.hits, gb); }
     { size_t np2 = 0; int nn = dt_names_walk(dt, dtlen, &np2, 0, dt_names_to_machine, m);   /* 0.4.79 */
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
