@@ -528,6 +528,23 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
 static int dt_has_kw(const char *s) { static const char *const kw[] = { "coresight", "impl-reg", "debug", "uttdbg", "reg-private" }; for (size_t i = 0; i < 5; i++) if (strstr(s, kw[i])) return 1; return 0; }
+/* 0.4.117 diagnostic: every property (name, length, first 8 words) of the nodes called `target`, comma separated */
+static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, const char *target, char *out, size_t cap, size_t *len) {
+    if (depth > 32 || *pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
+    char me[40] = "?"; size_t save = *pos;
+    for (uint32_t i = 0; i < np; i++) { if (*pos + 36 > n) return -1; uint32_t l; memcpy(&l, d + *pos + 32, 4); l &= 0x7FFFFFFFu;
+        if (!memcmp(d + *pos, "name\0", 5) && l < 39) { memcpy(me, d + *pos + 36, l); me[l] = 0; } *pos += 36 + (((size_t)l + 3) & ~(size_t)3); }
+    *pos = save; int hit = !strcmp(me, target);
+    for (uint32_t i = 0; i < np; i++) { char nm[33]; memcpy(nm, d + *pos, 32); nm[32] = 0; uint32_t l; memcpy(&l, d + *pos + 32, 4); l &= 0x7FFFFFFFu;
+        if (hit && *len + 200 < cap) { *len += (size_t)snprintf(out + *len, cap - *len, "%s(%u)=", nm, l);
+            for (uint32_t b = 0; b < l && b < 32 && b + 4 <= l; b += 4) { uint32_t w; memcpy(&w, d + *pos + 36 + b, 4); *len += (size_t)snprintf(out + *len, cap - *len, "%x,", w); }
+            if (l >= 4 && l <= 32 && !strncmp(nm, "name", 4)) { /* text */ }
+            *len += (size_t)snprintf(out + *len, cap - *len, " "); }
+        *pos += 36 + (((size_t)l + 3) & ~(size_t)3); }
+    for (uint32_t i = 0; i < nc; i++) { if (dt_dump_node(d, n, pos, depth + 1, target, out, cap, len) < 0) return -1; }
+    return 0;
+}
 static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, const char *parent, DtGrep *g) {
     if (depth > 32 || *pos + 8 > n) return -1;
     uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
@@ -825,6 +842,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
           if (a64m_add_unknown_mmio_named(m, base, 0x10000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
       LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x10000-byte blocks (size NOT in the DT; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
+    { static char db[5000]; static const char *const tg[] = { "cpu0", "cpu-debug-interface" };   /* 0.4.117: where is 0x210030000 described? */
+      for (int ti = 0; ti < 2; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
     { /* 0.4.80 diagnostic (changes nothing): log 0.4.79 shows the watchdog panic again (clock speed 0). Which frequency properties does the IPSW tree really carry, and are they zero placeholders? */
       static const char *const pn[] = { "timebase-frequency", "clock-frequency", "bus-frequency", "fixed-frequency", "memory-frequency", "peripheral-frequency", "bus-frequency-min", "bus-frequency-max", "cpu-frequency", "usbphy-frequency", "soc-generation" };
       static const char *const nd[] = { "cpu0", "arm-io", "device-tree" };
