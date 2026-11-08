@@ -241,6 +241,20 @@ int main(int argc, char **argv) {
         CHECK(a64m_cpu(m)->x[2] == 0x1234 && a64m_cpu(m)->x[3] == 0, "read-back: +8 gave 0x%llx (want 0x1234), unwritten +4 gave 0x%llx (want 0)", (unsigned long long)a64m_cpu(m)->x[2], (unsigned long long)a64m_cpu(m)->x[3]);
         a64m_destroy(m);
     }
+    { /* 0.4.122: RAMDisk property patch and BuildManifest path lookup */
+        uint8_t d[8 + 36 + 16 + 8 + 36 + 16]; memset(d, 0, sizeof d); uint32_t np = 2, nc = 0, l16 = 16; memcpy(d, &np, 4); memcpy(d + 4, &nc, 4);
+        strcpy((char *)d + 8, "name"); l16 = 16; memcpy(d + 8 + 32, &l16, 4); strcpy((char *)d + 8 + 36, "memory-map");
+        strcpy((char *)d + 8 + 36 + 16, "RAMDisk"); memcpy(d + 8 + 36 + 16 + 32, &l16, 4);
+        CHECK(a64_dt_patch_u64x2(d, sizeof d, "RAMDisk", 0x1122334455ull, 0x6677ull) == 1, "RAMDisk patched");
+        uint64_t a, b; memcpy(&a, d + 8 + 36 + 16 + 36, 8); memcpy(&b, d + 8 + 36 + 16 + 44, 8);
+        CHECK(a == 0x1122334455ull && b == 0x6677ull, "RAMDisk data is {0x%llx, 0x%llx}", (unsigned long long)a, (unsigned long long)b);
+        CHECK(a64_dt_patch_u64x2(d, sizeof d, "Nothing", 1, 2) == 0, "unknown property is not patched");
+        const char *pl = "<dict><key>RestoreRamDisk</key><dict><key>Info</key><dict><key>Path</key><string>048-16246-204.dmg</string></dict></dict></dict><key>Path</key><string>other</string>";
+        char o[64] = "";
+        CHECK(a64_plist_first_path(pl, strlen(pl), "RestoreRamDisk", o, sizeof o) == 1 && !strcmp(o, "048-16246-204.dmg"), "path found: '%s'", o);
+        CHECK(a64_plist_first_path(pl, strlen(pl), "UpdateRamDisk", o, sizeof o) == 0, "missing key reports 0");
+        CHECK(a64_plist_first_path(pl, strlen(pl), "RestoreRamDisk", o, 5) == 0, "too small output buffer reports 0");
+    }
     { /* 0.4.110: power-state mirror (ApplePMGR::waitReg32 waits for (reg & 0xf0) == 0xf0 after writing 0xf) */
         A64Machine *m = a64m_create_system(1u << 20);
         CHECK(a64m_add_unknown_mmio_named(m, 0x23b000000ull, 0x100000, "pmgr") == 0 && a64m_unknown_set_psmirror(m, 0x23b000000ull) == 0, "psmirror block added");

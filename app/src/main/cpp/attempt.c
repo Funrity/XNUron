@@ -572,6 +572,35 @@ static int host_random(void *buf, size_t n) {
     return 0;
 }
 
+/* 0.4.122: property data of `prop` (first occurrence anywhere in the flat tree; the 32-byte name field + length 16) set to two u64.
+   Used to fill /chosen/memory-map 'RAMDisk' = {physical address, size} once the final layout is known. 1 patched, 0 not found / length != 16, -1 ambiguous. */
+int a64_dt_patch_u64x2(uint8_t *d, size_t n, const char *prop, uint64_t a, uint64_t b) {
+    uint8_t pat[36]; memset(pat, 0, sizeof pat); strncpy((char *)pat, prop, 32); uint32_t l16 = 16; memcpy(pat + 32, &l16, 4);
+    uint8_t *hit = NULL; int cnt = 0;
+    for (size_t i = 0; i + 36 + 16 <= n; i += 4) if (!memcmp(d + i, pat, 36)) { if (!hit) hit = d + i; cnt++; }
+    if (cnt > 1) return -1; if (!hit) return 0;
+    memcpy(hit + 36, &a, 8); memcpy(hit + 44, &b, 8); return 1;
+}
+
+/* 0.4.122: BuildManifest.plist (XML text, `n` bytes, no NUL needed): the <string> after the first '<key>Path</key>' that follows the first
+   '<key>`key`</key>'; copied to out. 1 found, 0 not found. */
+int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, size_t cap) {
+    char pat[96]; snprintf(pat, sizeof pat, "<key>%s</key>", key);
+    const char *e = p + n, *k = NULL;
+    for (const char *q = p; q + strlen(pat) <= e; q++) if (!memcmp(q, pat, strlen(pat))) { k = q; break; }
+    if (!k) return 0;
+    static const char pk[] = "<key>Path</key>"; const char *pp = NULL;
+    for (const char *q = k; q + sizeof pk - 1 <= e; q++) if (!memcmp(q, pk, sizeof pk - 1)) { pp = q + sizeof pk - 1; break; }
+    if (!pp) return 0;
+    const char *a = NULL; for (const char *q = pp; q + 8 <= e; q++) if (!memcmp(q, "<string>", 8)) { a = q + 8; break; }
+    if (!a) return 0;
+    const char *z = NULL; for (const char *q = a; q + 9 <= e; q++) if (!memcmp(q, "</string>", 9)) { z = q; break; }
+    if (!z || (size_t)(z - a) + 1 > cap) return 0;
+    memcpy(out, a, (size_t)(z - a)); out[z - a] = 0; return 1;
+}
+static const char *g_pick_name;
+static bool pick_exact(const char *n) { return g_pick_name && !strcmp(n, g_pick_name); }
+static bool pick_manifest(const char *n) { return !strcmp(n, "BuildManifest.plist"); }
 static bool pick_dtree(const char *n) { return has(n, "DeviceTree") && !has(n, ".plist") && !has(n, ".dmg"); }
 
 static uint8_t *zip_extract(A64ReadAt rd, void *ud, const ZEnt *z, char *why, size_t wc) {
@@ -675,6 +704,33 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         } else LOG("[boot] step 5: DeviceTree '%s' could not be extracted: %s. Continuing without it.\n", de.name, why);
     } else LOG("[boot] step 5: no DeviceTree member found. Continuing without it.\n");
     if (dt && dtlen > 0x300000) { free(dt); dt = NULL; LOG("[boot] DeviceTree larger than 3 MiB, ignored\n"); }
+    /* 0.4.122 (MODELLED, iBoot does this): the kernel waits for a root device (IOMedia Apple_HFS, log 0.4.118) and the IPSW holds no firmware for the ANS
+       storage coprocessor, so the way a restore boot gets a root disk is used: the Restore RAM disk named by BuildManifest.plist is loaded into memory and
+       handed over in /chosen/memory-map 'RAMDisk' with boot-arg rd=md0. Its IM4P has no KBAG (not encrypted); nothing is decrypted or bypassed. */
+    uint8_t *rdk = NULL; size_t rdlen = 0; uint64_t rdpa = 0; int rd_on = 0;
+    if (dt) {
+        ZEnt me2; char rname[160] = "";
+        if (zip_find(rd, ud, total, pick_manifest, 0, &me2, why, sizeof why) == 0 && me2.usz < (32u << 20)) {
+            uint8_t *mf = zip_extract(rd, ud, &me2, why, sizeof why);
+            if (mf) { if (!a64_plist_first_path((const char *)mf, (size_t)me2.usz, "RestoreRamDisk", rname, sizeof rname)) rname[0] = 0; free(mf); }
+        }
+        if (!rname[0]) LOG("[boot] RAM disk: BuildManifest.plist or its RestoreRamDisk entry not found, no root device is provided\n");
+        else {
+            ZEnt re; g_pick_name = rname;
+            if (zip_find(rd, ud, total, pick_exact, 0, &re, why, sizeof why) < 0) LOG("[boot] RAM disk: '%s' named by BuildManifest.plist is not in the archive (%s)\n", rname, why);
+            else {
+                uint8_t *rr = zip_extract(rd, ud, &re, why, sizeof why);
+                if (!rr) LOG("[boot] RAM disk: '%s' could not be extracted: %s\n", rname, why);
+                else { const char *s3 = NULL; rdk = to_plain(m, rr, (size_t)re.usz, "RestoreRamDisk", &rdlen, &s3); free(rr);
+                    if (!rdk) LOG("[boot] RAM disk '%s' unusable: %s\n", rname, s3); }
+            }
+        }
+        if (rdk) {
+            uint64_t add = ((uint64_t)rdlen + 0x3FFFull) & ~0x3FFFull;
+            if (ram + add > MAX_RAM) { LOG("[boot] RAM disk %zu bytes does not fit the %llu MiB guest RAM limit, not used\n", rdlen, (unsigned long long)(MAX_RAM >> 20)); free(rdk); rdk = NULL; }
+            else { ram += add; LOG("[boot] RAM disk '%s': %zu bytes, guest RAM grown by %llu MiB for it\n", rname, rdlen, (unsigned long long)(add >> 20)); }
+        }
+    }
     uint32_t boot_reg = 0; int have_boot_reg = 0;
     if (dt) {
         char fn[40]; int nf = a64_dt_fixup(dt, dtlen, fn);
@@ -692,6 +748,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
               dt = nd;
               int a1 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "security-domain", 1);
               int a2 = a64_dt_chosen_add_u32(dt, &dtlen, dtcap, "chip-epoch", 0);
+              if (rdk) { int ar = a64_dt_node_add_zero_prop(dt, &dtlen, dtcap, "memory-map", "RAMDisk", 16); LOG("[boot] DeviceTree fix-up (MODELLED, iBoot does this): /chosen/memory-map 'RAMDisk' %s (filled with the physical address and size once the layout is known)\n", ar == 1 ? "added" : ar == 0 ? "already present" : "NOT possible (no memory-map node?)"); }
               { /* 0.4.65/0.4.75: ApplePMGR.cpp:899 panics "voltage-statesN not found" one N per run (log 0.4.74: N=5 after N=1); every missing voltage-states0..15 becomes an empty property so the next runs do not stop on each index */
                 char vn[24], added[96] = ""; int na3 = 0, bad = 0;
                 char filled[96] = ""; int nfill = 0;
@@ -766,6 +823,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
            slides the DT pointer with that region's delta, and maps the memory above topOfKernelData (+0x20000 for its own first page tables) as the last
            region. So the DT must sit between the end of the kernel image and topOfKernelData, and deviceTreeP is a kernel VIRTUAL address. */
         dtp = kend; top = (kend + dtlen + 0x3FFFull) & ~0x3FFFull;
+        if (rdk) { rdpa = top; top = (rdpa + rdlen + 0x3FFFull) & ~0x3FFFull; rd_on = 1; }   /* 0.4.122: the RAM disk lies between the DT and topOfKernelData, i.e. inside the kernel-data region iBoot reserves */
         if (top + 0x20000 > A64M_RAM_BASE + ram) { free(dt); a64m_abort(m, "step 7 - no room for the DeviceTree above the kernel"); return m; }
     }
     /* 0.4.28 (MODELLED): iBoot hands the kernel a linear framebuffer in boot_args.Video {baseAddr(40) display(48) rowBytes(56) width(64) height(72) depth(80)}.
@@ -781,6 +839,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         if (pr == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): 'pmgr' has #bridges=%u and optional-bridge-mask=0x%x but no 'bridge-settings-<i>' for %u of the bridges; the kernel (ApplePMGR.cpp:843) requires one of the two for every bridge, so those bridges were marked optional: mask 0x%x -> 0x%x. ASSUMPTION: the real settings (which iBoot or the hardware would supply) are unknown here; nothing is invented except the optional flag\n", pnb, pom, pmiss, pom, pnm);
         else if (pr == 0) LOG("[boot] DeviceTree 'pmgr': every one of the %u bridges already has bridge-settings or an optional bit (mask 0x%x), nothing changed\n", pnb, pom);
         else LOG("[boot] WARNING: 'pmgr' node with #bridges / optional-bridge-mask not found or the tree is malformed (%d), the ApplePMGR bridge check is not prepared\n", pr); }
+    if (rd_on) { int pr2 = a64_dt_patch_u64x2(dt, dtlen, "RAMDisk", rdpa, (uint64_t)rdlen);
+        if (pr2 == 1) { memcpy(a64m_ram_at(m, rdpa, rdlen), rdk, rdlen); LOG("[boot] MODELLED (iBoot does this): RAM disk placed at physical 0x%llx (%zu bytes), /chosen/memory-map RAMDisk = {0x%llx, 0x%zx}, boot-arg rd=md0\n", (unsigned long long)rdpa, rdlen, (unsigned long long)rdpa, rdlen); }
+        else { rd_on = 0; LOG("[boot] RAM disk NOT handed over: the 'RAMDisk' property could not be patched (%d)\n", pr2); } }
+    free(rdk); rdk = NULL;
     if (dt) { memcpy(a64m_ram_at(m, dtp, dtlen), dt, dtlen); v = dt_virt ? mo.lowest_vm + (dtp - kphys) : dtp; memcpy(b + 96, &v, 8); uint32_t l = (uint32_t)dtlen; memcpy(b + 104, &l, 4); }
     if (dt && dt_virt) {
         uint64_t upa[3], usz[3]; char ul[1000]; int nu = a64_dt_uarts(dt, dtlen, upa, usz, ul, sizeof ul);
@@ -870,7 +932,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       if (nn >= 0) LOG("[boot] diagnostic (changes nothing): %d DeviceTree property names registered; at the stop the emulator lists lowercase dashed strings the kernel passed to calls that are NOT among them (heuristic list of missing DeviceTree properties)\n", nn);
       else LOG("[boot] diagnostic: DeviceTree property-name walk failed (tree malformed), the missing-name list stays off\n"); }
     free(dt);
-    strcpy((char *)b + 112, "-v serial=3 debug=0x14e");
+    strcpy((char *)b + 112, rd_on ? "-v serial=3 debug=0x14e rd=md0" : "-v serial=3 debug=0x14e");
     a64m_mark_attempt(m, mo.lowest_vm, kphys);
     a64m_set_pc(m, entry_p); a64m_set_boot_arg(m, ba);
     if (dt_virt) { a64m_set_dt_phys(m, dtp); /* 0.4.14: code/caller/refs/data windows dropped (the log is cut at 20000 characters; they are known now) */   /* 0.4.13: first_avail reaches avail_end BEFORE pmap_startup (0x7b53ed0): the loop that consumes every page stores from pc 0x7b53e50 inside this function */   /* 0.3.41 panic: "Invalid waitq" - the function that panicked (return address 0x7ab26ec) */
