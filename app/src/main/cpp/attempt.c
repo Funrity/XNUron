@@ -830,7 +830,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
         LOG("%s (%d)\n", hl, nh); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
-      uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = hi0, hi = hi0 + 0x680;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
+      uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = hi0, hi = hi0;   /* 0.4.130: dumps no longer needed */   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
       for (uint64_t a = lo; a < hi; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
@@ -947,8 +947,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
           if (a64m_add_unknown_mmio_named(m, base, 0x40000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
       LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x40000-byte blocks (size NOT in the DT; 0.4.116 used 0x10000, the kernel then wrote base+0x20fb0; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
-    { static char db[5000]; static const char *const tg[] = { "ans", "sep", "nvme-mmu0", "nand" };   /* 0.4.117: where is 0x210030000 described? */
-      for (int ti = 0; ti < 4; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
+    { static char db[5000]; static const char *const tg[] = { "chosen", "memory-map" };   /* 0.4.117: where is 0x210030000 described? */
+      for (int ti = 0; ti < 2; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
     { /* 0.4.80 diagnostic (changes nothing): log 0.4.79 shows the watchdog panic again (clock speed 0). Which frequency properties does the IPSW tree really carry, and are they zero placeholders? */
       static const char *const pn[] = { "timebase-frequency", "clock-frequency", "bus-frequency", "fixed-frequency", "memory-frequency", "peripheral-frequency", "bus-frequency-min", "bus-frequency-max", "cpu-frequency", "usbphy-frequency", "soc-generation" };
       static const char *const nd[] = { "cpu0", "arm-io", "device-tree" };
