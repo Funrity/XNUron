@@ -753,3 +753,7 @@ CI падал не на коде эмулятора, а на тестовых с
 - Отчёт IPSW (0.4.121): прошивки ANS в IPSW нет; два restore-ramdisk (rdsk, ~107 МБ) НЕ зашифрованы (нет KBAG) и не сжаты.
 - MODELLED (так делает iBoot при восстановлении): Restore RAM-диск из BuildManifest.plist (RestoreRamDisk) загружается в память между DT и topOfKernelData, адрес и размер пишутся в /chosen/memory-map RAMDisk, в boot-args добавлено rd=md0. RAM гостя растёт на размер диска. Ничего не расшифровывается и не обходится. Цель: дать ядру честный корневой диск вместо ожидания ANS.
 - Тесты: a64_dt_patch_u64x2, a64_plist_first_path.
+
+## 0.4.123
+
+- Headless 0.4.122: путь после ключа RestoreRamDisk в BuildManifest указал на Firmware/ane/... (моя ошибка разбора: у записи RestoreRamDisk нет Path сразу после ключа). Отчёт IPSW теперь печатает фрагмент манифеста (без бинарных данных), чтобы разобрать структуру. Только чтение.

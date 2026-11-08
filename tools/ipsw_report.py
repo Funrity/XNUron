@@ -64,3 +64,14 @@ for n in z.namelist():
             print(n, im4p_info(b))
         except Exception as e:
             print(n, "parse error", e)
+
+# ---- 0.4.123: BuildManifest excerpt around RestoreRamDisk / the first Path after it (binary <data> blobs removed)
+import re
+mf = z.read("BuildManifest.plist").decode("utf8", "replace")
+mf = re.sub(r"<data>[^<]*</data>", "<data/>", mf)
+for key in ("RestoreRamDisk",):
+    for mm in list(re.finditer("<key>%s</key>" % key, mf))[:3]:
+        print("---- manifest excerpt at", mm.start(), "of", len(mf))
+        print(re.sub(r"\s+", " ", mf[mm.start() - 200: mm.start() + 900]))
+print("---- all Path strings that mention .dmg:", sorted(set(re.findall(r"<string>([^<]*\.dmg)</string>", mf))))
+print("---- BuildIdentities:", mf.count("<key>BuildIdentities</key>"), "RestoreRamDisk keys:", mf.count("<key>RestoreRamDisk</key>"), "UpdateRamDisk keys:", mf.count("<key>UpdateRamDisk</key>"))
