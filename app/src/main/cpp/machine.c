@@ -95,7 +95,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[64]; uint32_t ps_val[64]; int ps; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
@@ -110,7 +110,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off;
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
-    if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 64) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
+    if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " w+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)v); }
 }
 /* 0.4.53: blocks with a label (the DeviceTree node name) so the log says which one was touched; 0.4.58: up to 360, each with a log budget (`cap` accesses) */
