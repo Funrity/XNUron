@@ -830,13 +830,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
         LOG("%s (%d)\n", hl, nh); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
-      uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00810b9d4ull - 0x40, hi = 0xfffffff00810b9d4ull + 0x5c0;   /* 0.4.131: PE_parse_boot_argn (call target of the 'rd' lookup at 0x80e9b34) */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
+      uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fe80ull;   /* 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
       for (uint64_t a = lo; a < hi; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.128: strings referenced (ADRP+ADD) by that window, in address order: which DT properties / boot-args does the root selection read? */
-      uint64_t lo = 0xfffffff00810b9d4ull - 0x40, hi = 0xfffffff00810b9d4ull + 0x5c0; char sl[1500]; size_t sn = 0; int nsr = 0;
+      uint64_t lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fe80ull; char sl[1500]; size_t sn = 0; int nsr = 0;
       sn += (size_t)snprintf(sl, sizeof sl, "[boot] diagnostic (changes nothing): strings referenced by the root-selection code 0x%llx..0x%llx:", (unsigned long long)lo, (unsigned long long)hi);
       for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint64_t pc = g->vmaddr + o; if (pc < lo || pc >= hi) continue;
