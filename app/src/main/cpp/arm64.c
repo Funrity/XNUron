@@ -1206,6 +1206,7 @@ static int step(A64 *c) {
     if (c->pp2_pc && pc == c->pp2_pc && !c->pp2_hit && c->x[c->pp2_reg & 31] == c->pp2_val) { c->pp2_hit = 1; memcpy(c->pp2_x, c->x, sizeof c->x); c->pp2_sp = c->sp; }
     if (c->pp_pc && pc == c->pp_pc && !c->pp_hit && c->x[c->pp_reg & 31] == c->pp_val) { c->pp_hit = 1; memcpy(c->pp_x, c->x, sizeof c->x); c->pp_sp = c->sp; }
     if (c->tr_pc) { if (!c->tr_on && pc == c->tr_pc) c->tr_on = 1; if (c->tr_on && c->tr_n < 400) c->tr_pcs[c->tr_n++] = pc; }
+    if (c->hist_pc && pc == c->hist_pc) { unsigned q = 0; while (q < c->hist_n && !(c->hist_lr[q] == c->x[30] && c->hist_x1[q] == c->x[1])) q++; if (q < c->hist_n) c->hist_cnt[q]++; else if (c->hist_n < 24) { c->hist_lr[q] = c->x[30]; c->hist_x1[q] = c->x[1]; c->hist_cnt[q] = 1; c->hist_n++; } else c->hist_other++; }
     if (c->ctr_pc && pc == c->ctr_pc && c->ctr_mode == 1) { static const int rr[8] = {0, 8, 9, 10, 24, 25, 26, 27}; unsigned slot = c->ctr_total % 40; for (int q = 0; q < 8; q++) c->ctr[slot][q] = c->x[rr[q]]; c->ctr_total++; }
     else if (c->ctr_pc && pc == c->ctr_pc && c->ctr_n < 40 && c->x[2] != 0) { for (int q = 0; q < 7; q++) c->ctr[c->ctr_n][q] = c->x[q]; c->ctr[c->ctr_n][7] = c->x[30]; c->ctr_n++; }
     if (c->aw_val && c->aw_n < 48) {
