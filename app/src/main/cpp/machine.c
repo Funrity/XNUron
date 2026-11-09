@@ -120,9 +120,9 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 static struct Unk { A64Machine *m; uint64_t ts_base[16]; uint32_t ts_raw; int ts_n; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
-static char g_tstrace[3000]; static unsigned g_tsn;   /* 0.4.147 diagnostic: first accesses inside a temperature sensor window: S<window>+<rel offset> */
-static void ts_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { for (int k = 0; k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k]; if (r < 0x34000 && g_tsn < 90) { size_t l = strlen(g_tstrace); if (l < sizeof g_tstrace - 40) { snprintf(g_tstrace + l, sizeof g_tstrace - l, " %c%d+0x%llx=0x%llx", w ? 'w' : 'r', k, (unsigned long long)r, (unsigned long long)v); g_tsn++; } break; } } }
-const char *a64m_tempsensor_trace(void) { return g_tstrace; }
+static struct { char w; uint64_t off, v; } g_tsr[60]; static unsigned g_tsn;   /* 0.4.149 diagnostic: ring of the LAST accesses inside any temperature sensor window (offset from the start of the pmgr block) */
+static void ts_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { for (int k = 0; k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k]; if (r < 0x34000) { unsigned i = g_tsn++ % 60; g_tsr[i].w = w ? 'w' : 'r'; g_tsr[i].off = off; g_tsr[i].v = v; break; } } }
+const char *a64m_tempsensor_trace(void) { static char b[2600]; size_t l = 0; b[0] = 0; unsigned n = g_tsn < 60 ? g_tsn : 60, st = g_tsn < 60 ? 0 : g_tsn % 60; for (unsigned k = 0; k < n && l < sizeof b - 40; k++) { unsigned i = (st + k) % 60; l += (size_t)snprintf(b + l, sizeof b - l, " %c+0x%llx=0x%llx", g_tsr[i].w, (unsigned long long)g_tsr[i].off, (unsigned long long)g_tsr[i].v); } return b; }
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
