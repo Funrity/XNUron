@@ -829,6 +829,22 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
             if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
         LOG("%s (%d)\n", hl, nh); } }
+    { /* 0.4.143 diagnostic (changes nothing): code that references the string containing 'sensor off' (AppleT8015TempSensor timeout line) and a window of code before it */
+      size_t kl2 = 10; uint64_t sva2 = 0; size_t si = 0;
+      for (size_t i = 1; i + kl2 <= klen && !sva2; i++) if (!memcmp(kern + i, "sensor off", kl2)) { si = i; while (si > 0 && kern[si - 1] != 0) si--;
+          for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; uint64_t off = si - mo.slice_off; if (si >= mo.slice_off && off >= g->fileoff && off < g->fileoff + g->filesize) { sva2 = g->vmaddr + (off - g->fileoff); break; } } }
+      uint64_t xr = 0; char hl[300]; size_t hn = (size_t)snprintf(hl, sizeof hl, "[boot] diagnostic (changes nothing): string '%s' at virtual 0x%llx; ADRP+ADD references from:", sva2 ? (const char *)(kern + si) : "?", (unsigned long long)sva2);
+      for (int q = 0; q < mo.nseg && sva2; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+        for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint32_t w1, w2; memcpy(&w1, kern + mo.slice_off + g->fileoff + o, 4); memcpy(&w2, kern + mo.slice_off + g->fileoff + o + 4, 4);
+          if ((w1 & 0x9f000000u) != 0x90000000u || (w2 & 0xffc00000u) != 0x91000000u || (w1 & 31) != ((w2 >> 5) & 31)) continue;
+          int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
+          uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
+          if (tgt == sva2) { if (!xr) xr = pc; hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
+      LOG("%s\n", hl);
+      if (xr) for (uint64_t a = (xr - 0x300) & ~0x7full; a < xr + 0x100; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.143):", (unsigned long long)a); int okd = 0;
+        for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
+            for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
+        if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
       uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fc00ull;   /* 0.4.135: dump done; was hi=..fe80, 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
       static const uint64_t rg[2][2] = { { 0xfffffff007bb21d0ull, 0xfffffff007bb2450ull }, { 0xfffffff007a6e9f0ull, 0xfffffff007a6eab0ull } };   /* 0.4.141: callee bl 0x14eb0 of the cpu idle routine 0x7b9d320 (called with w0=1) */ (void)lo; (void)hi;
@@ -948,7 +964,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
           if (a64m_add_unknown_mmio_named(m, base, 0x40000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
       LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x40000-byte blocks (size NOT in the DT; 0.4.116 used 0x10000, the kernel then wrote base+0x20fb0; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
-    { static char db[5000]; static const char *const tg[] = { "chosen", "memory-map" };   /* 0.4.117: where is 0x210030000 described? */
+    { static char db[5000]; static const char *const tg[] = { "tempsensor0", "dietempctl0" };   /* 0.4.117: where is 0x210030000 described? */
       for (int ti = 0; ti < 2; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
     { /* 0.4.135 (MODELLED, ASSUMPTION): headless [cpu] state 0.4.133 + decoded code 0.4.134: the kernel (_mccEnableCacheMode) spins forever on the memory controller (block 0x200000000): it writes the cache mode to +0x1c00 and polls +0x1c04 + 0x40000*k (k = 0..3) until bits 14:10 and 9:5 equal the mode. */
       int bad = 0; for (int ch = 0; ch < 4; ch++) bad += a64m_unknown_set_modelink(m, 0x200000000ull, 0x1c00, 0x1c04 + 0x40000ull * (uint64_t)ch) != 0;
