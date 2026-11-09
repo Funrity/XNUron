@@ -115,6 +115,8 @@ int  a64m_exit_code(const A64Machine *m);
 size_t a64m_log_read(A64Machine *m, size_t offset, char *buf, size_t cap);
 size_t a64m_log_size(A64Machine *m);
 /* kind 0 = everything in order, 1 = only what the guest wrote (UART / HLE output), 2 = only emulator messages. */
+void a64m_log_collapse(A64Machine *m, bool on);   /* 0.4.137: collapse identical consecutive guest lines into '[last line repeated N more times]' (attempt machines do) */
+void a64m_log_flush(A64Machine *m);                /* 0.4.137: write out the pending guest line / repeat note (end of a run) */
 size_t a64m_log_read_kind(A64Machine *m, int kind, size_t offset, char *buf, size_t cap);
 void a64m_log(A64Machine *m, const char *fmt, ...);
 

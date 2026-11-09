@@ -20,6 +20,8 @@ struct A64Machine {
     A64MState state;
     pthread_mutex_t lock;
     char *slog[3]; size_t slen[3];
+    /* 0.4.137: collapsing of identical consecutive GUEST output lines (the kernel's AppleT8015TempSensor timeout line fills the 1 MiB log): complete lines are held until the newline */
+    bool collapse; char gl_cur[600], gl_prev[600]; size_t gl_n, gl_pn; bool gl_pv; unsigned gl_rep;
     Fb fb; Touch touch;
     struct { uint64_t pa; uint32_t w, h, rowbytes; uint64_t sum; int64_t frame; } vid;   /* boot_args.Video framebuffer (IPSW attempt), read-only for the UI */
     uint64_t entry;
@@ -41,11 +43,31 @@ static void stream_add(A64Machine *m, int s, const char *p, size_t n) {
     memcpy(m->slog[s] + m->slen[s], p, n); m->slen[s] += n;
     if (m->slen[s] >= cap) { const char *t = "\n[log truncated]\n"; memcpy(m->slog[s] + m->slen[s], t, strlen(t)); m->slen[s] += strlen(t); }
 }
+static void guest_emit(A64Machine *m, const char *p, size_t n) { stream_add(m, 0, p, n); stream_add(m, 1, p, n); }
+static void guest_note(A64Machine *m) {   /* lock held */
+    if (!m->gl_rep) return;
+    char t[80]; int k = snprintf(t, sizeof t, "[last line repeated %u more time%s]\n", m->gl_rep, m->gl_rep == 1 ? "" : "s");
+    guest_emit(m, t, (size_t)k); m->gl_rep = 0;
+}
+static void guest_line_done(A64Machine *m, bool nl) {   /* lock held; gl_cur holds one complete line (nl) or a part of a very long one */
+    if (nl && m->gl_pv && m->gl_n == m->gl_pn && !memcmp(m->gl_cur, m->gl_prev, m->gl_n)) { if (++m->gl_rep >= 256) guest_note(m); m->gl_n = 0; return; }
+    guest_note(m); guest_emit(m, m->gl_cur, m->gl_n);
+    if (nl) { memcpy(m->gl_prev, m->gl_cur, m->gl_n); m->gl_pn = m->gl_n; m->gl_pv = true; } else m->gl_pv = false;
+    m->gl_n = 0;
+}
+static void guest_flush(A64Machine *m) { if (m->gl_n) guest_line_done(m, false); guest_note(m); }   /* lock held */
 static void log_raw_k(A64Machine *m, const char *s, size_t n, int kind) {   /* kind: 1 guest, 2 emulator */
     pthread_mutex_lock(&m->lock);
-    stream_add(m, 0, s, n); stream_add(m, kind, s, n);
+    if (kind == 1 && m->collapse) {
+        for (size_t i = 0; i < n; i++) { m->gl_cur[m->gl_n++] = s[i]; if (s[i] == '\n') guest_line_done(m, true); else if (m->gl_n >= sizeof m->gl_cur) guest_line_done(m, false); }
+    } else {
+        if (m->collapse) guest_flush(m);   /* keep the chronological order: an emulator message first ends the pending guest line */
+        stream_add(m, 0, s, n); stream_add(m, kind, s, n);
+    }
     pthread_mutex_unlock(&m->lock);
 }
+void a64m_log_collapse(A64Machine *m, bool on) { pthread_mutex_lock(&m->lock); if (!on) guest_flush(m); m->collapse = on; pthread_mutex_unlock(&m->lock); }
+void a64m_log_flush(A64Machine *m) { pthread_mutex_lock(&m->lock); if (m->collapse) guest_flush(m); pthread_mutex_unlock(&m->lock); }
 static void log_raw(A64Machine *m, const char *s, size_t n) { log_raw_k(m, s, n, 1); }   /* guest output */
 void a64m_log(A64Machine *m, const char *fmt, ...) {
     char b[2048]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b, fmt, ap); va_end(ap);
@@ -282,7 +304,7 @@ void a64m_destroy(A64Machine *m) {
 A64 *a64m_cpu(A64Machine *m) { return &m->cpu; }
 void a64m_mark_raw(A64Machine *m) { m->raw = true; }
 static uint64_t impl_reg(void *u, unsigned k, bool wr, uint64_t v);
-void a64m_mark_attempt(A64Machine *m, uint64_t vb, uint64_t pb) { m->cpu.stub_impl_regs = true; m->cpu.on_impl_reg = impl_reg; m->cpu.impl_ud = m; m->attempt = true; m->virt_base = vb; m->phys_base = pb; }
+void a64m_mark_attempt(A64Machine *m, uint64_t vb, uint64_t pb) { m->cpu.stub_impl_regs = true; m->cpu.on_impl_reg = impl_reg; m->cpu.impl_ud = m; m->attempt = true; m->collapse = true; m->virt_base = vb; m->phys_base = pb; }
 void a64m_set_pc(A64Machine *m, uint64_t pc) { m->cpu.pc = m->entry = pc; }
 void a64m_abort(A64Machine *m, const char *why) {
     a64m_log(m, "\n[boot] ATTEMPT ENDED BEFORE ANY GUEST INSTRUCTION RAN: %s\n", why);

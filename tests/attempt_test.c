@@ -255,6 +255,18 @@ int main(int argc, char **argv) {
         CHECK(a64_plist_first_path(pl, strlen(pl), "UpdateRamDisk", o, sizeof o) == 0, "missing key reports 0");
         CHECK(a64_plist_first_path(pl, strlen(pl), "RestoreRamDisk", o, 5) == 0, "too small output buffer reports 0");
     }
+    { /* 0.4.137: identical consecutive guest lines are collapsed */
+        A64Machine *m = a64m_create_system(1u << 20); a64m_log_collapse(m, true);
+        const char *txt = "T\nT\nT\nT\nU\nV\nV\n"; uint32_t code[64]; int nc = 0;
+        code[nc++] = 0xD2A12001;   /* movz x1, #0x0900, lsl #16 -> UART base 0x09000000 */
+        for (const char *q = txt; *q; q++) { code[nc++] = 0x52800002u | ((uint32_t)(unsigned char)*q << 5); code[nc++] = 0x39000022u; }   /* movz w2,#ch ; strb w2,[x1] */
+        code[nc++] = 0x14000000;
+        memcpy(a64m_ram_at(m, A64M_RAM_BASE, (size_t)nc * 4), code, (size_t)nc * 4);
+        a64m_run(m, 100, false); a64m_log_flush(m);
+        char buf[600]; size_t n = a64m_log_read_kind(m, 1, 0, buf, sizeof buf - 1); buf[n] = 0;
+        CHECK(!strcmp(buf, "T\n[last line repeated 3 more times]\nU\nV\n[last line repeated 1 more time]\n"), "collapsed guest log is '%s'", buf);
+        a64m_destroy(m);
+    }
     { /* 0.4.135: mode link (memory controller cache mode request/status) */
         A64Machine *m = a64m_create_system(1u << 20);
         CHECK(a64m_add_unknown_mmio_named(m, 0x200000000ull, 0x100000, "mem") == 0, "mem block added");
