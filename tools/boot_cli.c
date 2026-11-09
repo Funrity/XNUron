@@ -30,6 +30,9 @@ int main(int argc, char **argv) {
       fprintf(stderr, "[cpu] wfi/wfe executed=%llu, of which put the cpu to sleep=%llu\n", (unsigned long long)c->wfi_n, (unsigned long long)c->wfi_slept);
       fprintf(stderr, "[tempsensor] LAST 60 accesses (r/w +offset from the pmgr block start = value):%s\n", a64m_tempsensor_trace());
       { unsigned tot = c->call_total, n = tot < 60 ? tot : 60; fprintf(stderr, "[calls] %u distinct bl targets seen; the %u most recently FIRST-called (newest last):", tot, n); for (unsigned k = tot - n; k < tot; k++) fprintf(stderr, " %llx", (unsigned long long)c->callring[k % 160]); fprintf(stderr, "\n"); }
+      for (int k = 0; k < c->exc_first_n; k++) fprintf(stderr, "[exc] sync exception #%d at step %llu: esr=0x%x elr=0x%llx far=0x%llx\n", k, (unsigned long long)c->exc_first[k].steps, c->exc_first[k].esr, (unsigned long long)c->exc_first[k].elr, (unsigned long long)c->exc_first[k].far);
+      if (c->exc0_valid) { fprintf(stderr, "[exc] regs at the first sync exception: sp=%llx", (unsigned long long)c->exc0_sp); for (int r = 0; r < 31; r++) fprintf(stderr, " x%d=%llx", r, (unsigned long long)c->exc0_x[r]); fprintf(stderr, "\n"); }
+      if (c->trap_note[0]) fprintf(stderr, "[exc] trap note: %s\n", c->trap_note);
       fprintf(stderr, "[cpu] last pcs:"); for (unsigned k = 0; k < 24; k++) fprintf(stderr, " 0x%llx", (unsigned long long)c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 24 + k) % A64_PC_HIST]); fprintf(stderr, "\n");
       fprintf(stderr, "[cpu] x0..x8:"); for (int k = 0; k < 9; k++) fprintf(stderr, " %llx", (unsigned long long)c->x[k]); fprintf(stderr, " lr=%llx ttbr0=%llx ttbr1=%llx tpidr_el0=%llx\n", (unsigned long long)c->x[30], (unsigned long long)c->ttbr0_el1, (unsigned long long)c->ttbr1_el1, (unsigned long long)c->tpidr_el0); }
     return 0;
