@@ -831,13 +831,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         LOG("%s (%d)\n", hl, nh); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
       uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fc00ull;   /* 0.4.135: dump done; was hi=..fe80, 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
-      static const uint64_t rg[2][2] = { { 0xfffffff007a08800ull, 0xfffffff007a09100ull }, { 0xfffffff007a6e9f0ull, 0xfffffff007a6eab0ull } };   /* 0.4.137: loop after the root mount, [cpu] pcs of the 0.4.136 headless run */ (void)lo; (void)hi;
+      static const uint64_t rg[2][2] = { { 0xfffffff007b9d300ull, 0xfffffff007b9d700ull }, { 0xfffffff007a6e9f0ull, 0xfffffff007a6eab0ull } };   /* 0.4.140: idle thread loop (0x7a6e9f0..) and the cpu idle routine it enters via 0x7a08820 -> 0x7b9d320 */ (void)lo; (void)hi;
       for (int ri = 0; ri < 2; ri++) for (uint64_t a = rg[ri][0]; a < rg[ri][1]; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.128: strings referenced (ADRP+ADD) by that window, in address order: which DT properties / boot-args does the root selection read? */
-      uint64_t lo = 0xfffffff007a08800ull, hi = 0xfffffff007a6eab0ull; char sl[1500]; size_t sn = 0; int nsr = 0;
+      uint64_t lo = 0xfffffff007b9d300ull, hi = 0xfffffff007b9d700ull; char sl[1500]; size_t sn = 0; int nsr = 0;
       sn += (size_t)snprintf(sl, sizeof sl, "[boot] diagnostic (changes nothing): strings referenced by the root-selection code 0x%llx..0x%llx:", (unsigned long long)lo, (unsigned long long)hi);
       for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint64_t pc = g->vmaddr + o; if (pc < lo || pc >= hi || (pc >= 0xfffffff007a09100ull && pc < 0xfffffff007a6e9f0ull)) continue;
