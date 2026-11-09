@@ -120,6 +120,9 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 static struct Unk { A64Machine *m; uint64_t ts_base[16]; uint32_t ts_raw; int ts_n; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
+static char g_tstrace[3000]; static unsigned g_tsn;   /* 0.4.147 diagnostic: first accesses inside a temperature sensor window: S<window>+<rel offset> */
+static void ts_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { for (int k = 0; k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k]; if (r < 0x34000 && g_tsn < 90) { size_t l = strlen(g_tstrace); if (l < sizeof g_tstrace - 40) { snprintf(g_tstrace + l, sizeof g_tstrace - l, " %c%d+0x%llx=0x%llx", w ? 'w' : 'r', k, (unsigned long long)r, (unsigned long long)v); g_tsn++; } break; } } }
+const char *a64m_tempsensor_trace(void) { return g_tstrace; }
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
@@ -129,11 +132,12 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
+    if (d->ts_n) ts_trace(d, 0, off, val);
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
-    struct Unk *d = u; d->writes++; d->last_off = off;
+    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v);
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
     for (int k = 0; k < d->lk_n; k++) if (d->lk_w[k] == off) { d->lk_v[k] = (uint32_t)v & 0x1f; d->lk_set[k] = 1; }
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }

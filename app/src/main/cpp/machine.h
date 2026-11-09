@@ -72,6 +72,7 @@ int a64m_unknown_set_psmirror(A64Machine *m, uint64_t pa);
 int a64m_unknown_set_modelink(A64Machine *m, uint64_t pa, uint64_t w_off, uint64_t r_off);   /* 0.4.135 */
 int a64m_unknown_lastreads(A64Machine *m, char *out, size_t cap);
 int a64m_unknown_add_tempsensor(A64Machine *m, uint64_t block_pa, uint64_t base_off, uint32_t raw);   /* 0.4.145 MODELLED temperature sensor window inside a block */
+const char *a64m_tempsensor_trace(void);   /* 0.4.147 diagnostic: first accesses to the temperature sensor windows */
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val);   /* MODELLED fixed read value at an offset of an unknown block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */
 int a64m_unknown_summary(A64Machine *m, char *out, size_t cap);   /* touched blocks: name reads/writes last-offset */
