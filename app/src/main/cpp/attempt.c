@@ -830,9 +830,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
             if (tgt == sva) { hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); if (nh < 2 && xi * 2 + nh < 4) g_xref[xi * 2 + nh] = pc; nh++; } } }
         LOG("%s (%d)\n", hl, nh); } }
-    { /* 0.4.143 diagnostic (changes nothing): code that references the string containing 'sensor off' (AppleT8015TempSensor timeout line) and a window of code before it */
-      size_t kl2 = 10; uint64_t sva2 = 0; size_t si = 0;
-      for (size_t i = 1; i + kl2 <= klen && !sva2; i++) if (!memcmp(kern + i, "sensor off", kl2)) { si = i; while (si > 0 && kern[si - 1] != 0) si--;
+    { /* 0.4.151 diagnostic (changes nothing): code that references the string containing '/sbin/launchd' and a window of code before it */
+      size_t kl2 = 13; uint64_t sva2 = 0; size_t si = 0;
+      for (size_t i = 1; i + kl2 <= klen && !sva2; i++) if (!memcmp(kern + i, "/sbin/launchd", kl2)) { si = i; while (si > 0 && kern[si - 1] != 0) si--;
           for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; uint64_t off = si - mo.slice_off; if (si >= mo.slice_off && off >= g->fileoff && off < g->fileoff + g->filesize) { sva2 = g->vmaddr + (off - g->fileoff); break; } } }
       uint64_t xr = 0; char hl[300]; size_t hn = (size_t)snprintf(hl, sizeof hl, "[boot] diagnostic (changes nothing): string '%s' at virtual 0x%llx; ADRP+ADD references from:", sva2 ? (const char *)(kern + si) : "?", (unsigned long long)sva2);
       for (int q = 0; q < mo.nseg && sva2; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
@@ -842,6 +842,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
           if (tgt == sva2) { if (!xr) xr = pc; hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
       LOG("%s\n", hl);
+      if (xr) a64m_cpu(m)->hist_pc = xr;   /* 0.4.151: the run's [hist] line then says whether this code (the first reference to '/sbin/launchd') is ever executed */
       if (xr) for (uint64_t a = (xr - 0x300) & ~0x7full; a < xr + 0x100; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.143):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
