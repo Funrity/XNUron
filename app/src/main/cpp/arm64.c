@@ -794,7 +794,9 @@ static int exec_sys(A64 *c, uint32_t i, uint64_t *next) {
     if ((i & 0xFFFFF01Fu) == 0xD503201Fu) {          /* hints */
         unsigned h = (i >> 5) & 0x7F;
         if (h == 3 || h == 2) {                      /* WFI / WFE */
+            c->wfi_n++;
             if (c->mode != A64_MODE_SYSTEM || a64_irq_asserted(c) || fiq_asserted(c)) return 0;
+            c->wfi_slept++;
             c->idle = true;
             c->idle_ticks = timer_wait_ticks(c);
         }

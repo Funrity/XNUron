@@ -110,7 +110,7 @@ typedef struct {
     uint8_t *cov, *callseen; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
     uint64_t tr_pc; unsigned tr_n; int tr_on; uint64_t tr_pcs[400];   /* diagnostic: the 400 pcs executed from the first execution of tr_pc on */
     uint64_t ctr_pc; int ctr_mode; unsigned ctr_total; unsigned ctr_n; uint64_t ctr[40][8];
-    uint64_t hist_pc; unsigned hist_n; uint64_t hist_lr[24], hist_x1[24], hist_cnt[24], hist_other;   /* diagnostic 0.4.138: histogram of (lr, x1) at every entry of one pc */
+    uint64_t wfi_n, wfi_slept; uint64_t hist_pc; unsigned hist_n; uint64_t hist_lr[24], hist_x1[24], hist_cnt[24], hist_other;   /* diagnostic 0.4.138: histogram of (lr, x1) at every entry of one pc */
        /* diagnostic: x0..x6 and lr at each entry of one function */
     uint64_t vw_val; unsigned vw_n; struct { uint64_t pc, va, pa, lr, x[4]; uint8_t sz; } vw[8];   /* diagnostic: stores of a given value */
     uint64_t sw_lo, sw_hi; unsigned sw_n; struct { uint64_t pc, addr, val; uint8_t sz; } sw[16]; uint64_t sw_x[4][31];   /* diagnostic: first stores to a physical range (kernel global) */
