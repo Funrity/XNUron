@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     uint64_t maxm = argc > 2 ? strtoull(argv[2], 0, 10) : 4000;
     A64Machine *m = a64_attempt_ipsw(file_read, f, sz); if (!m) { fprintf(stderr, "out of memory\n"); return 2; }
     uint64_t steps = 0; A64MState st;
-    { const char *hp = getenv("XN_HIST_PC"); if (hp) a64m_cpu(m)->hist_pc = strtoull(hp, 0, 16); }   /* 0.4.138 diagnostic */
+    { const char *hp = getenv("XN_HIST_PC"); if (hp) a64m_cpu(m)->hist_pc = strtoull(hp, 0, 16); } a64m_cpu(m)->cr_on = 1;   /* 0.4.138 diagnostic */
     while ((st = a64m_run(m, 200000, false)) == A64M_RUNNING) { steps += 200000; if (steps % 500000000ull == 0) { A64 *c0 = a64m_cpu(m); fprintf(stderr, "[progress] %llu M steps: EL%d pc=0x%llx daif=0x%x exceptions=%llu x0=%llx lr=%llx\n", (unsigned long long)(steps / 1000000ull), c0->el, (unsigned long long)c0->pc, c0->daif, (unsigned long long)c0->exc_count, (unsigned long long)c0->x[0], (unsigned long long)c0->x[30]); } if (steps > maxm * 1000000ull) { fprintf(stderr, "step limit reached\n"); break; } }
     a64m_log_flush(m);
     size_t off = 0, n; char *b = malloc(65536);
@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
       for (int k = 0; k < c->exc_first_n; k++) fprintf(stderr, "[exc] sync exception #%d at step %llu: esr=0x%x elr=0x%llx far=0x%llx\n", k, (unsigned long long)c->exc_first[k].steps, c->exc_first[k].esr, (unsigned long long)c->exc_first[k].elr, (unsigned long long)c->exc_first[k].far);
       if (c->exc0_valid) { fprintf(stderr, "[exc] regs at the first sync exception: sp=%llx", (unsigned long long)c->exc0_sp); for (int r = 0; r < 31; r++) fprintf(stderr, " x%d=%llx", r, (unsigned long long)c->exc0_x[r]); fprintf(stderr, "\n"); }
       if (c->trap_note[0]) fprintf(stderr, "[exc] trap note: %s\n", c->trap_note);
+      { unsigned n = c->cr_n < 64 ? c->cr_n : 64, st = c->cr_n < 64 ? 0 : c->cr_n % 64; fprintf(stderr, "[bl] last %u bl call sites executed with interrupts unmasked (site->target, newest last):", n); for (unsigned k = 0; k < n; k++) { unsigned qq = (st + k) % 64; fprintf(stderr, " %llx>%llx", (unsigned long long)c->cr_pc[qq], (unsigned long long)c->cr_tg[qq]); } fprintf(stderr, "\n"); }
       fprintf(stderr, "[cpu] last pcs:"); for (unsigned k = 0; k < 24; k++) fprintf(stderr, " 0x%llx", (unsigned long long)c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 24 + k) % A64_PC_HIST]); fprintf(stderr, "\n");
       fprintf(stderr, "[cpu] x0..x8:"); for (int k = 0; k < 9; k++) fprintf(stderr, " %llx", (unsigned long long)c->x[k]); fprintf(stderr, " lr=%llx ttbr0=%llx ttbr1=%llx tpidr_el0=%llx\n", (unsigned long long)c->x[30], (unsigned long long)c->ttbr0_el1, (unsigned long long)c->ttbr1_el1, (unsigned long long)c->tpidr_el0); }
     return 0;
