@@ -117,7 +117,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; uint64_t ts_base[16]; uint32_t ts_raw; int ts_n; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static struct { char w; uint64_t off, v; } g_tsr[60]; static unsigned g_tsn;   /* 0.4.149 diagnostic: ring of the LAST accesses inside any temperature sensor window (offset from the start of the pmgr block) */
@@ -126,8 +126,7 @@ const char *a64m_tempsensor_trace(void) { static char b[2600]; size_t l = 0; b[0
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
-    for (int k = 0; !fixed && k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k];   /* 0.4.145 MODELLED temperature sensor window, see a64m_unknown_add_tempsensor */
-        if (r == 0x0 || r == 0x4 || r == 0x8 || r == 0xc || r == 0x10) { val = 1; fixed = 5; }   /* ASSUMPTION 0.4.146: which of the control/status registers the kernel tests with bit0 is not known (struct field +0x130), so all read 1 */ else if (r == 0x20000 || r == 0x20004) { val = 0x80000000ull | d->ts_raw; fixed = 5; } else if (r == 0x28) { val = 4ull * d->ts_raw; fixed = 5; } else if (r == 0x30) { val = 4; fixed = 5; } }
+    for (int k = 0; !fixed && k < d->ts_rn; k++) if (d->ts_off[k] == off) { val = d->ts_val[k]; fixed = 5; }   /* 0.4.150 MODELLED temperature sensor registers, see a64m_unknown_ts_read */
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
     if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
@@ -187,11 +186,14 @@ int a64m_unknown_set_modelink(A64Machine *m, uint64_t pa, uint64_t w_off, uint64
     for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == pa) { struct Unk *d = &g_unk[k]; if (d->lk_n >= 8) return -1; d->lk_w[d->lk_n] = w_off; d->lk_r[d->lk_n] = r_off; d->lk_set[d->lk_n] = 0; d->lk_n++; return 0; }
     return -1;
 }
-/* 0.4.145 MODELLED / ASSUMPTION (PLACEHOLDER raw): a temperature sensor whose register window starts at `base_off` inside the block (the DT 'tempsensorN' reg lies inside a 'pmgr' block). Offsets are the DT's sensor-offset-* properties:
-   status(+0x10) reads 1 (bit0 'on'; the kernel's AppleT8015TempSensor timeout code prints 'sensor off' when bit0 is 0), readBK(+0x20000, +0x20004) read bit31 'valid' | raw, readSum(+0x28) = 4*raw, readCnt(+0x30) = 4.
-   The real sensor (conversion, alarms, interrupt) is NOT modelled; raw is invented. Up to 16 windows per block, raw is shared. */
-int a64m_unknown_add_tempsensor(A64Machine *m, uint64_t block_pa, uint64_t base_off, uint32_t raw) {
-    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == block_pa) { struct Unk *d = &g_unk[k]; if (d->ts_n >= 16) return -1; d->ts_base[d->ts_n++] = base_off; d->ts_raw = raw; return 0; }
+/* 0.4.150 MODELLED / ASSUMPTION (PLACEHOLDER values): registers of the AppleT8015TempSensor instances, which lie INSIDE a 'pmgr' block (their DT `reg` overlaps it). The caller (attempt.c) takes every register offset from the node's own
+   sensor-offset-* properties; `ts_window` only marks the sensor's range for the access trace, `ts_read` adds one fixed read value (block-relative offset, up to 160 per block). Real sensor behaviour (conversion, alarms, interrupt) is NOT modelled. */
+int a64m_unknown_ts_window(A64Machine *m, uint64_t block_pa, uint64_t base_off) {
+    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == block_pa) { struct Unk *d = &g_unk[k]; if (d->ts_n >= 16) return -1; d->ts_base[d->ts_n] = base_off; return d->ts_n++; }
+    return -1;
+}
+int a64m_unknown_ts_read(A64Machine *m, uint64_t block_pa, uint64_t off, uint64_t val) {
+    for (int k = g_unk_n - 1; k >= 0; k--) if (g_unk[k].m == m && g_unk[k].pa == block_pa) { struct Unk *d = &g_unk[k]; if (d->ts_rn >= 160) return -1; d->ts_off[d->ts_rn] = off; d->ts_val[d->ts_rn++] = val; return 0; }
     return -1;
 }
 int a64m_unknown_set_psmirror(A64Machine *m, uint64_t pa) {
