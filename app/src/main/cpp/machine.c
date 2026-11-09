@@ -124,7 +124,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     for (int k = 0; !fixed && k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k];   /* 0.4.145 MODELLED temperature sensor window, see a64m_unknown_add_tempsensor */
-        if (r == 0x10) { val = 1; fixed = 5; } else if (r == 0x20000 || r == 0x20004) { val = 0x80000000ull | d->ts_raw; fixed = 5; } else if (r == 0x28) { val = 4ull * d->ts_raw; fixed = 5; } else if (r == 0x30) { val = 4; fixed = 5; } }
+        if (r == 0x0 || r == 0x4 || r == 0x8 || r == 0xc || r == 0x10) { val = 1; fixed = 5; }   /* ASSUMPTION 0.4.146: which of the control/status registers the kernel tests with bit0 is not known (struct field +0x130), so all read 1 */ else if (r == 0x20000 || r == 0x20004) { val = 0x80000000ull | d->ts_raw; fixed = 5; } else if (r == 0x28) { val = 4ull * d->ts_raw; fixed = 5; } else if (r == 0x30) { val = 4; fixed = 5; } }
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
     if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
