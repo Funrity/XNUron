@@ -71,6 +71,24 @@ int main(int argc, char **argv) {
             if (tg >= 0) fprintf(stderr, " %llx@%llx(bl %llx)", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8), (unsigned long long)tg); else fprintf(stderr, " %llx@%llx", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8)); } }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.178 diagnostic: strings referenced (ADRP+ADD) in the 0x300 bytes before each return address on the owner thread's kernel stack: names the code that called the blocking wait */
+        uint64_t sb = 0, pa; uint8_t *q;
+        if (a64_virt_to_phys(c, 0xffffffe000745fe0ull + 0x98, &pa) == 0 && (q = a64m_ram_at(m, pa, 8))) memcpy(&sb, q, 8);
+        uint64_t seen[16]; int ns = 0;
+        if (sb) for (uint64_t off = 0x4000; off >= 8 && ns < 16; off -= 8) { uint64_t v = 0;
+          if (a64_virt_to_phys(c, sb + off - 8, &pa) != 0 || !(q = a64m_ram_at(m, pa, 8))) continue; memcpy(&v, q, 8);
+          uint64_t t = 0xfffffff000000000ull | (v & 0xfffffffffull); if (!((v >> 36) != 0 && (v & 3) == 0 && t >= c->cov_base && t < c->cov_base + c->cov_len)) continue;
+          int dup = 0; for (int z = 0; z < ns; z++) if (seen[z] == t) dup = 1; if (dup) continue; seen[ns++] = t;
+          fprintf(stderr, "[kstr] ret %llx:", (unsigned long long)(t & 0xfffffffffull));
+          int cnt = 0; for (uint64_t a = t - 0x300; a < t && cnt < 4; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+            if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+            if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+            int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff) ;
+            uint64_t sp; uint8_t *sq; char buf[48]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 40))) continue; memcpy(buf, sq, 40); buf[40] = 0;
+            int ok = 1, n = 0; while (n < 40 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) ok = 0; n++; } if (!ok || n < 5) continue;
+            fprintf(stderr, " \"%s\"", buf); cnt++; }
+          fprintf(stderr, "\n"); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
