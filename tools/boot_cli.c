@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[calls-in] chain #%d (depth %d, fn %llx): %d bl sites, last executed #%d; around it (X = executed):", ck, dep3, (unsigned long long)fn3, n2, last);
           for (int k = last - 3 < 0 ? 0 : last - 3; k < n2 && k <= last + 2; k++) { a64_attempt_bsdinit(ck, k, &st2, &tg2); uint64_t co = st2 - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7))); fprintf(stderr, " #%d %llx>%llx%s", k, (unsigned long long)st2, (unsigned long long)tg2, ex ? "X" : "-"); } fprintf(stderr, "\n"); } }
       { /* 0.4.163 diagnostic: reconstruct kernel call chains from frame records [fp, lr] in guest RAM (ASSUMPTIONS: kernel heap/stacks are linearly mapped as VA = 0xffffffe000000000 + (PA - 0x40000000), saved lr values are unsigned in this interpreter) */
-        uint64_t sz = 0; for (uint64_t t = 0x40000000ull; t <= 0x100000000ull; t += 0x4000000ull) if (a64m_ram_at(m, 0x40000000ull, t)) sz = t; else break;
+        uint64_t sz = 0; for (uint64_t t = 0x1000000ull; t <= 0x100000000ull; t += 0x1000000ull) if (a64m_ram_at(m, 0x40000000ull, t)) sz = t; else break;
         uint8_t *ram = sz ? a64m_ram_at(m, 0x40000000ull, sz) : 0; const uint64_t VB = 0xffffffe000000000ull, lo = c->cov_base, hi = c->cov_base + c->cov_len;
         if (ram) { uint8_t *ref = calloc(sz / 16 / 8 + 1, 1); unsigned nch = 0;
           for (uint64_t p = 0; p + 16 <= sz; p += 16) { uint64_t fp, lr; memcpy(&fp, ram + p, 8); memcpy(&lr, ram + p + 8, 8); if (lr < lo || lr >= hi || fp < VB) continue; uint64_t o2 = fp - VB; if (o2 <= p || o2 - p >= 0x4000 || (o2 & 15) || o2 + 16 > sz) continue; ref[o2 / 16 / 8] |= (uint8_t)(1u << ((o2 / 16) & 7)); }
