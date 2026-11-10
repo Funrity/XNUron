@@ -142,8 +142,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
       }
       { /* 0.4.184 diagnostic: every ADRP+ADD reference in kernel code to the strings "SecureRoot" and "IORTC" (the platform method waits for flags set by a matching callback for these), with nearby strings, to find who publishes them */
-        static const char *want[2] = {"SecureRoot", "IORTC"}; static const uint64_t hint[2] = {0xfffffff008151b58ull, 0xfffffff008151ae0ull};
-        for (int w = 0; w < 2; w++) { uint64_t strva = 0; uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+        static const char *want[3] = {"SecureRoot", "IORTC", "SecureRootCallBack"}; static const uint64_t hint[3] = {0xfffffff008151b58ull, 0xfffffff008151ae0ull, 0xfffffff008151d54ull};
+        for (int w = 2; w < 3; w++) { uint64_t strva = 0; uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
           { uint64_t a = hint[w] - 8; if (!(a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4)))) { memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
               int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; strva = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); } }
           /* the hint address is only approximate: scan +-0x20 for the exact ADRP+ADD whose target string equals want[w] */
