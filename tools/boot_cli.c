@@ -67,7 +67,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "[kstk] owner thread stack base %llx; text words from the top down (addr@offset):", (unsigned long long)sb);
         if (sb) for (uint64_t off = 0x4000; off >= 8; off -= 8) { uint64_t va = sb + off - 8, v = 0;
           if (a64_virt_to_phys(c, va, &pa) != 0 || !(q = a64m_ram_at(m, pa, 8))) continue; memcpy(&v, q, 8);
-          uint64_t t = 0xfffffff000000000ull | (v & 0xfffffffffull); if (t >= c->cov_base && t < c->cov_base + c->cov_len && (v >> 36) != 0 && (v & 3) == 0) fprintf(stderr, " %llx@%llx", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8)); }
+          uint64_t t = 0xfffffff000000000ull | (v & 0xfffffffffull); if (t >= c->cov_base && t < c->cov_base + c->cov_len && (v >> 36) != 0 && (v & 3) == 0) { uint64_t ppa; uint8_t *iq; uint32_t ins = 0; long long tg = -1; if (a64_virt_to_phys(c, t - 4, &ppa) == 0 && (iq = a64m_ram_at(m, ppa, 4))) { memcpy(&ins, iq, 4); if ((ins >> 26) == 0x25) { int64_t im = (int32_t)(ins << 6) >> 6; tg = (long long)((t - 4 + (uint64_t)(im * 4)) & 0xfffffffffull); } }
+            if (tg >= 0) fprintf(stderr, " %llx@%llx(bl %llx)", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8), (unsigned long long)tg); else fprintf(stderr, " %llx@%llx", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8)); } }
         fprintf(stderr, "\n");
       }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
