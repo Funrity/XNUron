@@ -101,6 +101,18 @@ int main(int argc, char **argv) {
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); }
           fprintf(stderr, "\n"); }
       }
+      { /* 0.4.180 diagnostic: strings referenced (ADRP+ADD, 0x400 bytes back) before return addresses of the blocked thread whose stack chain is 7a68fcc 8151cbc 80eaa68 7e8e3a8 7a75284 */
+        static const uint64_t rets[5] = {0xfffffff008151cbcull, 0xfffffff0080eaa68ull, 0xfffffff007e8e3a8ull, 0xfffffff007a75284ull, 0xfffffff007a68fccull};
+        for (int r = 0; r < 5; r++) { fprintf(stderr, "[bstr] ret %llx:", (unsigned long long)(rets[r] & 0xfffffffffull)); int cnt = 0;
+          for (uint64_t a = rets[r] - 0x400; a < rets[r] && cnt < 6; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+            if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+            if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+            int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+            uint64_t sp; uint8_t *sq; char buf[64]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 60))) continue; memcpy(buf, sq, 60); buf[60] = 0;
+            int ok = 1, n = 0; while (n < 60 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) ok = 0; n++; } if (!ok || n < 4) continue;
+            fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
+          fprintf(stderr, "\n"); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
