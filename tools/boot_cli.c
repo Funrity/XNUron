@@ -165,6 +165,17 @@ int main(int argc, char **argv) {
             fprintf(stderr, "}"); }
           fprintf(stderr, "\n"); }
       }
+      { /* 0.4.186 diagnostic: walk the frame records from the bsd-init thread (slot ffffffe0107c3910); in the frame whose saved lr is 0x80eaa68 (the AppleARMPE callPlatformFunction method) print the saved x19..x24 (this = x19) and the platform object words +0x100..+0x120 (flags +0x108 no-rtc, +0x109 no-suspend, +0x10a request, +0x10b answer, +0x10c result, +0x110 provider) */
+        uint64_t cur = 0xffffffe0107c3910ull;
+        for (int d = 0; d < 8; d++) { uint64_t pa, fp = 0, lr = 0; uint8_t *q;
+          if (a64_virt_to_phys(c, cur, &pa) || !(q = a64m_ram_at(m, pa, 16))) break; memcpy(&fp, q, 8); memcpy(&lr, q + 8, 8);
+          fprintf(stderr, "[fr] #%d slot %llx fp %llx lr %llx\n", d, (unsigned long long)cur, (unsigned long long)fp, (unsigned long long)(lr & 0xfffffffffull));
+          if ((lr & 0xfffffffffull) == 0x80eaa68ull) { uint64_t sv[7]; for (int z = 0; z < 7; z++) { sv[z] = 0; uint64_t pp; uint8_t *qq; if (!a64_virt_to_phys(c, cur - 0x38 + 8 * z, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&sv[z], qq, 8); }
+            fprintf(stderr, "[fr] saved (slot-0x38..slot-8): x24=%llx x23=%llx x22=%llx x21=%llx x20=%llx x19=%llx\n", (unsigned long long)sv[0], (unsigned long long)sv[1], (unsigned long long)sv[2], (unsigned long long)sv[3], (unsigned long long)sv[4], (unsigned long long)sv[5]);
+            uint64_t obj = sv[5]; for (uint64_t off = 0x100; off < 0x120; off += 8) { uint64_t pp, w = 0; uint8_t *qq; if (!a64_virt_to_phys(c, obj + off, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&w, qq, 8); fprintf(stderr, "[plat] +%llx = %016llx\n", (unsigned long long)off, (unsigned long long)w); }
+            break; }
+          if (!fp) break; cur = fp; }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
