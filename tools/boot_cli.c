@@ -176,6 +176,13 @@ int main(int argc, char **argv) {
             break; }
           if (!fp) break; cur = fp; }
       }
+      { /* 0.4.187 diagnostic: raw stack words around the AppleARMPE method frame (slot ffffffe0107c39b0), and for every word that looks like a kernel pointer the 8 bytes at +0x108 and +0x110 with a mapped flag */
+        const uint64_t slot = 0xffffffe0107c39b0ull;
+        for (int z = -10; z <= 1; z++) { uint64_t va = slot + 8 * (int64_t)z, pa, w = 0; uint8_t *q; int ok = !a64_virt_to_phys(c, va, &pa) && (q = a64m_ram_at(m, pa, 8)); if (ok) memcpy(&w, q, 8);
+          fprintf(stderr, "[sf] slot%+d: %016llx", z * 8, (unsigned long long)w);
+          if (ok && (w >> 36) == 0xfffffffull || ok && (w >> 36) == 0xfffffffffull) { for (int r = 0; r < 2; r++) { uint64_t o = w + (r ? 0x110 : 0x108), p2, v = 0; uint8_t *q2; int ok2 = !a64_virt_to_phys(c, o, &p2) && (q2 = a64m_ram_at(m, p2, 8)); if (ok2) memcpy(&v, q2, 8); fprintf(stderr, "  [+%x]=%s%016llx", r ? 0x110 : 0x108, ok2 ? "" : "UNMAPPED:", (unsigned long long)v); } }
+          fprintf(stderr, "\n"); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
