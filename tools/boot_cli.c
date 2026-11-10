@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
           strva = 0; for (uint64_t a = hint[w] - 0x30; a < hint[w] + 0x30 && !strva; a += 4) { if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
             if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
             int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
-            uint64_t sp; uint8_t *sq; char buf[32]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 16))) continue; memcpy(buf, sq, 16); buf[15] = 0; if (!strcmp(buf, want[w])) strva = tg; }
+            uint64_t sp; uint8_t *sq; char buf[40]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 32))) continue; memcpy(buf, sq, 32); buf[31] = 0; if (!strcmp(buf, want[w])) strva = tg; }
           fprintf(stderr, "[sref] \"%s\" string at %llx; references:", want[w], (unsigned long long)(strva & 0xfffffffffull)); if (!strva) { fprintf(stderr, " (string not located)\n"); continue; }
           int nref = 0; for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len && nref < 12; a += 4) { if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
             if (a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
