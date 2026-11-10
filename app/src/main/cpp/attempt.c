@@ -606,6 +606,9 @@ static uint64_t g_ch_fn[48], g_ch_site[48]; static int g_ch_d[48], g_ch_n;   /* 
 int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth) { if (i < 0 || i >= g_ch_n) return 0; *fn = g_ch_fn[i]; *site = g_ch_site[i]; *depth = g_ch_d[i]; return 1; }
 static uint64_t g_bi_site[600], g_bi_tg[600]; static int g_bi_n, g_bi_cnt[48], g_bi_first[48];   /* 0.4.160 diagnostic: every bl inside the depth-4 caller of the launchd code (bsd_init?) up to the call towards launchd */
 int a64_attempt_bsdinit(int chain_i, int j, uint64_t *site, uint64_t *target) { if (chain_i < 0 || chain_i >= 48 || j < 0 || j >= g_bi_cnt[chain_i]) return 0; *site = g_bi_site[g_bi_first[chain_i] + j]; *target = g_bi_tg[g_bi_first[chain_i] + j]; return 1; }
+static uint64_t *g_sym_a; static uint32_t *g_sym_n; static char *g_sym_str; static size_t g_sym_cnt;   /* 0.4.170 diagnostic: kernelcache LC_SYMTAB (if the file carries one), sorted by address */
+const char *a64_attempt_symbolize(uint64_t va, uint64_t *off) { if (!g_sym_cnt) return 0; size_t lo = 0, hi = g_sym_cnt; while (hi - lo > 1) { size_t md = (lo + hi) / 2; if (g_sym_a[md] <= va) lo = md; else hi = md; } if (g_sym_a[lo] > va || va - g_sym_a[lo] > 0x4000) return 0; *off = va - g_sym_a[lo]; return g_sym_str + g_sym_n[lo]; }
+static int sym_cmp(const void *x, const void *y) { uint64_t a = *(const uint64_t *)x, b = *(const uint64_t *)y; return a < b ? -1 : a > b; }
 static uint64_t g_xref[4];   /* 0.4.126 diagnostic: code addresses referencing 'RAMDisk' (0,1) and 'root-matching' (2,3) */
 static const char *g_pick_name;
 static bool pick_exact(const char *n) { return g_pick_name && !strcmp(n, g_pick_name); }
@@ -885,6 +888,16 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
                 const uint8_t *sp = kern + mo.slice_off + h->fileoff + (tgt - h->vmaddr); size_t L = 0; while (L < 70 && tgt - h->vmaddr + L < h->filesize && sp[L] >= 32 && sp[L] < 127) L++;
                 if (L >= 3 && sp[L] == 0 && sn + L + 30 < sizeof sl) { sn += (size_t)snprintf(sl + sn, sizeof sl - sn, " @%llx=[%.*s]", (unsigned long long)(pc & 0xfffff), (int)L, sp); nsr++; } break; } } } }
       LOG("%s (%d)\n", sl, nsr); }
+    { /* 0.4.170: does the kernelcache carry a symbol table (LC_SYMTAB)? If yes, keep it so that addresses in the headless log can be named */
+      const uint8_t *hd = kern + mo.slice_off; uint32_t nc = mo.ncmds, symoff = 0, nsyms = 0, stroff = 0, strsize = 0; size_t po = 32;
+      for (uint32_t ci = 0; ci < nc && mo.slice_off + po + 8 <= klen; ci++) { uint32_t cmd, cs; memcpy(&cmd, hd + po, 4); memcpy(&cs, hd + po + 4, 4); if (cs < 8) break; if (cmd == 2 && mo.slice_off + po + 24 <= klen) { memcpy(&symoff, hd + po + 8, 4); memcpy(&nsyms, hd + po + 12, 4); memcpy(&stroff, hd + po + 16, 4); memcpy(&strsize, hd + po + 20, 4); } po += cs; }
+      uint64_t nok = 0; if (nsyms && nsyms < 4000000u && (uint64_t)symoff + (uint64_t)nsyms * 16 <= klen - mo.slice_off && (uint64_t)stroff + strsize <= klen - mo.slice_off && strsize) {
+        uint64_t *tmp = malloc(sizeof(uint64_t) * 2 * nsyms); g_sym_str = malloc(strsize + 1);
+        if (tmp && g_sym_str) { memcpy(g_sym_str, hd + stroff, strsize); g_sym_str[strsize] = 0;
+          for (uint32_t k = 0; k < nsyms; k++) { const uint8_t *e = hd + symoff + (uint64_t)k * 16; uint32_t sx; uint64_t val; memcpy(&sx, e, 4); memcpy(&val, e + 8, 8); if ((e[4] & 0x0e) != 0x0e || !val || sx >= strsize || !g_sym_str[sx]) continue; tmp[nok * 2] = val; tmp[nok * 2 + 1] = sx; nok++; }
+          qsort(tmp, nok, 16, sym_cmp); g_sym_a = malloc(8 * (nok + 1)); g_sym_n = malloc(4 * (nok + 1)); if (g_sym_a && g_sym_n) { for (uint64_t k = 0; k < nok; k++) { g_sym_a[k] = tmp[k * 2]; g_sym_n[k] = (uint32_t)tmp[k * 2 + 1]; } g_sym_cnt = nok; } }
+        free(tmp); }
+      LOG("[boot] diagnostic (changes nothing): kernelcache symbol table: LC_SYMTAB %s, %u entries, %llu usable named section symbols\n", symoff ? "present" : "absent", nsyms, (unsigned long long)g_sym_cnt); }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     free(kern);
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
