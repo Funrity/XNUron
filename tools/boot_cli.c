@@ -41,6 +41,12 @@ int main(int argc, char **argv) {
           if (last < 0) continue;
           fprintf(stderr, "[calls-in] chain #%d (depth %d, fn %llx): %d bl sites, last executed #%d; around it (X = executed):", ck, dep3, (unsigned long long)fn3, n2, last);
           for (int k = last - 3 < 0 ? 0 : last - 3; k < n2 && k <= last + 2; k++) { a64_attempt_bsdinit(ck, k, &st2, &tg2); uint64_t co = st2 - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7))); fprintf(stderr, " #%d %llx>%llx%s", k, (unsigned long long)st2, (unsigned long long)tg2, ex ? "X" : "-"); } fprintf(stderr, "\n"); } }
+      { /* 0.4.173 diagnostic: raw words around the mutex address seen at the frontier (x1 of the last lck_mtx slow-path new pc) */
+        uint64_t mv = 0xffffffe000868550ull, pa;
+        if (a64_virt_to_phys(c, mv & ~0xfull, &pa) == 0) { uint8_t *q = a64m_ram_at(m, pa, 16); if (q) { uint64_t w0, w1; memcpy(&w0, q, 8); memcpy(&w1, q + 8, 8);
+          fprintf(stderr, "[mtx] %llx: %016llx %016llx (TPIDR_EL1=%llx)\n", (unsigned long long)(mv & ~0xfull), (unsigned long long)w0, (unsigned long long)w1, (unsigned long long)c->tpidr_el1); } }
+        else fprintf(stderr, "[mtx] %llx not mapped\n", (unsigned long long)mv);
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
