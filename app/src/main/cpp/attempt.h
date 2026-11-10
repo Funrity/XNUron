@@ -40,6 +40,7 @@ int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *nod
 int a64_dt_patch_u64x2(uint8_t *d, size_t n, const char *prop, uint64_t a, uint64_t b);   /* 0.4.122 */
 int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, size_t cap);   /* 0.4.122 */
 int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth);   /* 0.4.159 diagnostic: callers chain of the code that references '/sbin/launchd' */
+int a64_attempt_bsdinit(int i, uint64_t *site, uint64_t *target);   /* 0.4.160 diagnostic */
 int a64_dt_node_prop_words(uint8_t *d, size_t n, const char *node, const char *prop, char *out, size_t cap);   /* 0.4.69: property data as hex u32 words */
 int a64_dt_node_info(uint8_t *d, size_t n, const char *node, const char *prop, int64_t *plen, char *log, size_t logcap);   /* property length of the first node with this name + all its property names */
 int a64_dt_soc_nodes(uint8_t *d, size_t n, A64SocNode *out, int max);   /* every /arm-io node with a reg: name, compatible, physical range */

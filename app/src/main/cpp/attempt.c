@@ -604,6 +604,8 @@ int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, si
 #define TEMPSENSOR_RAW 0x8c0ull   /* PLACEHOLDER raw reading: the kernel converts raw*100*(1/64) (double constant 0x3f90000000000000 at 0x706f4a0, 0.4.144 dump) -> raw 0x8c0 = 35.0 (units: 1/64 degree, ASSUMPTION) */
 static uint64_t g_ch_fn[48], g_ch_site[48]; static int g_ch_d[48], g_ch_n;   /* 0.4.159 diagnostic: callers chain of the code referencing '/sbin/launchd' */
 int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth) { if (i < 0 || i >= g_ch_n) return 0; *fn = g_ch_fn[i]; *site = g_ch_site[i]; *depth = g_ch_d[i]; return 1; }
+static uint64_t g_bi_site[600], g_bi_tg[600]; static int g_bi_n;   /* 0.4.160 diagnostic: every bl inside the depth-4 caller of the launchd code (bsd_init?) up to the call towards launchd */
+int a64_attempt_bsdinit(int i, uint64_t *site, uint64_t *target) { if (i < 0 || i >= g_bi_n) return 0; *site = g_bi_site[i]; *target = g_bi_tg[i]; return 1; }
 static uint64_t g_xref[4];   /* 0.4.126 diagnostic: code addresses referencing 'RAMDisk' (0,1) and 'root-matching' (2,3) */
 static const char *g_pick_name;
 static bool pick_exact(const char *n) { return g_pick_name && !strcmp(n, g_pick_name); }
@@ -855,6 +857,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
               uint64_t f = pc; for (uint64_t o2 = o; o2 >= 4 && o - o2 < 0x4000; o2 -= 4) { uint32_t w2; memcpy(&w2, kern + mo.slice_off + g->fileoff + o2, 4); if (w2 == 0xd503237fu) { f = g->vmaddr + o2; break; } }
               int dup = 0; for (int k = 0; k < nnx; k++) if (nxt[k] == f) dup = 1; if (dup) continue; nxt[nnx++] = f; if (g_ch_n < 48) { g_ch_fn[g_ch_n] = f; g_ch_site[g_ch_n] = pc; g_ch_d[g_ch_n++] = dep; } } }
           ncur = nnx; memcpy(cur, nxt, sizeof nxt); } }
+      if (xr && g_ch_n > 4) { uint64_t bf = 0, bs = 0; for (int k = 0; k < g_ch_n; k++) if (g_ch_d[k] == 4) { bf = g_ch_fn[k]; bs = g_ch_site[k]; break; }   /* 0.4.160 */
+        for (int q = 0; q < mo.nseg && bf; q++) { const A64Seg *g = &mo.seg[q]; if (bf < g->vmaddr || bf >= g->vmaddr + g->filesize || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+          for (uint64_t pc = bf; pc <= bs && g_bi_n < 600; pc += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + (pc - g->vmaddr), 4); if ((w & 0xfc000000u) != 0x94000000u) continue; int64_t d = (int64_t)(w & 0x3ffffffu); if (d & 0x2000000) d -= 0x4000000; g_bi_site[g_bi_n] = pc; g_bi_tg[g_bi_n++] = pc + (uint64_t)(d * 4); } break; } }
       if (xr) a64m_cpu(m)->hist_pc = xr;   /* 0.4.151: the run's [hist] line then says whether this code (the first reference to '/sbin/launchd') is ever executed */
       if (xr) for (uint64_t a = (xr - 0x300) & ~0x7full; a < xr + 0x100; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.143):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
