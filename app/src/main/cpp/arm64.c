@@ -1197,7 +1197,7 @@ static int step(A64 *c) {
     uint32_t i; memcpy(&i, p, 4);
     c->pc_hist[c->pc_hist_i++ % A64_PC_HIST] = pc;
     if (c->cov) {
-        uint64_t co = pc - c->cov_base; if (co < c->cov_len) c->cov[co >> 5] |= (uint8_t)(1u << ((co >> 2) & 7));
+        uint64_t co = pc - c->cov_base; if (co < c->cov_len) { uint8_t bm = (uint8_t)(1u << ((co >> 2) & 7)); if (!(c->cov[co >> 5] & bm)) { unsigned q = c->nw_n++ % 96; c->nw_pc[q] = pc; c->nw_step[q] = c->steps; } c->cov[co >> 5] |= bm; }
         if ((i & 0xfc000000u) == 0x94000000u) {   /* BL: remember the first call of every target, newest 160 kept */
             int64_t d = (int64_t)(i & 0x3ffffffu); if (d & 0x2000000) d -= 0x4000000;
             uint64_t tg = pc + (uint64_t)(d * 4), to = tg - c->cov_base;
