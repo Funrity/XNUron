@@ -183,6 +183,11 @@ int main(int argc, char **argv) {
           if (ok && (w >> 36) == 0xfffffffull || ok && (w >> 36) == 0xfffffffffull) { for (int r = 0; r < 2; r++) { uint64_t o = w + (r ? 0x110 : 0x108), p2, v = 0; uint8_t *q2; int ok2 = !a64_virt_to_phys(c, o, &p2) && (q2 = a64m_ram_at(m, p2, 8)); if (ok2) memcpy(&v, q2, 8); fprintf(stderr, "  [+%x]=%s%016llx", r ? 0x110 : 0x108, ok2 ? "" : "UNMAPPED:", (unsigned long long)v); } }
           fprintf(stderr, "\n"); }
       }
+      { /* 0.4.188 diagnostic: the real "this" of the AppleARMPE method is the heap object saved at slot-8 (ffffffe0004b56a0); dump +0..+0x10 and +0x100..+0x120 */
+        const uint64_t obj = 0xffffffe0004b56a0ull;
+        for (uint64_t off = 0; off < 0x130; off += 8) { if (off == 0x10) off = 0x100; uint64_t pa, w = 0; uint8_t *q; int ok = !a64_virt_to_phys(c, obj + off, &pa) && (q = a64m_ram_at(m, pa, 8)); if (ok) memcpy(&w, q, 8);
+          fprintf(stderr, "[this] +%03llx = %s%016llx\n", (unsigned long long)off, ok ? "" : "UNMAPPED:", (unsigned long long)w); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
