@@ -141,6 +141,30 @@ int main(int argc, char **argv) {
           fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.184 diagnostic: every ADRP+ADD reference in kernel code to the strings "SecureRoot" and "IORTC" (the platform method waits for flags set by a matching callback for these), with nearby strings, to find who publishes them */
+        static const char *want[2] = {"SecureRoot", "IORTC"}; static const uint64_t hint[2] = {0xfffffff008151b58ull, 0xfffffff008151ae0ull};
+        for (int w = 0; w < 2; w++) { uint64_t strva = 0; uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+          { uint64_t a = hint[w] - 8; if (!(a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4)))) { memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+              int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; strva = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); } }
+          /* the hint address is only approximate: scan +-0x20 for the exact ADRP+ADD whose target string equals want[w] */
+          strva = 0; for (uint64_t a = hint[w] - 0x30; a < hint[w] + 0x30 && !strva; a += 4) { if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+            if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+            int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+            uint64_t sp; uint8_t *sq; char buf[32]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 16))) continue; memcpy(buf, sq, 16); buf[15] = 0; if (!strcmp(buf, want[w])) strva = tg; }
+          fprintf(stderr, "[sref] \"%s\" string at %llx; references:", want[w], (unsigned long long)(strva & 0xfffffffffull)); if (!strva) { fprintf(stderr, " (string not located)\n"); continue; }
+          int nref = 0; for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len && nref < 12; a += 4) { if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
+            if (a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+            int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); if (tg != strva) continue;
+            nref++; fprintf(stderr, " @%llx{", (unsigned long long)(a & 0xfffffffffull)); int cnt = 0;
+            for (uint64_t b = a - 0x180; b < a + 0x180 && cnt < 5; b += 4) { uint32_t j1 = 0, j2 = 0; uint64_t q1, q2; uint8_t *s1, *s2; if (b == a) continue;
+              if (a64_virt_to_phys(c, b, &q1) || !(s1 = a64m_ram_at(m, q1, 4)) || a64_virt_to_phys(c, b + 4, &q2) || !(s2 = a64m_ram_at(m, q2, 4))) continue; memcpy(&j1, s1, 4); memcpy(&j2, s2, 4);
+              if ((j1 & 0x9f000000u) != 0x90000000u || (j2 & 0xff800000u) != 0x91000000u || ((j2 >> 5) & 31) != (j1 & 31)) continue;
+              int64_t jm = ((int64_t)(((j1 >> 5) & 0x7ffff) << 2 | ((j1 >> 29) & 3)) << 43) >> 43; uint64_t jt = ((b & ~0xfffull) + (uint64_t)(jm << 12)) + ((j2 >> 10) & 0xfff);
+              uint64_t sp; uint8_t *sq; char bf[48]; if (a64_virt_to_phys(c, jt, &sp) || !(sq = a64m_ram_at(m, sp, 44))) continue; memcpy(bf, sq, 44); bf[44] = 0; int ok = 1, n = 0; while (n < 44 && bf[n]) { if ((unsigned char)bf[n] < 32 || (unsigned char)bf[n] > 126) ok = 0; n++; } if (!ok || n < 4) continue;
+              fprintf(stderr, "%s\"%s\"", cnt ? " " : "", bf); cnt++; }
+            fprintf(stderr, "}"); }
+          fprintf(stderr, "\n"); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
