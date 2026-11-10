@@ -602,6 +602,8 @@ int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, si
     memcpy(out, a, (size_t)(z - a)); out[z - a] = 0; return 1;
 }
 #define TEMPSENSOR_RAW 0x8c0ull   /* PLACEHOLDER raw reading: the kernel converts raw*100*(1/64) (double constant 0x3f90000000000000 at 0x706f4a0, 0.4.144 dump) -> raw 0x8c0 = 35.0 (units: 1/64 degree, ASSUMPTION) */
+static uint64_t g_ch_fn[48], g_ch_site[48]; static int g_ch_d[48], g_ch_n;   /* 0.4.159 diagnostic: callers chain of the code referencing '/sbin/launchd' */
+int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth) { if (i < 0 || i >= g_ch_n) return 0; *fn = g_ch_fn[i]; *site = g_ch_site[i]; *depth = g_ch_d[i]; return 1; }
 static uint64_t g_xref[4];   /* 0.4.126 diagnostic: code addresses referencing 'RAMDisk' (0,1) and 'root-matching' (2,3) */
 static const char *g_pick_name;
 static bool pick_exact(const char *n) { return g_pick_name && !strcmp(n, g_pick_name); }
@@ -842,6 +844,17 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
           if (tgt == sva2) { if (!xr) xr = pc; hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
       LOG("%s\n", hl);
+      if (xr) { /* 0.4.159: who calls the function that references '/sbin/launchd'? breadth-first, 5 levels, function start = nearest preceding pacibsp (ASSUMPTION; a heuristic) */
+        uint64_t cur[8], nxt[8]; int ncur = 0, nnx; g_ch_n = 0;
+        { uint64_t f = xr; for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (xr >= g->vmaddr && xr < g->vmaddr + g->filesize && mo.slice_off + g->fileoff + g->filesize <= klen) { for (uint64_t o = xr - g->vmaddr; o >= 4 && xr - g->vmaddr - o < 0x4000; o -= 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if (w == 0xd503237fu) { f = g->vmaddr + o; break; } } break; } }
+          cur[ncur++] = f; g_ch_fn[g_ch_n] = f; g_ch_site[g_ch_n] = xr; g_ch_d[g_ch_n++] = 0; }
+        for (int dep = 1; dep <= 5 && ncur && g_ch_n < 44; dep++) { nnx = 0;
+          for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+            for (uint64_t o = 0; o + 4 <= g->filesize && nnx < 8; o += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if ((w & 0xfc000000u) != 0x94000000u) continue;
+              int64_t d = (int64_t)(w & 0x3ffffffu); if (d & 0x2000000) d -= 0x4000000; uint64_t pc = g->vmaddr + o, tg = pc + (uint64_t)(d * 4); int hit = 0; for (int k = 0; k < ncur; k++) if (cur[k] == tg) hit = 1; if (!hit) continue;
+              uint64_t f = pc; for (uint64_t o2 = o; o2 >= 4 && o - o2 < 0x4000; o2 -= 4) { uint32_t w2; memcpy(&w2, kern + mo.slice_off + g->fileoff + o2, 4); if (w2 == 0xd503237fu) { f = g->vmaddr + o2; break; } }
+              int dup = 0; for (int k = 0; k < nnx; k++) if (nxt[k] == f) dup = 1; if (dup) continue; nxt[nnx++] = f; if (g_ch_n < 48) { g_ch_fn[g_ch_n] = f; g_ch_site[g_ch_n] = pc; g_ch_d[g_ch_n++] = dep; } } }
+          ncur = nnx; memcpy(cur, nxt, sizeof nxt); } }
       if (xr) a64m_cpu(m)->hist_pc = xr;   /* 0.4.151: the run's [hist] line then says whether this code (the first reference to '/sbin/launchd') is ever executed */
       if (xr) for (uint64_t a = (xr - 0x300) & ~0x7full; a < xr + 0x100; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.143):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
