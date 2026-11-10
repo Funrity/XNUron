@@ -61,6 +61,15 @@ int main(int argc, char **argv) {
           uint64_t w[4]; memcpy(w, q, 32);
           fprintf(stderr, "[q%d] %llx: %016llx %016llx %016llx %016llx\n", t, (unsigned long long)(bs[t] + off), (unsigned long long)w[0], (unsigned long long)w[1], (unsigned long long)w[2], (unsigned long long)w[3]); }
       }
+      { /* 0.4.176 diagnostic: kernel text addresses found on the 16 KB kernel stack of the mutex-owner thread (stack base taken from thread +0x98) */
+        uint64_t sb = 0, pa; uint8_t *q;
+        if (a64_virt_to_phys(c, 0xffffffe000745fe0ull + 0x98, &pa) == 0 && (q = a64m_ram_at(m, pa, 8))) memcpy(&sb, q, 8);
+        fprintf(stderr, "[kstk] owner thread stack base %llx; text words from the top down (addr@offset):", (unsigned long long)sb);
+        if (sb) for (uint64_t off = 0x4000; off >= 8; off -= 8) { uint64_t va = sb + off - 8, v = 0;
+          if (a64_virt_to_phys(c, va, &pa) != 0 || !(q = a64m_ram_at(m, pa, 8))) continue; memcpy(&v, q, 8);
+          uint64_t t = 0xfffffff000000000ull | (v & 0xfffffffffull); if (t >= c->cov_base && t < c->cov_base + c->cov_len && (v >> 36) != 0 && (v & 3) == 0) fprintf(stderr, " %llx@%llx", (unsigned long long)(t & 0xfffffffffull), (unsigned long long)(off - 8)); }
+        fprintf(stderr, "\n");
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
