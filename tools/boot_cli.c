@@ -128,6 +128,19 @@ int main(int argc, char **argv) {
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
           fprintf(stderr, "\n"); }
       }
+      { /* 0.4.182 diagnostic: strings (all) and bl targets in 0x8151a80..0x8151cc0, the function that calls the blocking helper (7a6c3a8) before thread_block */
+        fprintf(stderr, "[wstr] 8151a80..8151cc0:");
+        for (uint64_t a = 0xfffffff008151a80ull; a < 0xfffffff008151cc0ull; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+          if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4);
+          if ((i1 >> 26) == 0x25) fprintf(stderr, " @%llx:bl %llx", (unsigned long long)(a & 0xfffffffffull), (unsigned long long)((a + (uint64_t)(((int64_t)(int32_t)(i1 << 6) >> 6) * 4)) & 0xfffffffffull));
+          if (a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4);
+          if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+          int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+          uint64_t sp; uint8_t *sq; char buf[64]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 60))) continue; memcpy(buf, sq, 60); buf[60] = 0;
+          int ok = 1, n = 0; while (n < 60 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) ok = 0; n++; } if (!ok || n < 3) continue;
+          fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); }
+        fprintf(stderr, "\n");
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
