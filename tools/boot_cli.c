@@ -54,6 +54,13 @@ int main(int argc, char **argv) {
           uint64_t w[4]; memcpy(w, q, 32);
           fprintf(stderr, "[thr%d] +%03llx: %016llx %016llx %016llx %016llx\n", t, (unsigned long long)off, (unsigned long long)w[0], (unsigned long long)w[1], (unsigned long long)w[2], (unsigned long long)w[3]); }
       }
+      { /* 0.4.175 diagnostic: raw words around the queue head 0xffffffe000868550 and the static queue 0xfffffff008f94e90 */
+        uint64_t bs[3] = {0xffffffe000868500ull, 0xfffffff008f94e40ull, 0xfffffff008f94d00ull};
+        for (int t = 0; t < 3; t++) for (uint64_t off = 0; off < 0x100; off += 0x20) { uint64_t pa; uint8_t *q;
+          if (a64_virt_to_phys(c, bs[t] + off, &pa) != 0 || !(q = a64m_ram_at(m, pa, 32))) { fprintf(stderr, "[q%d] %llx unmapped\n", t, (unsigned long long)(bs[t] + off)); continue; }
+          uint64_t w[4]; memcpy(w, q, 32);
+          fprintf(stderr, "[q%d] %llx: %016llx %016llx %016llx %016llx\n", t, (unsigned long long)(bs[t] + off), (unsigned long long)w[0], (unsigned long long)w[1], (unsigned long long)w[2], (unsigned long long)w[3]); }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
