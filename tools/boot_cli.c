@@ -188,6 +188,11 @@ int main(int argc, char **argv) {
         for (uint64_t off = 0; off < 0x130; off += 8) { if (off == 0x10) off = 0x100; uint64_t pa, w = 0; uint8_t *q; int ok = !a64_virt_to_phys(c, obj + off, &pa) && (q = a64m_ram_at(m, pa, 8)); if (ok) memcpy(&w, q, 8);
           fprintf(stderr, "[this] +%03llx = %s%016llx\n", (unsigned long long)off, ok ? "" : "UNMAPPED:", (unsigned long long)w); }
       }
+      { /* 0.4.189 diagnostic: every STRB w,[x,#0x10b] (answer flag writer) and STRB w,[x,#0x10a] in kernel code; [this] 0.4.188: flags are +0x10a=1 (request), +0x10b=0 (answer missing), +0x10c=1 */
+        fprintf(stderr, "[wr10b] strb +0x10b at:"); int n1 = 0; for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len && n1 < 24; a += 4) { uint64_t pa; uint8_t *q; uint32_t i; if (a64_virt_to_phys(c, a, &pa) || !(q = a64m_ram_at(m, pa, 4))) continue; memcpy(&i, q, 4); if ((i & 0xFFFFFC00u) == 0x39042C00u) { fprintf(stderr, " %llx", (unsigned long long)(a & 0xfffffffffull)); n1++; } }
+        fprintf(stderr, "\n[wr10b] strb +0x10a at:"); n1 = 0; for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len && n1 < 24; a += 4) { uint64_t pa; uint8_t *q; uint32_t i; if (a64_virt_to_phys(c, a, &pa) || !(q = a64m_ram_at(m, pa, 4))) continue; memcpy(&i, q, 4); if ((i & 0xFFFFFC00u) == 0x39042800u) { fprintf(stderr, " %llx", (unsigned long long)(a & 0xfffffffffull)); n1++; } }
+        fprintf(stderr, "\n");
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
