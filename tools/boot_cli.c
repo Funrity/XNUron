@@ -194,9 +194,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
       }
       { /* 0.4.193 diagnostic: find "_sep_enabled" in the kernel cstring area, then every ADRP+ADD reference to its string; print the code words from -0x1c0 to +0x40 around each (decides how AppleSEPKeyStore::start computes _sep_enabled and whether it waits for the SEP) */
-        uint64_t strva = 0; static const char nd[] = "AppleSEPKeyStore::start: _sep_enabled";
-        for (uint64_t pg = 0xfffffff0074c0000ull; pg < 0xfffffff007500000ull && !strva; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
-          for (unsigned o = 0; o + sizeof nd < 0x1000; o++) if (!memcmp(q + o, nd, sizeof nd - 1)) { strva = pg + o; break; } }
+        uint64_t strva = 0; static const char nd[] = "_sep_enabled";
+        for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && !strva; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 0; o + sizeof nd < 0x1000; o++) if (!memcmp(q + o, nd, sizeof nd - 1)) { unsigned st = o; while (st > 0 && q[st - 1]) st--; strva = pg + st; break; } }
         fprintf(stderr, "[sep] string at %llx\n", (unsigned long long)(strva & 0xfffffffffull));
         int nref = 0; if (strva) for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len && nref < 3; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
           if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
