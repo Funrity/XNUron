@@ -962,6 +962,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           if (!shown) LOG("[boot] diagnostic (0.4.195): no /arm-io node with 'sep' or 'mailbox' in name or compatible\n");
           char sl[2400]; int64_t spl = -1; int sr = a64_dt_node_info(dt, dtlen, "sep", "nonexistent-prop", &spl, sl, sizeof sl);
           LOG("[boot] diagnostic (0.4.195): node 'sep' lookup %d: %s\n", sr, sr >= 0 ? sl : "");
+          { static const char *nn[2] = {"pmp", "pmgr"}; for (int z = 0; z < 2; z++) { static char pl[6000]; int64_t ppl = -1; int pr = a64_dt_node_info(dt, dtlen, nn[z], "nonexistent-prop", &ppl, pl, sizeof pl);
+              LOG("[boot] diagnostic (0.4.206): node '%s' lookup %d: %s\n", nn[z], pr, pr >= 0 ? pl : ""); } }
         }
         { /* 0.4.57: log 0.4.56: after aic start the kernel reads physical 0x23d1f0000 (external abort, `ldr w0,[x8,w1,uxtw]` register read at offset 0). Same method as for aic: ask the DeviceTree who owns it, model that node as an unknown block (reads 0). */
           static const uint64_t seen[2] = { 0x23d1f0000ull, 0x24ac04000ull };   /* 0.4.60: + dapf-aop (log 0.4.59: REQUIRE failed in AppleDAPF.cpp:158 for it) so its first 40 accesses are logged */
