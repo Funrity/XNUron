@@ -870,13 +870,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
       uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fc00ull;   /* 0.4.135: dump done; was hi=..fe80, 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
-      static const uint64_t rg[2][2] = { { 0xfffffff00898ac80ull, 0xfffffff00898ad40ull }, { 0xfffffff00898af20ull, 0xfffffff00898afc0ull } };   /* 0.4.172: the lck_mtx code where the newest never-before-executed instructions are (0.4.171 [new]) */ (void)lo; (void)hi;
+      static const uint64_t rg[2][2] = { { 0xfffffff0082df8c0ull, 0xfffffff0082dfa40ull }, { 0xfffffff0082dfe40ull, 0xfffffff0082dffc0ull } };   /* 0.4.172: the lck_mtx code where the newest never-before-executed instructions are (0.4.171 [new]) */ (void)lo; (void)hi;
       for (int ri = 0; ri < 2; ri++) for (uint64_t a = rg[ri][0]; a < rg[ri][1]; a += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a); int okd = 0;
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.128: strings referenced (ADRP+ADD) by that window, in address order: which DT properties / boot-args does the root selection read? */
-      static const uint64_t sw[4] = { 0xfffffff00898ac80ull, 0xfffffff00898ad40ull, 0xfffffff00898af20ull, 0xfffffff00898afc0ull }; uint64_t lo = sw[0], hi = sw[0] + 0x200; char sl[4000]; size_t sn = 0; int nsr = 0;
+      static const uint64_t sw[4] = { 0xfffffff0082df8c0ull, 0xfffffff0082dfa40ull, 0xfffffff0082dfe40ull, 0xfffffff0082dffc0ull }; uint64_t lo = sw[0], hi = sw[0] + 0x200; char sl[4000]; size_t sn = 0; int nsr = 0;
       sn += (size_t)snprintf(sl, sizeof sl, "[boot] diagnostic (changes nothing): strings referenced (0.4.154) by 0x%llx / 0x%llx / 0x%llx / 0x%llx (+0x200 each, @=low address bits of the referencing code):", (unsigned long long)sw[0], (unsigned long long)sw[1], (unsigned long long)sw[2], (unsigned long long)sw[3]); (void)lo; (void)hi;
       for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint64_t pc = g->vmaddr + o; { int inw = 0; for (int wq = 0; wq < 4; wq++) if (pc >= sw[wq] && pc < sw[wq] + 0x200) inw = 1; if (!inw) continue; }
@@ -962,6 +962,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           if (!shown) LOG("[boot] diagnostic (0.4.195): no /arm-io node with 'sep' or 'mailbox' in name or compatible\n");
           char sl[2400]; int64_t spl = -1; int sr = a64_dt_node_info(dt, dtlen, "sep", "nonexistent-prop", &spl, sl, sizeof sl);
           LOG("[boot] diagnostic (0.4.195): node 'sep' lookup %d: %s\n", sr, sr >= 0 ? sl : "");
+          for (int z = 0; z < na2; z++) if (!strcmp(all2[z].name, "pmp")) LOG("[boot] diagnostic (0.4.208): DT node 'pmp' compatible '%s' physical 0x%llx size 0x%llx\n", all2[z].compat, (unsigned long long)all2[z].pa, (unsigned long long)all2[z].size);
           { static const char *nn[2] = {"pmp", "pmgr"}; for (int z = 0; z < 2; z++) { static char pl[6000]; int64_t ppl = -1; int pr = a64_dt_node_info(dt, dtlen, nn[z], "nonexistent-prop", &ppl, pl, sizeof pl);
               LOG("[boot] diagnostic (0.4.206): node '%s' lookup %d: %s\n", nn[z], pr, pr >= 0 ? pl : ""); } }
         }
