@@ -102,8 +102,8 @@ int main(int argc, char **argv) {
           fprintf(stderr, "\n"); }
       }
       { /* 0.4.180 diagnostic: strings referenced (ADRP+ADD, 0x400 bytes back) before return addresses of the blocked thread whose stack chain is 7a68fcc 8151cbc 80eaa68 7e8e3a8 7a75284 */
-        static const uint64_t rets[5] = {0xfffffff008c97584ull, 0xfffffff0089825f8ull, 0xfffffff008063e70ull, 0xfffffff0080639a0ull, 0xfffffff00806cb60ull};
-        for (int r = 0; r < 5; r++) { fprintf(stderr, "[bstr] ret %llx:", (unsigned long long)(rets[r] & 0xfffffffffull)); int cnt = 0;
+        static const uint64_t rets[14] = {0xfffffff008b7edacull, 0xfffffff0080c38b0ull, 0xfffffff0080bc488ull, 0xfffffff008149748ull, 0xfffffff008f45424ull, 0xfffffff008f49fc4ull, 0xfffffff008f495b8ull, 0xfffffff008178864ull, 0xfffffff00816be24ull, 0xfffffff008e97f94ull, 0xfffffff008219b38ull, 0xfffffff008ed2510ull, 0xfffffff008c13960ull, 0xfffffff0081496f8ull};
+        for (int r = 0; r < 14; r++) { fprintf(stderr, "[bstr] ret %llx:", (unsigned long long)(rets[r] & 0xfffffffffull)); int cnt = 0;
           for (uint64_t a = rets[r] - 0x400; a < rets[r] && cnt < 8; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
             if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
             if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
