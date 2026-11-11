@@ -229,6 +229,13 @@ int main(int argc, char **argv) {
         for (unsigned z = 0; z < sizeof pc2 / sizeof pc2[0]; z++) { uint64_t co = pc2[z] - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7))); fprintf(stderr, " %c@%llx", ex ? 'E' : '-', (unsigned long long)(pc2[z] & 0xfffffffffull)); }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.202 diagnostic: executed/never-executed instruction ranges of AppleSEPKeyStore::start (code around 0x898ac48 where "_sep_enabled" is printed) - where does start() stop? */
+        const uint64_t lo = 0xfffffff00898aa80ull, hi = 0xfffffff00898b500ull; int run = -1; uint64_t rs = lo;
+        fprintf(stderr, "[ksx] executed ranges (E) in %llx..%llx:", (unsigned long long)(lo & 0xfffffffffull), (unsigned long long)(hi & 0xfffffffffull));
+        for (uint64_t a = lo; a <= hi; a += 4) { uint64_t co = a - c->cov_base; int ex = a < hi && c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
+          if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
+        fprintf(stderr, "\n");
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
