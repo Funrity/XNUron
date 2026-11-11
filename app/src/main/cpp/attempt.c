@@ -955,6 +955,14 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           if (added)
               LOG("[boot] DeviceTree node '%s' (compatible '%s') owns physical 0x%llx (size 0x%llx), the page the kernel read when it hit the external abort. MODELLED device: unknown SoC block '%s': reads return 0, writes are ignored, the first accesses are logged. ASSUMPTION: real registers (and any interrupt behaviour) of this block are UNKNOWN here\n", nn, cc, (unsigned long long)nb, (unsigned long long)ns, nn);
           else LOG("[boot] DeviceTree lookup for physical 0x23b100000: %s\n", fr == 1 ? "found, but the size is unusable or the device could not be added" : fr == 0 ? "no /arm-io node covers it, nothing modelled" : "tree malformed"); }
+        { /* 0.4.195 diagnostic (changes nothing): which /arm-io nodes describe the Secure Enclave (the kernel's keystore waits for the SEP) - name, compatible, physical range - and all properties of the node called 'sep' */
+          static A64SocNode all2[300]; int na2 = a64_dt_soc_nodes(dt, dtlen, all2, 300); int shown = 0;
+          for (int z = 0; z < na2 && shown < 16; z++) if (strstr(all2[z].name, "sep") || strstr(all2[z].name, "mailbox") || strstr(all2[z].compat, "sep") || strstr(all2[z].compat, "mailbox")) {
+              LOG("[boot] diagnostic (0.4.195): SEP-related DeviceTree node '%s' compatible '%s' physical 0x%llx size 0x%llx\n", all2[z].name, all2[z].compat, (unsigned long long)all2[z].pa, (unsigned long long)all2[z].size); shown++; }
+          if (!shown) LOG("[boot] diagnostic (0.4.195): no /arm-io node with 'sep' or 'mailbox' in name or compatible\n");
+          char sl[2400]; int64_t spl = -1; int sr = a64_dt_node_info(dt, dtlen, "sep", "nonexistent-prop", &spl, sl, sizeof sl);
+          LOG("[boot] diagnostic (0.4.195): node 'sep' lookup %d: %s\n", sr, sr >= 0 ? sl : "");
+        }
         { /* 0.4.57: log 0.4.56: after aic start the kernel reads physical 0x23d1f0000 (external abort, `ldr w0,[x8,w1,uxtw]` register read at offset 0). Same method as for aic: ask the DeviceTree who owns it, model that node as an unknown block (reads 0). */
           static const uint64_t seen[2] = { 0x23d1f0000ull, 0x24ac04000ull };   /* 0.4.60: + dapf-aop (log 0.4.59: REQUIRE failed in AppleDAPF.cpp:158 for it) so its first 40 accesses are logged */
           for (int z = 0; z < 2; z++) { char nn[40], cc[100]; uint64_t nb = 0, ns = 0; int fr = a64_dt_find_pa(dt, dtlen, seen[z], nn, sizeof nn, cc, sizeof cc, &nb, &ns);
