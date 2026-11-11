@@ -209,6 +209,18 @@ int main(int argc, char **argv) {
       { /* 0.4.196 diagnostic: which unknown SoC blocks the kernel touched (name reads/writes), to see whether the SEP mailbox block 'sep' (0x242400000) was ever accessed */
         static char us[6000]; int un = a64m_unknown_summary(m, us, sizeof us); fprintf(stderr, "[unk] %d touched blocks:%s\n", un, us);
       }
+      { /* 0.4.197 diagnostic: did the kernel ever run SEP-manager code? Find cstrings starting with "AppleSEP" or "SEP" in the cstring area, then every ADRP+ADD reference to them, and say whether that referencing instruction WAS executed (coverage bitmap) */
+        static uint64_t sv[48]; static char sn[48][44]; int ns = 0;
+        for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && ns < 48; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 1; o + 20 < 0x1000 && ns < 48; o++) if (!q[o - 1] && (!memcmp(q + o, "AppleSEP", 8) || !memcmp(q + o, "AppleSEPManager", 15) || !memcmp(q + o, "SEPManager", 10) || !memcmp(q + o, "sep-", 4))) { sv[ns] = pg + o; snprintf(sn[ns], 44, "%.43s", (const char *)(q + o)); ns++; } }
+        fprintf(stderr, "[sepx] %d SEP-related cstrings; referencing code (E = executed, - = never executed):\n", ns);
+        for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+          if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
+          if (a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+          int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+          for (int z = 0; z < ns; z++) if (sv[z] == tg) { uint64_t co = a - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
+            fprintf(stderr, "[sepx]  %c @%llx \"%s\"\n", ex ? 'E' : '-', (unsigned long long)(a & 0xfffffffffull), sn[z]); } }
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
