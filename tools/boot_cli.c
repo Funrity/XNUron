@@ -236,6 +236,14 @@ int main(int argc, char **argv) {
           if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.204 diagnostic: the kext personality (Info.plist, if the prelinked XML is still in memory) of AppleSEPManager: IOClass key with that value, plus 700 bytes around it (matching keys: IONameMatch, IOProviderClass, IOResourceMatch ...) */
+        static const char nd[] = "<string>AppleSEPManager</string>"; int found = 0;
+        for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && found < 2; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 0; o + sizeof nd < 0x1000 && found < 2; o++) if (q[o] == '<' && !memcmp(q + o, nd, sizeof nd - 1)) { found++;
+            char buf[801]; uint64_t va = pg + o - 400; for (int i = 0; i < 800; i++) { uint64_t pp; uint8_t *qq; char ch = '?'; if (!a64_virt_to_phys(c, va + i, &pp) && (qq = a64m_ram_at(m, pp, 1))) ch = (char)*qq; buf[i] = (ch == '\n' || ch == '\t') ? ' ' : ch; } buf[800] = 0;
+            fprintf(stderr, "[plist] at %llx: %s\n", (unsigned long long)((pg + o) & 0xfffffffffull), buf); } }
+        if (!found) fprintf(stderr, "[plist] no '%s' found in 0xfffffff007000000..0xfffffff00b000000 (prelink info not in memory)\n", nd);
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
