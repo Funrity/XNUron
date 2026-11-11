@@ -210,9 +210,9 @@ int main(int argc, char **argv) {
         static char us[6000]; int un = a64m_unknown_summary(m, us, sizeof us); fprintf(stderr, "[unk] %d touched blocks:%s\n", un, us);
       }
       { /* 0.4.197 diagnostic: did the kernel ever run SEP-manager code? Find cstrings starting with "AppleSEP" or "SEP" in the cstring area, then every ADRP+ADD reference to them, and say whether that referencing instruction WAS executed (coverage bitmap) */
-        static uint64_t sv[48]; static char sn[48][44]; int ns = 0;
-        for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && ns < 48; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
-          for (unsigned o = 1; o + 20 < 0x1000 && ns < 48; o++) if (!q[o - 1] && (!memcmp(q + o, "AppleSEP", 8) || !memcmp(q + o, "AppleSEPManager", 15) || !memcmp(q + o, "SEPManager", 10) || !memcmp(q + o, "sep-", 4))) { sv[ns] = pg + o; snprintf(sn[ns], 44, "%.43s", (const char *)(q + o)); ns++; } }
+        static uint64_t sv[600]; static char sn[600][60]; int ns = 0;
+        for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && ns < 600; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 1; o + 20 < 0x1000 && ns < 600; o++) if (!q[o - 1] && (!memcmp(q + o, "AppleSEP", 8) || !memcmp(q + o, "AppleSEPManager", 15) || !memcmp(q + o, "SEPManager", 10) || !memcmp(q + o, "sep-", 4))) { sv[ns] = pg + o; snprintf(sn[ns], 60, "%.59s", (const char *)(q + o)); ns++; } }
         fprintf(stderr, "[sepx] %d SEP-related cstrings; referencing code (E = executed, - = never executed):\n", ns);
         for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
           if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
