@@ -221,6 +221,14 @@ int main(int argc, char **argv) {
           for (int z = 0; z < ns; z++) if (sv[z] == tg) { uint64_t co = a - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
             fprintf(stderr, "[sepx]  %c @%llx \"%s\"\n", ex ? 'E' : '-', (unsigned long long)(a & 0xfffffffffull), sn[z]); } }
       }
+      { /* 0.4.201 diagnostic: was the code that references "SecureRoot"/"SecureRootCallBack" executed? (instruction addresses of those references; E = executed) */
+        static const uint64_t pcs[] = {0xfffffff0083d23f0ull, 0xfffffff0083d272cull, 0xfffffff0089876e4ull};
+        (void)pcs;
+        static const uint64_t pc2[] = {0xfffffff0083d23f0ull, 0xfffffff0083d272cull, 0xfffffff0089876e4ull, 0xfffffff00898af7cull, 0xfffffff0088b2f50ull, 0xfffffff008151b58ull};
+        fprintf(stderr, "[skx] reference executed? (E yes / - no):");
+        for (unsigned z = 0; z < sizeof pc2 / sizeof pc2[0]; z++) { uint64_t co = pc2[z] - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7))); fprintf(stderr, " %c@%llx", ex ? 'E' : '-', (unsigned long long)(pc2[z] & 0xfffffffffull)); }
+        fprintf(stderr, "\n");
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
