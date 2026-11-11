@@ -206,6 +206,9 @@ int main(int argc, char **argv) {
           for (uint64_t b = a - 0x1c0; b < a + 0x40; b += 4) { uint32_t w = 0; uint64_t pp; uint8_t *qq; if (!a64_virt_to_phys(c, b, &pp) && (qq = a64m_ram_at(m, pp, 4))) memcpy(&w, qq, 4); fprintf(stderr, " %08x", w); }
           fprintf(stderr, "\n"); }
       }
+      { /* 0.4.196 diagnostic: which unknown SoC blocks the kernel touched (name reads/writes), to see whether the SEP mailbox block 'sep' (0x242400000) was ever accessed */
+        static char us[6000]; int un = a64m_unknown_summary(m, us, sizeof us); fprintf(stderr, "[unk] %d touched blocks:%s\n", un, us);
+      }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
         static uint64_t vis[1 << 20]; unsigned nch = 0, npg = 0, nuq = 0; static char uqs[400][420]; static unsigned uqn[400]; static uint64_t uqs_slot[400];
