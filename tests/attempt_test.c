@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
         CHECK(a64m_add_unknown_mmio_named(m, 0x23b100000ull, 0x8000, "aic") == 0 && a64m_unknown_set_read(m, 0x23b100000ull, 0x4, 512) == 0, "set_read on the block");
         CHECK(a64m_unknown_set_read(m, 0x300000000ull, 0x4, 1) == -1, "set_read on an unknown address is refused");
         CHECK(a64m_add_unknown_mmio_named(m, 0x24b000000ull, 0x400000, "pmgr") == 0 && a64m_unknown_ts_window(m, 0x24b000000ull, 0x288000) == 0 && a64m_unknown_ts_read(m, 0x24b000000ull, 0x288010, 1) == 0 && a64m_unknown_ts_read(m, 0x300000000ull, 0, 1) == -1, "0.4.150: temperature sensor window and register added inside a pmgr block, unknown block refused");
+        CHECK(a64m_add_unknown_mmio_named(m, 0x200000000ull, 0x100000, "mem") == 0 && a64m_add_unknown_mmio_named(m, 0x200100000ull, 0x100000, "amcc") == 0 && a64m_add_unknown_mmio_named(m, 0x200100000ull, 0x100000, "amcc") != 0, "0.4.213: the AMCC block 0x200100000 sits right behind the 0x200000000 block (no overlap) and covers 0x200158000");
         CHECK(a64m_add_unknown_mmio_auto(m, 0x23b100000ull, 0x8000, "aic") == -1, "0.4.59: re-adding the same block is refused");
         uint32_t code[] = { 0xD2C00040, 0xF2A76200, 0xB9400402, 0xB9400003, 0x14000000 };   /* x0 = 0x23b100000 (the 0x3b10 imm is the same as in the other test); ldr w2,[x0,#4]; ldr w3,[x0]; b . */
         memcpy(a64m_ram_at(m, A64M_RAM_BASE, sizeof code), code, sizeof code);
