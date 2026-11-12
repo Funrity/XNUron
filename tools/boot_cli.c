@@ -212,8 +212,8 @@ int main(int argc, char **argv) {
       { /* 0.4.197 diagnostic: did the kernel ever run SEP-manager code? Find cstrings starting with "AppleSEP" or "SEP" in the cstring area, then every ADRP+ADD reference to them, and say whether that referencing instruction WAS executed (coverage bitmap) */
         static uint64_t sv[600]; static char sn[600][60]; int ns = 0;
         for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && ns < 600; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
-          for (unsigned o = 1; o + 20 < 0x1000 && ns < 600; o++) if (!q[o - 1] && (!memcmp(q + o, "Apple", 5) || !memcmp(q + o, "pmp", 3) || !memcmp(q + o, "PMP", 3)) && ({ char t[40]; memcpy(t, q + o, 39); t[39] = 0; strstr(t, "PMP") != NULL; })) { sv[ns] = pg + o; snprintf(sn[ns], 60, "%.59s", (const char *)(q + o)); ns++; } }
-        fprintf(stderr, "[sepx] %d PMP-related cstrings; referencing code (E = executed, - = never executed):\n", ns);
+          for (unsigned o = 1; o + 20 < 0x1000 && ns < 600; o++) if (!q[o - 1] && ({ char t[60]; memcpy(t, q + o, 59); t[59] = 0; strstr(t, "unable") != NULL || strstr(t, "Tunable") != NULL; })   /* 0.4.221: needle = tunables (PCIe PHY) */) { sv[ns] = pg + o; snprintf(sn[ns], 60, "%.59s", (const char *)(q + o)); ns++; } }
+        fprintf(stderr, "[sepx] %d tunable-related cstrings; referencing code (E = executed, - = never executed):\n", ns);
         for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
           if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
           if (a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
