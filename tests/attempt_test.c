@@ -216,6 +216,13 @@ int main(int argc, char **argv) {
         char w[40]; int pl = a64_dt_node_prop_words(dt, q, "cpu0", "fixed-frequency", w, sizeof w);
         CHECK(r == 1 && pl == 4 && !strcmp(w, "16e3600"), "added property keeps its data: r=%d len=%d words=%s", r, pl, w);
     }
+    { /* 0.4.222: an EMPTY (0-byte) property can be added; the next node is intact */
+        uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(1, 1); PROP("name", 5, "root"); NODE(1, 0); PROP("name", 5, "apcie");
+        uint32_t d0 = 0; size_t n0 = q; int r = a64_dt_node_add_prop(dt, &q, sizeof dt, "apcie", "apcie-phy-tunables", &d0, 0);
+        char w[40]; int pl = a64_dt_node_prop_words(dt, q, "apcie", "apcie-phy-tunables", w, sizeof w);
+        CHECK(r == 1 && pl == 0 && q > n0, "empty tunables property added: r=%d len=%d size %zu->%zu", r, pl, n0, q);
+    }
     { /* 0.4.85: fill an existing EMPTY property; video size setting */
         uint8_t dt[1024]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
         NODE(1, 1); PROP("name", 5, "root"); NODE(3, 0); PROP("name", 5, "pmgr"); PROP("voltage-states9", 0, ""); PROP("x", 4, ((uint32_t[1]){7}));
