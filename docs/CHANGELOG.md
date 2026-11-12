@@ -1050,3 +1050,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.210
 - Найдено: заблокированные start() (ApplePMGR, AppleSOCTuner, baseband, кнопки, PMP-прошивка и др.) стоят в общей функции ожидания AppleARMCPU "AppleARMCPU-AllCPU-Initialized" (0x814a91c/0x814a9f0). Эмулятор запускает ОДИН процессор, остальные 5 ядер DT никогда не отмечаются. ASSUMPTION (изменение поведения): в командной строке добавлен штатный boot-arg XNU `cpus=1`, чтобы ядро не ждало несуществующие ядра. Ничего не подделывается; если ядро его не учитывает в AppleARMCPU, эффект будет нулевым и это видно по логу.
+
+## 0.4.211
+- РЕЗУЛЬТАТ 0.4.210: с `cpus=1` ядро больше не ждёт остальные ядра — стартуют AIC, SPI, I2C, AES, backlight, USB PHY, DWI, MTR, AGX и др. (первая смена поведения за долгое время). Затем паника ядра: "thread_invoke: preemption_level 1, possible cause: blocking while holding a spinlock, or within interrupt context" и "thread already waiting on 0xffffffe01002c208"; цикл 0x7ba5ec0 — это panic-halt самого ядра. Диагностика `[pfr]`: цепочка кадров от x29 на остановке, чтобы найти, кто блокируется при preemption_level 1. Поведение эмулятора не менялось.
