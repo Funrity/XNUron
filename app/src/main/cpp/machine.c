@@ -117,7 +117,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; int is_i2c; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static struct { char w; uint64_t off, v; } g_tsr[60]; static unsigned g_tsn;   /* 0.4.149 diagnostic: ring of the LAST accesses inside any temperature sensor window (offset from the start of the pmgr block) */
@@ -131,6 +131,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     for (int k = 0; !fixed && k < d->ts_rn; k++) if (d->ts_off[k] == off) { val = d->ts_val[k]; fixed = 5; }   /* 0.4.150 MODELLED temperature sensor registers, see a64m_unknown_ts_read */
+    if (!fixed && d->is_i2c && off == 0x14) { val = d->i2c_st; fixed = 6; }   /* 0.4.218 MODELLED (ASSUMPTION): I2C controller of an EMPTY bus, see unk_w */
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
     if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
@@ -142,6 +143,8 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
+    if (d->is_i2c) { if (off == 0x14) d->i2c_st &= ~(uint32_t)v;   /* status bits are write-1-to-clear (the driver writes back what it read) */
+        else if (off == 0x10 && (v & 0x80000000u)) d->i2c_st = 0x08200000u; }   /* 0.4.218 ASSUMPTION: the transaction is started by setting bit 31 of +0x10; nobody answers on an empty bus: status bit 27 "done" + bit 21 "NACK" */
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
     for (int k = 0; k < d->lk_n; k++) if (d->lk_w[k] == off) { d->lk_v[k] = (uint32_t)v & 0x1f; d->lk_set[k] = 1; }
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
@@ -152,11 +155,13 @@ static int add_unknown(A64Machine *m, uint64_t pa, uint64_t size, const char *la
     int slot = -1; for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].pa == pa) slot = k;   /* a stale entry of a destroyed machine that got the same address */
     if (slot < 0) for (int k = 0; k < g_unk_n; k++) if (!g_unk[k].m) { slot = k; break; }   /* free slot of a destroyed machine */
     if (slot < 0) { if (g_unk_n >= 360) return -1; slot = g_unk_n++; }
-    struct Unk *d = &g_unk[slot], keep = *d; memset(d, 0, sizeof *d); d->m = m; d->pa = pa; d->cap = cap; if (label) snprintf(d->label, sizeof d->label, "'%.38s'", label);
+    struct Unk *d = &g_unk[slot], keep = *d; memset(d, 0, sizeof *d); d->m = m; d->pa = pa; d->cap = cap; if (label) snprintf(d->label, sizeof d->label, "'%.38s'", label); d->is_i2c = label && strstr(label, "i2c") != NULL;
     A64Dev dev = { pa, size, unk_r, unk_w, d, "unknown-soc" };
     if (a64_add_device(&m->cpu, &dev)) { *d = keep; return -1; }   /* 0.4.59: a refused add (overlap with the SAME block added earlier) must not wipe the live entry: this lost the 'aic' +0x4 value in 0.4.58 */
     return 0;
 }
+/* 0.4.218: direct register access to the unknown block at pa (for tests): write if w, else read into *rv. Returns 0, or -1 when there is no such block. */
+int a64m_unknown_rw(A64Machine *m, uint64_t pa, int w, uint64_t off, uint64_t v, uint64_t *rv) { for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].pa == pa) { if (w) unk_w(&g_unk[k], off, 4, v); else { uint64_t r = unk_r(&g_unk[k], off, 4); if (rv) *rv = r; } return 0; } return -1; }
 int a64m_add_unknown_mmio_named(A64Machine *m, uint64_t pa, uint64_t size, const char *label) { return add_unknown(m, pa, size, label, 40); }
 /* 0.4.58: same, for the bulk of DeviceTree nodes: only the first few accesses of each block are logged; the stop report lists every touched block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label) { return add_unknown(m, pa, size, label, 6); }
