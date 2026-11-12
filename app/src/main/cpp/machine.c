@@ -131,7 +131,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     for (int k = 0; !fixed && k < d->ts_rn; k++) if (d->ts_off[k] == off) { val = d->ts_val[k]; fixed = 5; }   /* 0.4.150 MODELLED temperature sensor registers, see a64m_unknown_ts_read */
-    if (!fixed && d->is_i2c && off == 0x14) { val = d->i2c_st; fixed = 6; }   /* 0.4.218 MODELLED (ASSUMPTION): I2C controller of an EMPTY bus, see unk_w */
+    if (!fixed && d->is_i2c && off == 0x14) { val = d->i2c_st | 0x01000000u; fixed = 6; }   /* 0.4.219 MODELLED (ASSUMPTION): I2C controller of an idle, empty bus: status bit 24 reads 1. Source: _checkBusStatus asserts when bit 24 is 0 ("SCL is stuck low" side); it is read as the SCL line level */
     if (!fixed && d->rb && off < sizeof d->rbv) { val = d->rbv[off >> 2]; fixed = 2; }   /* 0.4.61: read-back block */
     if (!fixed) for (int k = 0; k < d->lk_n; k++) if (d->lk_r[k] == off && d->lk_set[k]) { val = (d->lk_v[k] << 10) | (d->lk_v[k] << 5); fixed = 4; }   /* 0.4.135 mode link, see a64m_unknown_set_modelink */
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
@@ -143,8 +143,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
-    if (d->is_i2c) { if (off == 0x14) d->i2c_st &= ~(uint32_t)v;   /* status bits are write-1-to-clear (the driver writes back what it read) */
-        else if (off == 0x10 && (v & 0x80000000u)) d->i2c_st = 0x08200000u; }   /* 0.4.218 ASSUMPTION: the transaction is started by setting bit 31 of +0x10; nobody answers on an empty bus: status bit 27 "done" + bit 21 "NACK" */
+    if (d->is_i2c && off == 0x14) d->i2c_st &= ~(uint32_t)v;   /* 0.4.219: status event bits are write-1-to-clear (the driver writes back what it read); bit 24 is a LEVEL, see unk_r */
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
     for (int k = 0; k < d->lk_n; k++) if (d->lk_w[k] == off) { d->lk_v[k] = (uint32_t)v & 0x1f; d->lk_set[k] = 1; }
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
