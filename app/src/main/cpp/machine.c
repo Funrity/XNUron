@@ -123,6 +123,10 @@ static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; st
 static struct { char w; uint64_t off, v; } g_tsr[60]; static unsigned g_tsn;   /* 0.4.149 diagnostic: ring of the LAST accesses inside any temperature sensor window (offset from the start of the pmgr block) */
 static void ts_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { for (int k = 0; k < d->ts_n; k++) { uint64_t r = off - d->ts_base[k]; if (r < 0x34000) { unsigned i = g_tsn++ % 60; g_tsr[i].w = w ? 'w' : 'r'; g_tsr[i].off = off; g_tsr[i].v = v; break; } } }
 const char *a64m_tempsensor_trace(void) { static char b[2600]; size_t l = 0; b[0] = 0; unsigned n = g_tsn < 60 ? g_tsn : 60, st = g_tsn < 60 ? 0 : g_tsn % 60; for (unsigned k = 0; k < n && l < sizeof b - 40; k++) { unsigned i = (st + k) % 60; l += (size_t)snprintf(b + l, sizeof b - l, " %c+0x%llx=0x%llx", g_tsr[i].w, (unsigned long long)g_tsr[i].off, (unsigned long long)g_tsr[i].v); } return b; }
+/* 0.4.217 diagnostic: ring of the LAST 80 accesses to blocks whose DeviceTree name contains "i2c" (which register starts a transaction, what the poll loop reads) */
+static struct { char w, lab[12]; uint64_t off, v; } g_i2r[80]; static unsigned g_i2n;
+static void i2_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { if (!strstr(d->label, "i2c")) return; unsigned i = g_i2n++ % 80; g_i2r[i].w = (char)(w ? 'w' : 'r'); snprintf(g_i2r[i].lab, sizeof g_i2r[i].lab, "%.10s", d->label + 1); g_i2r[i].off = off; g_i2r[i].v = v; }
+const char *a64m_i2c_trace(void) { static char b[5200]; size_t l = 0; b[0] = 0; unsigned n = g_i2n < 80 ? g_i2n : 80, st = g_i2n < 80 ? 0 : g_i2n % 80; for (unsigned k = 0; k < n && l < sizeof b - 50; k++) { unsigned i = (st + k) % 80; l += (size_t)snprintf(b + l, sizeof b - l, " %s:%c+0x%llx=0x%llx", g_i2r[i].lab, g_i2r[i].w, (unsigned long long)g_i2r[i].off, (unsigned long long)g_i2r[i].v); } return b; }
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
@@ -132,11 +136,12 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
     if (d->ts_n) ts_trace(d, 0, off, val);
+    i2_trace(d, 0, off, val);
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
-    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v);
+    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
     for (int k = 0; k < d->lk_n; k++) if (d->lk_w[k] == off) { d->lk_v[k] = (uint32_t)v & 0x1f; d->lk_set[k] = 1; }
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }

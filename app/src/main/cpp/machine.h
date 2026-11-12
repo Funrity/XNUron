@@ -73,7 +73,8 @@ int a64m_unknown_set_modelink(A64Machine *m, uint64_t pa, uint64_t w_off, uint64
 int a64m_unknown_lastreads(A64Machine *m, char *out, size_t cap);
 int a64m_unknown_ts_window(A64Machine *m, uint64_t block_pa, uint64_t base_off);   /* 0.4.150 range of one temperature sensor inside a block (trace only) */
 int a64m_unknown_ts_read(A64Machine *m, uint64_t block_pa, uint64_t off, uint64_t val);   /* 0.4.150 MODELLED fixed read of a sensor register */
-const char *a64m_tempsensor_trace(void);   /* 0.4.147 diagnostic: first accesses to the temperature sensor windows */
+const char *a64m_tempsensor_trace(void);
+const char *a64m_i2c_trace(void);   /* 0.4.217 diagnostic */   /* 0.4.147 diagnostic: first accesses to the temperature sensor windows */
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val);   /* MODELLED fixed read value at an offset of an unknown block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */
 int a64m_unknown_summary(A64Machine *m, char *out, size_t cap);   /* touched blocks: name reads/writes last-offset */
