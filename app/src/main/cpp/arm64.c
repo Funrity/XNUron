@@ -1209,6 +1209,7 @@ static int step(A64 *c) {
     if (c->pp_pc && pc == c->pp_pc && !c->pp_hit && c->x[c->pp_reg & 31] == c->pp_val) { c->pp_hit = 1; memcpy(c->pp_x, c->x, sizeof c->x); c->pp_sp = c->sp; }
     if (c->tr_pc) { if (!c->tr_on && pc == c->tr_pc) c->tr_on = 1; if (c->tr_on && c->tr_n < 400) c->tr_pcs[c->tr_n++] = pc; }
     if (c->cr_on && (i & 0xfc000000u) == 0x94000000u && (c->daif & 3) == 0 && c->el == 1) { int64_t dd = (int64_t)(i & 0x3ffffffu); if (dd & 0x2000000) dd -= 0x4000000; unsigned q = c->cr_n++ % 64; c->cr_pc[q] = pc; c->cr_tg[q] = pc + (uint64_t)(dd * 4); }
+    if (c->snap_pc && pc == c->snap_pc && !c->snap_n) { c->snap_n = 1; c->snap_fp = c->x[29]; c->snap_lr = c->x[30]; c->snap_sp = c->sp; c->snap_x0 = c->x[0]; c->snap_step = c->steps; }   /* 0.4.212 diagnostic: first entry into the panic function */
     if (c->hist_pc && pc == c->hist_pc) { unsigned q = 0; while (q < c->hist_n && !(c->hist_lr[q] == c->x[30] && c->hist_x1[q] == c->x[1])) q++; if (q < c->hist_n) c->hist_cnt[q]++; else if (c->hist_n < 24) { c->hist_lr[q] = c->x[30]; c->hist_x1[q] = c->x[1]; c->hist_cnt[q] = 1; c->hist_n++; } else c->hist_other++; }
     if (c->ctr_pc && pc == c->ctr_pc && c->ctr_mode == 1) { static const int rr[8] = {0, 8, 9, 10, 24, 25, 26, 27}; unsigned slot = c->ctr_total % 40; for (int q = 0; q < 8; q++) c->ctr[slot][q] = c->x[rr[q]]; c->ctr_total++; }
     else if (c->ctr_pc && pc == c->ctr_pc && c->ctr_n < 40 && c->x[2] != 0) { for (int q = 0; q < 7; q++) c->ctr[c->ctr_n][q] = c->x[q]; c->ctr[c->ctr_n][7] = c->x[30]; c->ctr_n++; }

@@ -1053,3 +1053,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.211
 - РЕЗУЛЬТАТ 0.4.210: с `cpus=1` ядро больше не ждёт остальные ядра — стартуют AIC, SPI, I2C, AES, backlight, USB PHY, DWI, MTR, AGX и др. (первая смена поведения за долгое время). Затем паника ядра: "thread_invoke: preemption_level 1, possible cause: blocking while holding a spinlock, or within interrupt context" и "thread already waiting on 0xffffffe01002c208"; цикл 0x7ba5ec0 — это panic-halt самого ядра. Диагностика `[pfr]`: цепочка кадров от x29 на остановке, чтобы найти, кто блокируется при preemption_level 1. Поведение эмулятора не менялось.
+
+## 0.4.212
+- Разобрано по `[pfr]`: цикл 0x7ba5ec0 — повторная паника внутри panic (mutex в обработчике → "thread already waiting"); исходная паника "thread_invoke: preemption_level 1". Добавлен снимок кадра при ПЕРВОМ входе в panic() (0x7a44164): `snap_*` в эмуляторе (одно сравнение pc на инструкцию) и вывод цепочки `[pfirst]`, чтобы увидеть, кто блокировался с preemption_level 1. Поведение гостя не менялось.

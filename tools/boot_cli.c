@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     uint64_t maxm = argc > 2 ? strtoull(argv[2], 0, 10) : 4000;
     A64Machine *m = a64_attempt_ipsw(file_read, f, sz); if (!m) { fprintf(stderr, "out of memory\n"); return 2; }
     uint64_t steps = 0; A64MState st;
-    { const char *hp = getenv("XN_HIST_PC"); if (hp) a64m_cpu(m)->hist_pc = strtoull(hp, 0, 16); } a64m_cpu(m)->cr_on = 1;   /* 0.4.138 diagnostic */
+    { const char *hp = getenv("XN_HIST_PC"); if (hp) a64m_cpu(m)->hist_pc = strtoull(hp, 0, 16); } a64m_cpu(m)->cr_on = 1; a64m_cpu(m)->snap_pc = 0xfffffff007a44164ull;   /* 0.4.138 diagnostic; 0.4.212: snapshot at the first entry of panic() */
     while ((st = a64m_run(m, 200000, false)) == A64M_RUNNING) { steps += 200000; if (steps % 500000000ull == 0) { A64 *c0 = a64m_cpu(m); fprintf(stderr, "[progress] %llu M steps: EL%d pc=0x%llx daif=0x%x exceptions=%llu x0=%llx lr=%llx\n", (unsigned long long)(steps / 1000000ull), c0->el, (unsigned long long)c0->pc, c0->daif, (unsigned long long)c0->exc_count, (unsigned long long)c0->x[0], (unsigned long long)c0->x[30]); } if (steps > maxm * 1000000ull) { fprintf(stderr, "step limit reached\n"); break; } }
     a64m_log_flush(m);
     size_t off = 0, n; char *b = malloc(65536);
@@ -257,6 +257,22 @@ int main(int argc, char **argv) {
             int ok = 1, n = 0; while (n < 60 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) ok = 0; n++; } if (!ok || n < 4) continue;
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
           fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; }
+      }
+      { /* 0.4.212 diagnostic: frame chain at the FIRST entry into panic() (0x7a44164), i.e. the code that triggered the first panic ("thread_invoke: preemption_level 1 ...") */
+        if (!c->snap_n) fprintf(stderr, "[pfirst] panic() was never entered\n");
+        else { fprintf(stderr, "[pfirst] panic() first entered at step %llu: lr=%llx sp=%llx x0=%llx\n", (unsigned long long)c->snap_step, (unsigned long long)(c->snap_lr & 0xfffffffffull), (unsigned long long)c->snap_sp, (unsigned long long)c->snap_x0);
+          uint64_t fp = c->snap_fp;
+          for (int d = 0; d < 20 && fp; d++) { uint64_t pa, nf = 0, lr = 0; uint8_t *q; if (a64_virt_to_phys(c, fp, &pa) || !(q = a64m_ram_at(m, pa, 16))) break; memcpy(&nf, q, 8); memcpy(&lr, q + 8, 8);
+            uint64_t t = 0xfffffff000000000ull | (lr & 0xfffffffffull); fprintf(stderr, "[pfirst] #%d lr %llx", d, (unsigned long long)(t & 0xfffffffffull));
+            uint64_t pp; uint8_t *iq; uint32_t ins = 0; if (!a64_virt_to_phys(c, t - 4, &pp) && (iq = a64m_ram_at(m, pp, 4))) { memcpy(&ins, iq, 4); if ((ins >> 26) == 0x25) fprintf(stderr, " (bl %llx)", (unsigned long long)((t - 4 + (uint64_t)(((int64_t)(int32_t)(ins << 6) >> 6) * 4)) & 0xfffffffffull)); }
+            int cnt = 0; for (uint64_t a = t - 0x300; a < t && cnt < 5; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+              if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+              if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+              int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+              uint64_t sp; uint8_t *sq; char buf[64]; if (a64_virt_to_phys(c, tg, &sp) || !(sq = a64m_ram_at(m, sp, 60))) continue; memcpy(buf, sq, 60); buf[60] = 0;
+              int ok = 1, n = 0; while (n < 60 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) ok = 0; n++; } if (!ok || n < 4) continue;
+              fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
+            fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;

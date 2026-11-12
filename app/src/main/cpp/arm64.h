@@ -112,6 +112,7 @@ typedef struct {
     uint64_t ctr_pc; int ctr_mode; unsigned ctr_total; unsigned ctr_n; uint64_t ctr[40][8];
     uint64_t nw_pc[96]; unsigned nw_n; uint64_t nw_step[96], nw_x0[96], nw_x1[96], nw_lr[96];   /* 0.4.171 diagnostic: ring of the most recently FIRST-executed instructions (the frontier of new code) */
     uint64_t cr_pc[64], cr_tg[64]; unsigned cr_n; int cr_on;   /* 0.4.157 diagnostic: ring of the last bl call sites executed with interrupts unmasked (daif==0) = what the last non-interrupt kernel thread called */
+    uint64_t snap_pc, snap_fp, snap_lr, snap_sp, snap_x0, snap_step; unsigned snap_n;   /* diagnostic 0.4.212: snapshot at first entry of snap_pc */
     uint64_t wfi_n, wfi_slept; uint64_t hist_pc; unsigned hist_n; uint64_t hist_lr[24], hist_x1[24], hist_cnt[24], hist_other;   /* diagnostic 0.4.138: histogram of (lr, x1) at every entry of one pc */
        /* diagnostic: x0..x6 and lr at each entry of one function */
     uint64_t vw_val; unsigned vw_n; struct { uint64_t pc, va, pa, lr, x[4]; uint8_t sz; } vw[8];   /* diagnostic: stores of a given value */
