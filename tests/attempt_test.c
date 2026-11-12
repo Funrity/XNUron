@@ -164,6 +164,8 @@ int main(int argc, char **argv) {
         { uint64_t st = 99; CHECK(a64m_add_unknown_mmio_named(m, 0x235100000ull, 0x4000, "i2c9") == 0, "0.4.218: i2c block added");
           a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: idle i2c status has only bit 24 (SCL level) set");
           a64m_unknown_rw(m, 0x235100000ull, 1, 0x14, 0x01000000u, NULL); a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: the SCL level bit survives a write-1-to-clear");
+          CHECK(a64m_add_unknown_mmio_named(m, 0x26b800000ull, 0x4000, "dart-ane") == 0, "0.4.224: dart block added");
+          { uint64_t d0 = 1, d4 = 1; a64m_unknown_rw(m, 0x26b800000ull, 0, 0x0, 0, &d0); a64m_unknown_rw(m, 0x26b800000ull, 0, 0x4, 0, &d4); CHECK(((d0 >> 24) & 0xf) == 14 && d4 == 0, "0.4.224: dart +0 has page shift 14 in bits 27:24, other registers read 0: %llx %llx", (unsigned long long)d0, (unsigned long long)d4); }
           CHECK(a64m_add_unknown_mmio_named(m, 0x235200000ull, 0x4000, "pmgr9") == 0, "0.4.218: non-i2c block added");
           a64m_unknown_rw(m, 0x235200000ull, 0, 0x14, 0, &st); CHECK(st == 0, "0.4.219: only i2c blocks get the status-level model"); }
         CHECK(a64m_add_unknown_mmio_auto(m, 0x23b100000ull, 0x8000, "aic") == -1, "0.4.59: re-adding the same block is refused");
