@@ -1052,7 +1052,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
        PE_parse_boot_argn_internal (0.4.131 dump: it reads [bootArgs + 0x6c]). Up to 0.4.131 the string was written 4 bytes too far, so the kernel
        always saw an EMPTY command line: none of '-v serial=3 debug=0x14e' (nor rd=md0) ever reached it. The old 'serial=3 debug=0x14e' is NOT
        restored here: it never took effect, so its behaviour is untested; only what this experiment needs is passed. */
-    strcpy((char *)b + 108, rd_on ? "-v rd=md0" : "-v");
+    /* 0.4.210 ASSUMPTION: this emulator runs ONE CPU; the 0.4.209 stacks show many driver start()s blocked in AppleARMCPU's wait for "AppleARMCPU-AllCPU-Initialized" (the 5 secondary cores never check in). 'cpus=1' is XNU's documented boot-arg that limits the number of CPUs; it only tells the kernel not to wait for cores this machine does not have. Nothing is faked. */
+    strcpy((char *)b + 108, rd_on ? "-v rd=md0 cpus=1" : "-v cpus=1");
     LOG("[boot] boot_args.CommandLine (offset 108) = \"%s\"\n", (const char *)b + 108);
     a64m_mark_attempt(m, mo.lowest_vm, kphys);
     a64m_set_pc(m, entry_p); a64m_set_boot_arg(m, ba);
