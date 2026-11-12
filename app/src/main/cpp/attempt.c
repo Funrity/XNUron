@@ -976,6 +976,11 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           for (int z = 0; z < npc && sh < 8; z++) if (strstr(pc[z].name, "pcie") || strstr(pc[z].compat, "pcie")) { static char pl[6000]; int64_t ppl = -1; int pr = a64_dt_node_info(dt, dtlen, pc[z].name, "nonexistent-prop", &ppl, pl, sizeof pl);
               LOG("[boot] diagnostic (0.4.220): PCIe node '%s' compatible '%s' physical 0x%llx size 0x%llx; properties (lookup %d): %s\n", pc[z].name, pc[z].compat, (unsigned long long)pc[z].pa, (unsigned long long)pc[z].size, pr, pr >= 0 ? pl : ""); sh++; }
           if (!sh) LOG("[boot] diagnostic (0.4.220): no /arm-io node with 'pcie' in name or compatible\n"); }
+        { /* 0.4.226 diagnostic (changes nothing): AppleSPMI asserts 'spmi timeout' (0.4.224 log, called from AppleDialogSPMIPMU); no block called spmi was ever touched - which DT nodes mention spmi, where are they, what do they carry */
+          static A64SocNode sp[300]; int nsp = a64_dt_soc_nodes(dt, dtlen, sp, 300), sh = 0;
+          for (int z = 0; z < nsp && sh < 8; z++) if (strstr(sp[z].name, "spmi") || strstr(sp[z].compat, "spmi") || strstr(sp[z].name, "dwi")) { static char pl[3000]; int64_t ppl = -1; int pr = a64_dt_node_info(dt, dtlen, sp[z].name, "nonexistent-prop", &ppl, pl, sizeof pl);
+              LOG("[boot] diagnostic (0.4.226): node '%s' compatible '%s' physical 0x%llx size 0x%llx; properties (lookup %d): %s\n", sp[z].name, sp[z].compat, (unsigned long long)sp[z].pa, (unsigned long long)sp[z].size, pr, pr >= 0 ? pl : ""); sh++; }
+          if (!sh) LOG("[boot] diagnostic (0.4.226): no /arm-io node with 'spmi' or 'dwi' in name or compatible\n"); }
         { /* 0.4.57: log 0.4.56: after aic start the kernel reads physical 0x23d1f0000 (external abort, `ldr w0,[x8,w1,uxtw]` register read at offset 0). Same method as for aic: ask the DeviceTree who owns it, model that node as an unknown block (reads 0). */
           static const uint64_t seen[2] = { 0x23d1f0000ull, 0x24ac04000ull };   /* 0.4.60: + dapf-aop (log 0.4.59: REQUIRE failed in AppleDAPF.cpp:158 for it) so its first 40 accesses are logged */
           for (int z = 0; z < 2; z++) { char nn[40], cc[100]; uint64_t nb = 0, ns = 0; int fr = a64_dt_find_pa(dt, dtlen, seen[z], nn, sizeof nn, cc, sizeof cc, &nb, &ns);
