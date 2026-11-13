@@ -996,6 +996,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           static A64SocNode nb[400]; int nnb = a64_dt_soc_nodes(dt, dtlen, nb, 400), shn = 0;
           for (int z = 0; z < nnb && shn < 12; z++) if (nb[z].pa >= 0x23bc00000ull - 0x100000 && nb[z].pa < 0x23bc00000ull + 0x200000) { LOG("[boot] diagnostic (0.4.254): node '%s' compatible '%s' physical 0x%llx size 0x%llx\n", nb[z].name, nb[z].compat, (unsigned long long)nb[z].pa, (unsigned long long)nb[z].size); shn++; }
           if (!shn) LOG("[boot] diagnostic (0.4.254): no /arm-io node within 0x23bb00000..0x23be00000\n"); }
+        { /* 0.4.257 diagnostic: the guest read 0x269104114 (external abort) - DeviceTree nodes within 0x1000000 of it */
+          static A64SocNode nc[400]; int nnc = a64_dt_soc_nodes(dt, dtlen, nc, 400), shc = 0;
+          for (int z = 0; z < nnc && shc < 12; z++) if (nc[z].pa + nc[z].size > 0x269104114ull - 0x400000 && nc[z].pa < 0x269104114ull + 0x400000) { LOG("[boot] diagnostic (0.4.257): node '%s' compatible '%s' physical 0x%llx size 0x%llx\n", nc[z].name, nc[z].compat, (unsigned long long)nc[z].pa, (unsigned long long)nc[z].size); shc++; }
+          if (!shc) LOG("[boot] diagnostic (0.4.257): no /arm-io node within 4 MiB of 0x269104114\n"); }
         { /* 0.4.57: log 0.4.56: after aic start the kernel reads physical 0x23d1f0000 (external abort, `ldr w0,[x8,w1,uxtw]` register read at offset 0). Same method as for aic: ask the DeviceTree who owns it, model that node as an unknown block (reads 0). */
           static const uint64_t seen[2] = { 0x23d1f0000ull, 0x24ac04000ull };   /* 0.4.60: + dapf-aop (log 0.4.59: REQUIRE failed in AppleDAPF.cpp:158 for it) so its first 40 accesses are logged */
           for (int z = 0; z < 2; z++) { char nn[40], cc[100]; uint64_t nb = 0, ns = 0; int fr = a64_dt_find_pa(dt, dtlen, seen[z], nn, sizeof nn, cc, sizeof cc, &nb, &ns);
