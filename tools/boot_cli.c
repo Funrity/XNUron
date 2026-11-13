@@ -274,6 +274,14 @@ int main(int argc, char **argv) {
               fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
+      { /* 0.4.231 diagnostic: AppleSPMI vtable (live, after the chained-fixup rebase): find the qword whose low 32 bits are 0x08982b18 (the retry/timeout handler = vtable slot 0x630), print slots 0x618..0x640 and the first 0x140 bytes of the code of slot 0x618 */
+        A64 *c2 = a64m_cpu(m); uint64_t pa2, slot = 0; int found = 0;
+        for (uint64_t va = 0xfffffff007000000ull; va < 0xfffffff00a800000ull && !found; va += 0x4000) { uint8_t *q2; if (a64_virt_to_phys(c2, va, &pa2) != 0 || !(q2 = a64m_ram_at(m, pa2, 0x4000))) continue;
+          for (uint64_t o = 0; o < 0x4000; o += 8) { uint64_t v; memcpy(&v, q2 + o, 8); if ((v & 0xffffffffull) == 0x08982b18ull && (v >> 36) != 0) { slot = va + o; found = 1; break; } } }
+        if (!found) fprintf(stderr, "[vt] no vtable slot pointing to 0x8982b18 found\n");
+        else { fprintf(stderr, "[vt] slot 0x630 at %llx; slots:", (unsigned long long)slot); uint64_t t618 = 0;
+          for (int d = -3; d <= 2; d++) { uint64_t v = 0; uint8_t *q3; if (a64_virt_to_phys(c2, slot + (uint64_t)(d * 8), &pa2) == 0 && (q3 = a64m_ram_at(m, pa2, 8))) memcpy(&v, q3, 8); uint64_t t = 0xfffffff000000000ull | (v & 0xfffffffffull); fprintf(stderr, " [0x%x]=%llx", 0x630 + d * 8, (unsigned long long)t); if (d == -3) t618 = t; }
+          fprintf(stderr, "\n"); for (int blk = 0; blk < 3; blk++) { fprintf(stderr, "[vt] code %llx:", (unsigned long long)(t618 + (uint64_t)blk * 0x80)); for (int w = 0; w < 32; w++) { uint32_t x = 0; uint8_t *q4; if (a64_virt_to_phys(c2, t618 + (uint64_t)blk * 0x80 + 4u * (uint64_t)w, &pa2) == 0 && (q4 = a64m_ram_at(m, pa2, 4))) memcpy(&x, q4, 4); fprintf(stderr, " %08x", x); } fprintf(stderr, "\n"); } } }
       fprintf(stderr, "[i2c] last accesses:%s\n", a64m_i2c_trace());
       { /* 0.4.167 diagnostic: kernel call chains from frame records [fp, lr] found by scanning the kernel heap VA range page by page through the guest MMU (the heap is NOT linearly mapped, measured in 0.4.166). ASSUMPTION: saved lr may carry a PAC signature, only its low 36 bits are used */
         const uint64_t lo = c->cov_base, hi = c->cov_base + c->cov_len; const uint64_t VS = 0xffffffe000000000ull, VE = VS + 0x20000000ull;
