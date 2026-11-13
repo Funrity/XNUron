@@ -151,7 +151,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
-    if (d->is_aic) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
+    if (d->is_aic && !(off >= 0x3000 && off < 0x4000 && !v)) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; aic_update(d); }
     if (d->is_spmi && off == 0x778) d->sp_irq &= ~(uint32_t)v;   /* write-1-to-clear: polled mode writes back (status & mask) */
     if (d->is_spmi && off == 0x704 && v) { d->sp_irq |= 1u; a64m_aic_raise(d->m, 192); }   /* 0.4.234 MODELLED (ASSUMPTION): every command "completes" at once: interrupt 192 */
