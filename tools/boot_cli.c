@@ -274,6 +274,10 @@ int main(int argc, char **argv) {
               fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
+      { /* 0.4.232 diagnostic: the AppleSPMI object itself (first qword = vtable pointer 0xfffffff00795ceb8, PAC bits ignored): print its words +0x100..+0x1a0 (+0x110 flag, +0x168 interrupt-status bit, +0x180 timeout ms, +0x184 wait flag, +0x18c retries) */
+        int nf = 0; for (uint64_t pb = 0x40000000ull; nf < 3; pb += 0x100000ull) { uint8_t *q5 = a64m_ram_at(m, pb, 0x100000); if (!q5) break;
+          for (uint64_t o = 0; o + 0x1c0 <= 0x100000 && nf < 3; o += 8) { uint64_t v; memcpy(&v, q5 + o, 8); if ((v & 0xfffffffffull) == 0x0795ceb8ull && (v >> 36) != 0) { nf++; fprintf(stderr, "[spo] object at pa %llx:", (unsigned long long)(pb + o)); for (int w = 0x100; w < 0x1a0; w += 4) { uint32_t x; memcpy(&x, q5 + o + w, 4); fprintf(stderr, " +%x=%x", w, x); } fprintf(stderr, "\n"); } } }
+        if (!nf) fprintf(stderr, "[spo] AppleSPMI object not found in RAM\n"); }
       { /* 0.4.231 diagnostic: AppleSPMI vtable (live, after the chained-fixup rebase): find the qword whose low 32 bits are 0x08982b18 (the retry/timeout handler = vtable slot 0x630), print slots 0x618..0x640 and the first 0x140 bytes of the code of slot 0x618 */
         A64 *c2 = a64m_cpu(m); uint64_t pa2, slot = 0; int found = 0;
         for (uint64_t va = 0xfffffff007000000ull; va < 0xfffffff00a800000ull && !found; va += 0x4000) { uint8_t *q2; if (a64_virt_to_phys(c2, va, &pa2) != 0 || !(q2 = a64m_ram_at(m, pa2, 0x4000))) continue;
