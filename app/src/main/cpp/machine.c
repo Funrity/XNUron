@@ -117,7 +117,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi, is_aic; uint32_t sp_fifo[16]; unsigned sp_n, sp_irq; uint32_t aic_pend[16], aic_mask[16]; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi, is_aic; uint32_t sp_fifo[16]; unsigned sp_n, sp_irq; uint32_t aic_pend[16], aic_mask[16]; uint16_t aw_off[128]; uint32_t aw_or[128], aw_n[128]; int aw_cnt; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
 /* 0.4.234 MODELLED (ASSUMPTION, PLACEHOLDER): minimal interrupt controller for the DeviceTree node "aic" (aic,t8020, reg 0x23b100000). Register layout taken from the PUBLIC Linux (Asahi) driver of the first-generation Apple AIC, NOT verified on this chip: EVENT +0x2004 (read: lowest pending unmasked interrupt as (1<<16)|number, acknowledged; 0 = none), MASK_SET +0x4100.., MASK_CLR +0x4180.. (one bit per interrupt, 32 per word), everything starts masked. No priorities, no target CPU, no IPIs, no software interrupts. The CPU's IRQ input is the OR of pending&~mask. */
 static void aic_update(struct Unk *d) { int any = 0; for (int i = 0; i < 16; i++) if (d->aic_pend[i] & ~d->aic_mask[i]) any = 1; d->m->cpu.irq_line = any ? true : false; }
 static struct Unk *aic_of(A64Machine *m);
@@ -151,6 +151,7 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
+    if (d->is_aic) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; aic_update(d); }
     if (d->is_spmi && off == 0x778) d->sp_irq &= ~(uint32_t)v;   /* write-1-to-clear: polled mode writes back (status & mask) */
     if (d->is_spmi && off == 0x704 && v) { d->sp_irq |= 1u; a64m_aic_raise(d->m, 192); }   /* 0.4.234 MODELLED (ASSUMPTION): every command "completes" at once: interrupt 192 */
@@ -162,6 +163,7 @@ static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " w+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)v); }
 }
 static struct Unk *aic_of(A64Machine *m) { for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].is_aic) return &g_unk[k]; return NULL; }
+const char *a64m_aic_writes(A64Machine *m) { static char b[6000]; size_t l = 0; b[0] = 0; struct Unk *a = aic_of(m); if (!a) return b; for (int k = 0; k < a->aw_cnt && l < sizeof b - 40; k++) l += (size_t)snprintf(b + l, sizeof b - l, " +%x:%ux|%x", a->aw_off[k], a->aw_n[k], a->aw_or[k]); return b; }
 int a64m_aic_raise(A64Machine *m, unsigned irq) { struct Unk *a = aic_of(m); if (!a || irq >= 512) return -1; a->aic_pend[irq >> 5] |= 1u << (irq & 31); aic_update(a); return 0; }   /* 0.4.234: a device raises interrupt `irq` */
 /* 0.4.53: blocks with a label (the DeviceTree node name) so the log says which one was touched; 0.4.58: up to 360, each with a log budget (`cap` accesses) */
 static int add_unknown(A64Machine *m, uint64_t pa, uint64_t size, const char *label, unsigned cap) {

@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
               fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
+      fprintf(stderr, "[aicw] distinct AIC register writes (+offset:count|OR of values):%s\n", a64m_aic_writes(m));
       { /* 0.4.232 diagnostic: the AppleSPMI object itself (first qword = vtable pointer 0xfffffff00795ceb8, PAC bits ignored): print its words +0x100..+0x1a0 (+0x110 flag, +0x168 interrupt-status bit, +0x180 timeout ms, +0x184 wait flag, +0x18c retries) */
         int nf = 0; for (uint64_t pb = 0x40000000ull; nf < 3; pb += 0x100000ull) { uint8_t *q5 = a64m_ram_at(m, pb, 0x100000); if (!q5) break;
           for (uint64_t o = 0; o + 0x1c0 <= 0x100000 && nf < 3; o += 8) { uint64_t v; memcpy(&v, q5 + o, 8); if ((v & 0xfffffffffull) == 0x0795ceb8ull && (v >> 36) != 0) { nf++; fprintf(stderr, "[spo] object at pa %llx:", (unsigned long long)(pb + o)); for (int w = 0x100; w < 0x1a0; w += 4) { uint32_t x; memcpy(&x, q5 + o + w, 4); fprintf(stderr, " +%x=%x", w, x); } fprintf(stderr, "\n"); } } }
