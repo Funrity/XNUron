@@ -1134,3 +1134,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.238
 - Сборка 0.4.237: IRQ 204 для SPMI убрал панику "spmi timeout" (команды SPMI теперь завершаются), стартовали DART ane/isp. Новая остановка (шаг ~1.29 млрд): AppleHxDART REQUIRE "translation not permitted for bypassed SID (%d)" (AppleHxDART, адрес 0x8f03890). Только диагностика: окна кода 0x8f03400..0x8f03900.
+
+## 0.4.239
+- Ошибка модели 0.4.237: IRQ 204 принадлежит dart-aop (паника "Max spurious DART/SMMU interrupts", x3[3]="dart-aop"), а не SPMI. Из списка прерываний SPMI ядро размаскировало №234 (0xea; MASK_CLR слово 7 = 0x3000470, бит 10). MODELLED (ASSUMPTION): команда SPMI поднимает IRQ 234.
