@@ -221,6 +221,16 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "y") == 1 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "avd", "y") == 1, "siblings after the removed node are intact and parsable");
         CHECK(a64_dt_node_remove(dt, &q, "avd") == 1 && a64_dt_node_remove(dt, &q, "avd") == 0 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "z") == 1, "last child removed; second removal finds nothing");
     }
+    { /* 0.4.277: remove nodes by name/compatible substring */
+        uint8_t dt[2048]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u; char lg[100];
+        NODE(1, 1); PROP("name", 5, "root"); NODE(1, 3); PROP("name", 7, "arm-io");
+        NODE(2, 0); PROP("name", 5, "amp0"); PROP("compatible", 14, "audio,AD5860x");
+        NODE(1, 0); PROP("name", 5, "uart"); NODE(1, 0); PROP("name", 6, "ad5860");
+        int r = a64_dt_node_remove_match(dt, &q, "ad5860", lg, sizeof lg);
+        CHECK(r == 2 && strstr(lg, "amp0") && strstr(lg, "ad5860"), "removed by compatible and by name: r=%d log=%s", r, lg);
+        CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "y") == 1 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "amp0", "y") == -2, "uart kept, amp0 gone");
+        CHECK(a64_dt_node_remove_match(dt, &q, "ad5860", lg, sizeof lg) == 0, "second call finds nothing");
+    }
     { /* 0.4.79: probe for lowercase dashed names passed to calls that are not DeviceTree property names */
         A64Machine *m = a64m_create_system(1u << 20);
         a64m_nm_add_dt_name(m, "present-name"); a64m_set_coverage(m, A64M_RAM_BASE, 0x1000);   /* strings count only inside the kernel image range */
