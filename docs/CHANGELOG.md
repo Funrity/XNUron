@@ -1254,3 +1254,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.278
 - Сборка 0.4.277: ядро без паник доходит до AppleSEPManager::start (запись 1 в sep+0x810c) и ждёт SEP. Диагностика (поведение не меняется): поиск и покрытие кода по строкам SEPManager / "SEP " / "sep-" ([sepx]) для разбора протокола ожидания SEP.
+
+## 0.4.279
+- Сборка 0.4.278: AppleSEPManager::start дошёл до "SEP memory IS coherent" и _setPowerState, но сообщений загрузки SEP ("SEP booting", ping, Tz0 и т.д.) не было; выполнялся код со строкой "wait-sep-pg" (0x8ce3d4c) — ожидание power-gate SEP в PMGR. Горячий цикл ядра на 0x8ceaa20–0x8ceaa40, вероятно, опрос состояния SEP_PS. Диагностика: выгрузка кода 0x8ce7c80..0x8ce8300 ("SEP still running after 5s SEP_PS") и 0x8cea780..0x8ceab00 (горячий цикл). Поведение не меняется.
