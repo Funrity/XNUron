@@ -176,6 +176,7 @@ int main(int argc, char **argv) {
             a64m_unknown_rw(m, 0x23b100000ull, 0, 0x2004, 0, &ev); CHECK(ev == 0, "0.4.234: EVENT with nothing pending reads 0");
             a64m_unknown_rw(m, 0x23b100000ull, 1, 0x4100 + 4 * 6, 1u, NULL); a64m_aic_raise(m, 192); CHECK(!a64_irq_asserted(a64m_cpu(m)), "0.4.234: MASK_SET masks again");
             a64m_unknown_rw(m, 0x23d180000ull, 1, 0x704, 0x60018f30u, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x778, 0, &sw); CHECK(sw == 1, "0.4.234: SPMI command sets status bit 0 of +0x778");
+            a64m_unknown_rw(m, 0x23d180000ull, 1, 0x738, 0xff7f3ff1u, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x738, 0, &sw); CHECK(sw == 0xff7f3ff1u, "0.4.240: spmi enable word reads back");
             a64m_unknown_rw(m, 0x23d180000ull, 1, 0x778, 1, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x778, 0, &sw); CHECK(sw == 0, "0.4.234: SPMI status is write-1-to-clear"); }
           CHECK(a64m_add_unknown_mmio_named(m, 0x235200000ull, 0x4000, "pmgr9") == 0, "0.4.218: non-i2c block added");
           a64m_unknown_rw(m, 0x235200000ull, 0, 0x14, 0, &st); CHECK(st == 0, "0.4.219: only i2c blocks get the status-level model"); }
