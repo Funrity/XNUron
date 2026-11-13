@@ -284,6 +284,8 @@ int main(int argc, char **argv) {
           if (a64_virt_to_phys(c4, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
           int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); if (tg == sva) { fprintf(stderr, " %llx(%s)", (unsigned long long)(a & 0xfffffffffull), (c4->cov && (a - c4->cov_base) < c4->cov_len && (c4->cov[(a - c4->cov_base) >> 5] & (1u << (((a - c4->cov_base) >> 2) & 7)))) ? "E" : "-"); nr++; } }
         fprintf(stderr, "\n"); }
+      { /* 0.4.271 diagnostic: strings used by AppleAVD::start revision code (0x8bfe5c8..): 0xfffffff0076926b5.. */
+        A64 *c5 = a64m_cpu(m); fprintf(stderr, "[avdstr]"); for (uint64_t ad = 0xfffffff0076926b0ull; ad < 0xfffffff007692800ull; ad++) { uint64_t pa5; uint8_t *q5; int ch = 0; if (a64_virt_to_phys(c5, ad, &pa5) == 0 && (q5 = a64m_ram_at(m, pa5, 1))) ch = *q5; fputc(ch ? ch : '|', stderr); } fputc('\n', stderr); }
       { /* 0.4.261 diagnostic: AppleH10CamIn::start loads fISPVersion from [table+0x204] with table = 0xfffffff0079ab1e8 (adrp/add at 0x8c51824); print the table words */
         A64 *c4 = a64m_cpu(m); uint64_t pa4; uint8_t *q7; fprintf(stderr, "[isp] table 0xfffffff0079ab1e8 words:");
         for (int w = 0; w < 0x240; w += 4) { uint32_t v = 0; if (a64_virt_to_phys(c4, 0xfffffff0079ab1e8ull + (uint64_t)w, &pa4) == 0 && (q7 = a64m_ram_at(m, pa4, 4))) memcpy(&v, q7, 4); if (v) fprintf(stderr, " +%x=%x", w, v); } fprintf(stderr, "\n"); }
