@@ -169,6 +169,14 @@ int main(int argc, char **argv) {
           CHECK(a64m_add_unknown_mmio_named(m, 0x23d180000ull, 0x4000, "spmi") == 0, "0.4.229: spmi block added");
           { uint64_t a = 0, b = 0, c = 0, e = 0; a64m_unknown_rw(m, 0x23d180000ull, 0, 0x700, 0, &a); a64m_unknown_rw(m, 0x23d180000ull, 1, 0x704, 0x60088f33u, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x700, 0, &b); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x708, 0, &c); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x700, 0, &e);
             CHECK(a == 0x01000000u && b == 0 && c == 0x60088f33u && e == 0x01000000u, "0.4.229: spmi RX-empty bit, command echoed once: %llx %llx %llx %llx", (unsigned long long)a, (unsigned long long)b, (unsigned long long)c, (unsigned long long)e); }
+          (void)0;   /* the aic block 0x23b100000 "aic" already exists in this machine (line 160) */
+          { uint64_t ev = 7, sw = 0; a64m_aic_raise(m, 192); CHECK(!a64_irq_asserted(a64m_cpu(m)), "0.4.234: a masked interrupt does not assert the CPU IRQ");
+            a64m_unknown_rw(m, 0x23b100000ull, 1, 0x4180 + 4 * 6, 1u, NULL); CHECK(a64_irq_asserted(a64m_cpu(m)), "0.4.234: unmasked pending interrupt asserts IRQ");
+            a64m_unknown_rw(m, 0x23b100000ull, 0, 0x2004, 0, &ev); CHECK(ev == 0x100c0u && !a64_irq_asserted(a64m_cpu(m)), "0.4.234: EVENT returns (1<<16)|192 and acknowledges: %llx", (unsigned long long)ev);
+            a64m_unknown_rw(m, 0x23b100000ull, 0, 0x2004, 0, &ev); CHECK(ev == 0, "0.4.234: EVENT with nothing pending reads 0");
+            a64m_unknown_rw(m, 0x23b100000ull, 1, 0x4100 + 4 * 6, 1u, NULL); a64m_aic_raise(m, 192); CHECK(!a64_irq_asserted(a64m_cpu(m)), "0.4.234: MASK_SET masks again");
+            a64m_unknown_rw(m, 0x23d180000ull, 1, 0x704, 0x60018f30u, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x778, 0, &sw); CHECK(sw == 1, "0.4.234: SPMI command sets status bit 0 of +0x778");
+            a64m_unknown_rw(m, 0x23d180000ull, 1, 0x778, 1, NULL); a64m_unknown_rw(m, 0x23d180000ull, 0, 0x778, 0, &sw); CHECK(sw == 0, "0.4.234: SPMI status is write-1-to-clear"); }
           CHECK(a64m_add_unknown_mmio_named(m, 0x235200000ull, 0x4000, "pmgr9") == 0, "0.4.218: non-i2c block added");
           a64m_unknown_rw(m, 0x235200000ull, 0, 0x14, 0, &st); CHECK(st == 0, "0.4.219: only i2c blocks get the status-level model"); }
         CHECK(a64m_add_unknown_mmio_auto(m, 0x23b100000ull, 0x8000, "aic") == -1, "0.4.59: re-adding the same block is refused");

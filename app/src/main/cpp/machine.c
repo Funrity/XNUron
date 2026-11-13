@@ -117,7 +117,10 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi; uint32_t sp_fifo[16]; unsigned sp_n; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi, is_aic; uint32_t sp_fifo[16]; unsigned sp_n, sp_irq; uint32_t aic_pend[16], aic_mask[16]; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+/* 0.4.234 MODELLED (ASSUMPTION, PLACEHOLDER): minimal interrupt controller for the DeviceTree node "aic" (aic,t8020, reg 0x23b100000). Register layout taken from the PUBLIC Linux (Asahi) driver of the first-generation Apple AIC, NOT verified on this chip: EVENT +0x2004 (read: lowest pending unmasked interrupt as (1<<16)|number, acknowledged; 0 = none), MASK_SET +0x4100.., MASK_CLR +0x4180.. (one bit per interrupt, 32 per word), everything starts masked. No priorities, no target CPU, no IPIs, no software interrupts. The CPU's IRQ input is the OR of pending&~mask. */
+static void aic_update(struct Unk *d) { int any = 0; for (int i = 0; i < 16; i++) if (d->aic_pend[i] & ~d->aic_mask[i]) any = 1; d->m->cpu.irq_line = any ? true : false; }
+static struct Unk *aic_of(A64Machine *m);
 /* 0.4.96: ring of the last 24 reads from unknown blocks (the memory-controller block at 0x200000000, polled millions of times, is left out) - shows which register was read right before a panic */
 static struct { A64Machine *m; char label[44]; uint64_t off, val; } g_rr[24]; static unsigned g_rr_n;
 static struct { char w; uint64_t off, v; } g_tsr[60]; static unsigned g_tsn;   /* 0.4.149 diagnostic: ring of the LAST accesses inside any temperature sensor window (offset from the start of the pmgr block) */
@@ -132,6 +135,8 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     for (int k = 0; !fixed && k < d->ts_rn; k++) if (d->ts_off[k] == off) { val = d->ts_val[k]; fixed = 5; }   /* 0.4.150 MODELLED temperature sensor registers, see a64m_unknown_ts_read */
     if (!fixed && d->is_dart && off == 0) { val = 0x0e000000u; fixed = 6; }   /* 0.4.224 MODELLED (ASSUMPTION, PLACEHOLDER): DART register +0x0, bits 27:24 = page-size shift. Source: AppleT8020DART.cpp:1918 compares this 4-bit field with the configured page shift and prints actual = 1<<field; config was 0x4000 (16 KiB) so the field must be 14. Other bits of the register are UNKNOWN and read 0 */
+    if (!fixed && d->is_aic && off == 0x2004) { val = 0; for (unsigned i = 0; i < 512 && !val; i++) if ((d->aic_pend[i >> 5] & ~d->aic_mask[i >> 5]) >> (i & 31) & 1) { d->aic_pend[i >> 5] &= ~(1u << (i & 31)); val = 0x10000u | i; } aic_update(d); fixed = 8; }   /* 0.4.234 */
+    if (!fixed && d->is_spmi && off == 0x778) { val = d->sp_irq; fixed = 7; }   /* 0.4.234 MODELLED (ASSUMPTION): per-interrupt status words at +0x60+4*(irq/32) of the controller; interrupt 192 (the first DeviceTree interrupt of "spmi", the one AppleSPMI waits for: object field +0x168 = 0xc0) = word 6 bit 0 = +0x78. Source: AppleSPMI polled-mode code (0x89829bc) */
     if (!fixed && d->is_spmi && (off == 0x700 || off == 0xd00)) { val = d->sp_n ? 0 : 0x01000000u; fixed = 7; }   /* 0.4.229 MODELLED (ASSUMPTION, PLACEHOLDER): SPMI controller status +0x0 of each controller (+0x700, +0xd00 in the block): bit 24 = RX FIFO empty. Source: AppleSPMI keeps reading with bit 24 clear and gives up after 10 rounds ("spmi timeout"); bit 24 is also the failure test in its poll routine */
     if (!fixed && d->is_spmi && (off == 0x708 || off == 0xd08)) { if (d->sp_n) { val = d->sp_fifo[0]; for (unsigned q = 1; q < d->sp_n; q++) d->sp_fifo[q - 1] = d->sp_fifo[q]; d->sp_n--; } fixed = 7; }   /* 0.4.229 MODELLED: +0x8 = response FIFO pop; the response of every command is the command word echoed (ASSUMPTION: real response framing UNKNOWN; no PMU data is invented, a read returns "the command" not a register value) */
     if (!fixed && d->is_i2c && off == 0x14) { val = d->i2c_st | 0x01000000u; fixed = 6; }   /* 0.4.219 MODELLED (ASSUMPTION): I2C controller of an idle, empty bus: status bit 24 reads 1. Source: _checkBusStatus asserts when bit 24 is 0 ("SCL is stuck low" side); it is read as the SCL line level */
@@ -146,6 +151,9 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
+    if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; aic_update(d); }
+    if (d->is_spmi && off == 0x778) d->sp_irq &= ~(uint32_t)v;   /* write-1-to-clear: polled mode writes back (status & mask) */
+    if (d->is_spmi && off == 0x704 && v) { d->sp_irq |= 1u; a64m_aic_raise(d->m, 192); }   /* 0.4.234 MODELLED (ASSUMPTION): every command "completes" at once: interrupt 192 */
     if (d->is_spmi && (off == 0x704 || off == 0xd04) && v && d->sp_n < 16) d->sp_fifo[d->sp_n++] = (uint32_t)v;   /* 0.4.229: non-zero command word -> one response */
     if (d->is_i2c && off == 0x14) d->i2c_st &= ~(uint32_t)v;   /* 0.4.219: status event bits are write-1-to-clear (the driver writes back what it read); bit 24 is a LEVEL, see unk_r */
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
@@ -153,12 +161,14 @@ static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     if (d->ps) { int k = 0; while (k < d->ps_n && d->ps_off[k] != off) k++; if (k < 512) { if (k == d->ps_n) { d->ps_off[k] = off; d->ps_n++; } d->ps_val[k] = (uint32_t)v; } }
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " w+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)v); }
 }
+static struct Unk *aic_of(A64Machine *m) { for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].is_aic) return &g_unk[k]; return NULL; }
+int a64m_aic_raise(A64Machine *m, unsigned irq) { struct Unk *a = aic_of(m); if (!a || irq >= 512) return -1; a->aic_pend[irq >> 5] |= 1u << (irq & 31); aic_update(a); return 0; }   /* 0.4.234: a device raises interrupt `irq` */
 /* 0.4.53: blocks with a label (the DeviceTree node name) so the log says which one was touched; 0.4.58: up to 360, each with a log budget (`cap` accesses) */
 static int add_unknown(A64Machine *m, uint64_t pa, uint64_t size, const char *label, unsigned cap) {
     int slot = -1; for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].pa == pa) slot = k;   /* a stale entry of a destroyed machine that got the same address */
     if (slot < 0) for (int k = 0; k < g_unk_n; k++) if (!g_unk[k].m) { slot = k; break; }   /* free slot of a destroyed machine */
     if (slot < 0) { if (g_unk_n >= 360) return -1; slot = g_unk_n++; }
-    struct Unk *d = &g_unk[slot], keep = *d; memset(d, 0, sizeof *d); d->m = m; d->pa = pa; d->cap = cap; if (label) snprintf(d->label, sizeof d->label, "'%.38s'", label); d->is_i2c = label && strstr(label, "i2c") != NULL; d->is_dart = label && !strncmp(label, "dart", 4); d->is_spmi = label && !strcmp(label, "spmi");
+    struct Unk *d = &g_unk[slot], keep = *d; memset(d, 0, sizeof *d); d->m = m; d->pa = pa; d->cap = cap; if (label) snprintf(d->label, sizeof d->label, "'%.38s'", label); d->is_i2c = label && strstr(label, "i2c") != NULL; d->is_dart = label && !strncmp(label, "dart", 4); d->is_spmi = label && !strcmp(label, "spmi"); d->is_aic = label && !strcmp(label, "aic"); if (d->is_aic) for (int z = 0; z < 16; z++) d->aic_mask[z] = 0xffffffffu;
     A64Dev dev = { pa, size, unk_r, unk_w, d, "unknown-soc" };
     if (a64_add_device(&m->cpu, &dev)) { *d = keep; return -1; }   /* 0.4.59: a refused add (overlap with the SAME block added earlier) must not wipe the live entry: this lost the 'aic' +0x4 value in 0.4.58 */
     return 0;
