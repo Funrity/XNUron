@@ -154,7 +154,7 @@ static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
     if (d->is_aic && !(off >= 0x3000 && off < 0x4000 && !v)) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; aic_update(d); }
     if (d->is_spmi && off == 0x778) d->sp_irq &= ~(uint32_t)v;   /* write-1-to-clear: polled mode writes back (status & mask) */
-    if (d->is_spmi && off == 0x704 && v) { d->sp_irq |= 1u; a64m_aic_raise(d->m, 192); }   /* 0.4.234 MODELLED (ASSUMPTION): every command "completes" at once: interrupt 192 */
+    if (d->is_spmi && off == 0x704 && v) { d->sp_irq |= 1u; a64m_aic_raise(d->m, 204); }   /* 0.4.237 MODELLED (ASSUMPTION): every command "completes" at once with interrupt 204 (0xcc): the ONLY entry of the spmi node's "interrupts" list the kernel unmasked in the 0.4.236 run (AIC MASK_CLR word 6 got bit 12 only; 192 was routed but never unmasked) */
     if (d->is_spmi && (off == 0x704 || off == 0xd04) && v && d->sp_n < 16) d->sp_fifo[d->sp_n++] = (uint32_t)v;   /* 0.4.229: non-zero command word -> one response */
     if (d->is_i2c && off == 0x14) d->i2c_st &= ~(uint32_t)v;   /* 0.4.219: status event bits are write-1-to-clear (the driver writes back what it read); bit 24 is a LEVEL, see unk_r */
     if (d->rb && off < sizeof d->rbv) d->rbv[off >> 2] = (uint32_t)v;
