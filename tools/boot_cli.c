@@ -284,6 +284,9 @@ int main(int argc, char **argv) {
           if (a64_virt_to_phys(c4, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
           int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); if (tg == sva) { fprintf(stderr, " %llx(%s)", (unsigned long long)(a & 0xfffffffffull), (c4->cov && (a - c4->cov_base) < c4->cov_len && (c4->cov[(a - c4->cov_base) >> 5] & (1u << (((a - c4->cov_base) >> 2) & 7)))) ? "E" : "-"); nr++; } }
         fprintf(stderr, "\n"); }
+      { /* 0.4.261 diagnostic: AppleH10CamIn::start loads fISPVersion from [table+0x204] with table = 0xfffffff0079ab1e8 (adrp/add at 0x8c51824); print the table words */
+        A64 *c4 = a64m_cpu(m); uint64_t pa4; uint8_t *q7; fprintf(stderr, "[isp] table 0xfffffff0079ab1e8 words:");
+        for (int w = 0; w < 0x240; w += 4) { uint32_t v = 0; if (a64_virt_to_phys(c4, 0xfffffff0079ab1e8ull + (uint64_t)w, &pa4) == 0 && (q7 = a64m_ram_at(m, pa4, 4))) memcpy(&v, q7, 4); if (v) fprintf(stderr, " +%x=%x", w, v); } fprintf(stderr, "\n"); }
       { /* 0.4.246 diagnostic: global 0xfffffff00914f7c8 (= x26+0x308 of the CLPC ANE function) holds the object the forwarder 0x8187884 calls through [obj+0x88]: print it and the object's words +0x00..+0x100 */
         A64 *c3 = a64m_cpu(m); uint64_t pa3, gp = 0; uint8_t *q6; if (a64_virt_to_phys(c3, 0xfffffff00914f7c8ull, &pa3) == 0 && (q6 = a64m_ram_at(m, pa3, 8))) memcpy(&gp, q6, 8);
         fprintf(stderr, "[obj] [0xfffffff00914f7c8] = %llx\n", (unsigned long long)gp);
