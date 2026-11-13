@@ -1245,3 +1245,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.275
 - Сборка 0.4.274: AVD прошёл проверки версии/ревизии, но упёрся в RTBuddy (ожидание ответа сопроцессора). Камера (isp) и видеодекодер (avd) не нужны, чтобы дойти до /sbin/launchd, а их драйверы паникуют без ответа железа. MODELLED (ASSUMPTION, НЕ то, что делает настоящий iBoot): из DeviceTree удаляются узлы isp, avd, dart-isp, dart-avd (новая функция a64_dt_node_remove с тестом). Откат — удалить блок 0.4.275 в attempt.c. Цель: добраться до SEP/SecureRootCallBack, на котором стоит bsd_init.
+
+## 0.4.276
+- Сборка 0.4.275: узлы isp/avd/dart-isp/dart-avd удалены (лог: removed 4 node(s)), но та же паника RTBuddy теперь от PMP (RTBuddy(PMP): Loaded firmware … затем "No response received"); SIO и AOP стартуют без паники. MODELLED (ASSUMPTION, НЕ то, что делает iBoot): из DT дополнительно удаляются узлы pmp и pmp0 (процессор управления питанием), чтобы ядро не ждало его mailbox. Откат — убрать их из списка блока 0.4.275.
