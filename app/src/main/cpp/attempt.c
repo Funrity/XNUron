@@ -987,6 +987,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           char w3[1200]; int64_t l3 = -1; int r3 = a64_dt_node_info(dt, dtlen, "aic", "nonexistent-prop", &l3, w3, sizeof w3); LOG("[boot] diagnostic (0.4.233): node 'aic' properties (%d): %s\n", r3, r3 >= 0 ? w3 : "");
           char w4[1200]; int r4 = a64_dt_node_prop_words(dt, dtlen, "aic", "compatible", w4, sizeof w4); LOG("[boot] diagnostic (0.4.233): node 'aic' compatible words (%d): %s\n", r4, r4 >= 0 ? w4 : "");
           char w5[1200]; int r5 = a64_dt_node_prop_words(dt, dtlen, "aic", "ipid-mask", w5, sizeof w5); LOG("[boot] diagnostic (0.4.233): node 'aic' ipid-mask (%d): %s\n", r5, r5 >= 0 ? w5 : ""); }
+        { /* 0.4.250 diagnostic: pmgr properties that define the perf domains (domain id 8 = ANE has 2 states with frequency 0) */
+          static const char *pn[] = { "perf-domains", "ifane-max", "voltage-states8", "voltage-states9", "voltage-states2", "perf-regs", "fane" };
+          for (unsigned z = 0; z < sizeof pn / sizeof pn[0]; z++) { static char w6[3000]; int r6 = a64_dt_node_prop_words(dt, dtlen, "pmgr", pn[z], w6, sizeof w6); LOG("[boot] diagnostic (0.4.250): pmgr '%s' (%d): %s\n", pn[z], r6, r6 >= 0 ? w6 : ""); } }
         { /* 0.4.57: log 0.4.56: after aic start the kernel reads physical 0x23d1f0000 (external abort, `ldr w0,[x8,w1,uxtw]` register read at offset 0). Same method as for aic: ask the DeviceTree who owns it, model that node as an unknown block (reads 0). */
           static const uint64_t seen[2] = { 0x23d1f0000ull, 0x24ac04000ull };   /* 0.4.60: + dapf-aop (log 0.4.59: REQUIRE failed in AppleDAPF.cpp:158 for it) so its first 40 accesses are logged */
           for (int z = 0; z < 2; z++) { char nn[40], cc[100]; uint64_t nb = 0, ns = 0; int fr = a64_dt_find_pa(dt, dtlen, seen[z], nn, sizeof nn, cc, sizeof cc, &nb, &ns);
