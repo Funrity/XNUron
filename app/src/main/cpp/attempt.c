@@ -477,6 +477,37 @@ int a64_dt_node_add_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *no
     memset(d + na.ins, 0, 36); strncpy((char *)d + na.ins, prop, 31);   /* length field stays 0 */
     np++; memcpy(d + na.hdr, &np, 4); *n += 36; return 1;
 }
+/* 0.4.275: remove a whole node (with its subtree) called `node` from the flattened DeviceTree and fix the parent's child count. The node name is the "name" property. 1 removed (the first match), 0 not found, -1 malformed. Never removes the root. */
+static int dt_sub(const uint8_t *d, size_t n, size_t pos, int depth, char *nm, size_t *end) {
+    if (depth > 32 || pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + pos, 4); memcpy(&nc, d + pos + 4, 4); pos += 8;
+    if (np > 4096 || nc > 4096) return -1;
+    if (nm) nm[0] = 0;
+    for (uint32_t i = 0; i < np; i++) {
+        if (pos + 36 > n) return -1;
+        uint32_t len; memcpy(&len, d + pos + 32, 4); len &= 0x7FFFFFFFu;
+        size_t adv = 36 + (((size_t)len + 3) & ~(size_t)3);
+        if (len > n || pos + adv > n) return -1;
+        if (nm && !strncmp((const char *)d + pos, "name", 32)) { size_t kk = len < 32 ? len : 32; memcpy(nm, d + pos + 36, kk); nm[kk] = 0; }
+        pos += adv;
+    }
+    for (uint32_t i = 0; i < nc; i++) { size_t e2; if (dt_sub(d, n, pos, depth + 1, NULL, &e2) < 0) return -1; pos = e2; }
+    *end = pos; return 0;
+}
+static int dt_rm_walk(uint8_t *d, size_t *n, size_t hdr, int depth, const char *node) {
+    size_t pos; uint32_t np, nc; size_t e0;
+    if (depth > 32 || dt_sub(d, *n, hdr, depth, NULL, &e0) < 0) return -1;   /* validates the whole subtree before any raw read below */
+    memcpy(&np, d + hdr, 4); memcpy(&nc, d + hdr + 4, 4); pos = hdr + 8;
+    for (uint32_t i = 0; i < np; i++) { uint32_t len; memcpy(&len, d + pos + 32, 4); len &= 0x7FFFFFFFu; pos += 36 + (((size_t)len + 3) & ~(size_t)3); }
+    for (uint32_t i = 0; i < nc; i++) {
+        char nm[40]; size_t e; if (dt_sub(d, *n, pos, depth + 1, nm, &e) < 0) return -1;
+        if (!strcmp(nm, node)) { memmove(d + pos, d + e, *n - e); *n -= e - pos; nc--; memcpy(d + hdr + 4, &nc, 4); return 1; }
+        int r = dt_rm_walk(d, n, pos, depth + 1, node); if (r) return r;
+        pos = e;
+    }
+    return 0;
+}
+int a64_dt_node_remove(uint8_t *d, size_t *n, const char *node) { if (!node || !*node) return 0; return dt_rm_walk(d, n, 0, 0, node); }
 /* 0.4.74: add a property of `len` zero bytes to the first node with this name; 1 added, 0 exists, -1 no room, -2 no node. */
 int a64_dt_node_add_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, const void *data, size_t len) {
     DtNodeAt na; memset(&na, 0, sizeof na); na.node = node; size_t pos = 0;
@@ -784,6 +815,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
                 int a6 = a64_dt_node_add_prop(dt, &dtlen, dtcap, "cpu0", "fixed-frequency", &f24, 8);
                 if (a6 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): added 'fixed-frequency' = 24000000 (u64, 8 bytes: log 0.4.85 showed the kernel reading 8 bytes, the 4-byte property gave 0x13016e3600) to the 'cpu0' node. The IPSW tree carries none of the cpu frequency properties (bus-/memory-/peripheral-/fixed-/clock-frequency: iBoot fills them); the kernel's frequency globals (dump at 0xfffffff00914e128) are 0 except the timebase = 24 MHz, and the watchdog (AppleS5L8960XWatchDogTimer.cpp:55) panics 'clock speed 0 does not match absolute time'. ASSUMPTION: the watchdog's clock is the fixed oscillator and equals the timebase (24 MHz) - the kernel's own check demands exactly that, and 24 MHz is the timebase this emulator models. Bus/memory/peripheral/cpu frequencies stay absent (unknown, NOT invented)\n");
                 else if (a6 != 0) LOG("[boot] WARNING: could not add 'fixed-frequency' to 'cpu0' (%d)\n", a6); }
+        { /* 0.4.275 MODELLED (ASSUMPTION): the camera ISP and the video decoder (AVD) are not needed to reach /sbin/launchd, but their drivers panic when the hardware does not answer (0.4.259: AppleH10CamIn fISPVersion assert; 0.4.274: RTBuddy 'No response received' for the AVD coprocessor). The DeviceTree is built here, not by a real iBoot, so these nodes (and their DARTs) are removed. This is NOT what iBoot does on a real phone; it just means the kernel never sees these devices. Revert by deleting this block. */
+            static const char *const rmn[] = { "isp", "avd", "dart-isp", "dart-avd" }; char rl[160] = ""; int nrm = 0;
+            for (int ri = 0; ri < 4; ri++) { int rr = a64_dt_node_remove(dt, &dtlen, rmn[ri]); if (rr == 1) { size_t l = strlen(rl); snprintf(rl + l, sizeof rl - l, "%s%s", nrm ? "," : "", rmn[ri]); nrm++; } else if (rr < 0) LOG("[boot] WARNING: DeviceTree malformed while removing '%s'\n", rmn[ri]); }
+            LOG("[boot] DeviceTree fix-up (MODELLED, ASSUMPTION; NOT what iBoot does): removed %d node(s): %s\n", nrm, rl); }
         { /* 0.4.222 MODELLED (ASSUMPTION, PLACEHOLDER): log 0.4.219: AppleT802xPCIe::configure panics 'REQUIRE _phyTunables != nullptr' (AppleT802xPCIe.cpp:135). The kernel reads the 'apcie' properties apcie-phy-tunables / apcie-phy-ip-tunables / apcie-axi2af-tunables (strings at 0x8cea130..0x8cea478, executed); the IPSW tree has none of them (iBoot adds the chip's PHY tuning). We add them EMPTY (0 entries: the kernel checks numTunables*sizeof(spdsTunable)==length, so 0 is valid). NO tuning values are invented; a real PCIe link would need the real ones, here nothing is attached to the PCIe bus anyway. */
           static const char *tn[3] = { "apcie-phy-tunables", "apcie-phy-ip-tunables", "apcie-axi2af-tunables" }; uint32_t dummy = 0;
           for (int z = 0; z < 3; z++) { int r = a64_dt_node_add_prop(dt, &dtlen, dtcap, "apcie", tn[z], &dummy, 0);

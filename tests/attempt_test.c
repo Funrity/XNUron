@@ -209,6 +209,18 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "arm-io", "clock-frequencies-nclk", 8) == 0 && q == n0 + 44, "second add is a no-op");
         CHECK(a64_dt_node_add_zero_prop(dt, &q, sizeof dt, "nosuch", "y", 4) == -2, "unknown node -> -2");
     }
+    { /* 0.4.275: remove a node with its subtree */
+        uint8_t dt[2048]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(1, 1); PROP("name", 5, "root"); NODE(1, 3); PROP("name", 7, "arm-io");
+        NODE(1, 1); PROP("name", 4, "isp"); NODE(1, 0); PROP("name", 2, "x");
+        NODE(1, 0); PROP("name", 5, "uart"); NODE(1, 0); PROP("name", 4, "avd");
+        size_t n0 = q;
+        CHECK(a64_dt_node_remove(dt, &q, "nosuch") == 0 && q == n0, "unknown node: nothing removed");
+        CHECK(a64_dt_node_remove(dt, &q, "isp") == 1 && q < n0, "isp removed with its child (size %zu -> %zu)", n0, q);
+        CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "isp", "y") == -2 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "x", "y") == -2, "isp and its child are gone");
+        CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "y") == 1 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "avd", "y") == 1, "siblings after the removed node are intact and parsable");
+        CHECK(a64_dt_node_remove(dt, &q, "avd") == 1 && a64_dt_node_remove(dt, &q, "avd") == 0 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "z") == 1, "last child removed; second removal finds nothing");
+    }
     { /* 0.4.79: probe for lowercase dashed names passed to calls that are not DeviceTree property names */
         A64Machine *m = a64m_create_system(1u << 20);
         a64m_nm_add_dt_name(m, "present-name"); a64m_set_coverage(m, A64M_RAM_BASE, 0x1000);   /* strings count only inside the kernel image range */
