@@ -275,6 +275,15 @@ int main(int argc, char **argv) {
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
       fprintf(stderr, "[aicw] distinct AIC register writes (+offset:count|OR of values):%s\n", a64m_aic_writes(m));
+      { /* 0.4.251 diagnostic: where does the kernel build "voltage-states%d" (the PMGR perf-domain frequency tables)? find the string, then every ADRP+ADD reference in the code range */
+        A64 *c4 = a64m_cpu(m); uint64_t sva = 0, pa4; uint8_t *q8; static const char nd[] = "voltage-states";
+        for (uint64_t va = 0xfffffff007000000ull; va < 0xfffffff00a800000ull && !sva; va += 0x4000) { if (a64_virt_to_phys(c4, va, &pa4) != 0 || !(q8 = a64m_ram_at(m, pa4, 0x4000))) continue;
+          for (uint64_t o = 0; o + 20 < 0x4000; o++) if (!memcmp(q8 + o, nd, 14) && q8[o + 14] == '%') { sva = va + o; break; } }
+        fprintf(stderr, "[vs] string at %llx; refs:", (unsigned long long)(sva & 0xfffffffffull));
+        int nr = 0; for (uint64_t a = c4->cov_base; sva && a < c4->cov_base + c4->cov_len && nr < 12; a += 4) { uint32_t i1 = 0, i2 = 0; uint8_t *r1, *r2; uint64_t p1, p2; if (a64_virt_to_phys(c4, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
+          if (a64_virt_to_phys(c4, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+          int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); if (tg == sva) { fprintf(stderr, " %llx(%s)", (unsigned long long)(a & 0xfffffffffull), (c4->cov && (a - c4->cov_base) < c4->cov_len && (c4->cov[(a - c4->cov_base) >> 5] & (1u << (((a - c4->cov_base) >> 2) & 7)))) ? "E" : "-"); nr++; } }
+        fprintf(stderr, "\n"); }
       { /* 0.4.246 diagnostic: global 0xfffffff00914f7c8 (= x26+0x308 of the CLPC ANE function) holds the object the forwarder 0x8187884 calls through [obj+0x88]: print it and the object's words +0x00..+0x100 */
         A64 *c3 = a64m_cpu(m); uint64_t pa3, gp = 0; uint8_t *q6; if (a64_virt_to_phys(c3, 0xfffffff00914f7c8ull, &pa3) == 0 && (q6 = a64m_ram_at(m, pa3, 8))) memcpy(&gp, q6, 8);
         fprintf(stderr, "[obj] [0xfffffff00914f7c8] = %llx\n", (unsigned long long)gp);
