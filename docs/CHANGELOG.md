@@ -1272,3 +1272,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.284
 - Прогон 0.4.283 на 12 млрд шагов: корень смонтирован (hfs: mounted Peace16A366.arm64eCustomerRamDisk), после этого за 8 млрд шагов нового вывода нет; ядро крутится в районе 0x7a6ea20 / 0x7a08820 / 0x7a090a4 (daif=0xf, таймерные FIQ идут). Последний вывод: AppleCredentialManager init, AppleMobileApNonce "requires AES accelerator". Диагностика: выгрузка кода 0x7a6e900..0x7a6ef00 и 0x7a08780..0x7a08e80, чтобы понять, что это за цикл (ожидание потока/idle или реальный опрос). Поведение не меняется.
+
+## 0.4.285
+- Сборка 0.4.284: код 0x7a6e9e0.. — штатный цикл простоя планировщика (processor idle: проверка runnable-потоков, WFI), т.е. все потоки спят, ядро ждёт событие. Из истории: bsd_init ждёт флаг +0x10b AppleARMPE, который ставит колбэк "SecureRootCallBack" кода keystore (0x83d23f0/0x83d272c); он запускается, когда появляется AppleSEPManager. В 0.4.278 AppleSEPManager::start выполнен — проверяем, дошёл ли keystore. Диагностика: [sepx] по строкам SecureRoot / KeyStore / aes_0 / "no SEP endpoint" (E = выполнялось). Поведение не меняется.
