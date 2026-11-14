@@ -308,9 +308,9 @@ int main(int argc, char **argv) {
       }
       fprintf(stderr, "[aicw] distinct AIC register writes (+offset:count|OR of values):%s\n", a64m_aic_writes(m));
       { /* 0.4.251 diagnostic: where does the kernel build "voltage-states%d" (the PMGR perf-domain frequency tables)? find the string, then every ADRP+ADD reference in the code range */
-        A64 *c4 = a64m_cpu(m); uint64_t sva = 0, pa4; uint8_t *q8; static const char nd[] = "voltage-states";
+        A64 *c4 = a64m_cpu(m); uint64_t sva = 0, pa4; uint8_t *q8; static const char nd[] = "/sbin/launchd";   /* 0.4.317: where is init_program_name used (bsd_utaskbootstrap/load_init_program)? are those executed (E)? */
         for (uint64_t va = 0xfffffff007000000ull; va < 0xfffffff00a800000ull && !sva; va += 0x4000) { if (a64_virt_to_phys(c4, va, &pa4) != 0 || !(q8 = a64m_ram_at(m, pa4, 0x4000))) continue;
-          for (uint64_t o = 0; o + 20 < 0x4000; o++) if (!memcmp(q8 + o, nd, 14) && q8[o + 14] == '%') { sva = va + o; break; } }
+          for (uint64_t o = 0; o + 20 < 0x4000; o++) if (!memcmp(q8 + o, nd, 13) && q8[o + 13] == 0) { sva = va + o; break; } }
         fprintf(stderr, "[vs] string at %llx; refs:", (unsigned long long)(sva & 0xfffffffffull));
         int nr = 0; for (uint64_t a = c4->cov_base; sva && a < c4->cov_base + c4->cov_len && nr < 12; a += 4) { uint32_t i1 = 0, i2 = 0; uint8_t *r1, *r2; uint64_t p1, p2; if (a64_virt_to_phys(c4, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
           if (a64_virt_to_phys(c4, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
