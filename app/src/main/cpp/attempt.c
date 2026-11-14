@@ -580,7 +580,7 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 }
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
-static int dt_has_kw(const char *s) { static const char *const kw[] = { "wait-for", "wait_for" }; for (size_t i = 0; i < 2; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "smartio", "smart-io", "wait-for" }; for (size_t i = 0; i < 3; i++) if (strstr(s, kw[i])) return 1; return 0; }
 /* 0.4.117 diagnostic: every property (name, length, first 8 words) of the nodes called `target`, comma separated */
 static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, const char *target, char *out, size_t cap, size_t *len) {
     if (depth > 32 || *pos + 8 > n) return -1;
