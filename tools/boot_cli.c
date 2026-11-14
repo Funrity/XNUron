@@ -237,9 +237,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
       }
       { /* 0.4.204 diagnostic: the kext personality (Info.plist, if the prelinked XML is still in memory) of AppleSEPManager: IOClass key with that value, plus 700 bytes around it (matching keys: IONameMatch, IOProviderClass, IOResourceMatch ...) */
-        static const char nd[] = "<string>AppleSmartIO</string>"; int found = 0;
-        for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && found < 2; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
-          for (unsigned o = 0; o + sizeof nd < 0x1000 && found < 2; o++) if (q[o] == '<' && !memcmp(q + o, nd, sizeof nd - 1)) { found++;
+        static const char nd[] = "SmartIO"; int found = 0;
+        for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && found < 8; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 0; o + sizeof nd < 0x1000 && found < 8; o++) if (q[o] == nd[0] && !memcmp(q + o, nd, sizeof nd - 1)) { found++;
             char buf[801]; uint64_t va = pg + o - 400; for (int i = 0; i < 800; i++) { uint64_t pp; uint8_t *qq; char ch = '?'; if (!a64_virt_to_phys(c, va + i, &pp) && (qq = a64m_ram_at(m, pp, 1))) ch = (char)*qq; buf[i] = (ch == '\n' || ch == '\t') ? ' ' : ch; } buf[800] = 0;
             fprintf(stderr, "[plist] at %llx: %s\n", (unsigned long long)((pg + o) & 0xfffffffffull), buf); } }
         if (!found) fprintf(stderr, "[plist] no '%s' found in 0xfffffff007000000..0xfffffff00b000000 (prelink info not in memory)\n", nd);
