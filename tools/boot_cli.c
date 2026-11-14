@@ -339,6 +339,13 @@ int main(int argc, char **argv) {
           if (a64_virt_to_phys(c4, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i2, r2, 4); if ((i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
           int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff); if (tg == sva) { fprintf(stderr, " %llx(%s)", (unsigned long long)(a & 0xfffffffffull), (c4->cov && (a - c4->cov_base) < c4->cov_len && (c4->cov[(a - c4->cov_base) >> 5] & (1u << (((a - c4->cov_base) >> 2) & 7)))) ? "E" : "-"); nr++; } }
         fprintf(stderr, "\n"); }
+      { /* 0.4.324 diagnostic: users of the global OSSymbol "AppleARMCPU-AllCPU-Initialized" stored at 0xfffffff00914e638 (static init at 0x814a630): adrp page 0x914e000 followed within 8 instructions by ldr/str [rd,#0x638]; (E)=executed */
+        A64 *c8 = a64m_cpu(m); fprintf(stderr, "[gsym] users of 0x914e638:");
+        int nu = 0; for (uint64_t a = c8->cov_base; a < c8->cov_base + c8->cov_len && nu < 40; a += 4) { uint32_t i1 = 0; uint8_t *r1; uint64_t p1; if (a64_virt_to_phys(c8, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
+          int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; if ((((a & ~0xfffull) + (uint64_t)(im << 12)) & 0xfffffffffull) != 0x914e000ull) continue;
+          for (int k = 1; k <= 8; k++) { uint32_t w = 0; uint8_t *r2; uint64_t p2; if (a64_virt_to_phys(c8, a + 4 * k, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) break; memcpy(&w, r2, 4);
+            if ((w & 0xff800000u) == 0xf9000000u && ((w >> 5) & 31) == (i1 & 31) && ((w >> 10) & 0xfff) == 0xc7) { uint64_t co = (a + 4 * k) - c8->cov_base; fprintf(stderr, " %llx%s%s", (unsigned long long)((a + 4 * k) & 0xfffffffffull), (w & 0x400000u) ? "L" : "S", (c8->cov && co < c8->cov_len && (c8->cov[co >> 5] & (1u << ((co >> 2) & 7)))) ? "(E)" : "(-)"); nu++; break; } } }
+        fprintf(stderr, "\n"); }
       { /* 0.4.272 diagnostic: constant that AppleAVD::start stores to [this+0x100] when avd-version byte == 2 (adrp 0x8bfe6a4): 0xfffffff00716e400 */
         A64 *c6 = a64m_cpu(m); fprintf(stderr, "[avdc] 0xfffffff00716e3f0:"); for (uint64_t ad = 0xfffffff00716e3f0ull; ad < 0xfffffff00716e420ull; ad += 4) { uint64_t pa6; uint8_t *q6; uint32_t v6 = 0; if (a64_virt_to_phys(c6, ad, &pa6) == 0 && (q6 = a64m_ram_at(m, pa6, 4))) memcpy(&v6, q6, 4); fprintf(stderr, " %08x", v6); } fprintf(stderr, "\n"); }
       { /* 0.4.271 diagnostic: strings used by AppleAVD::start revision code (0x8bfe5c8..): 0xfffffff0076926b5.. */
