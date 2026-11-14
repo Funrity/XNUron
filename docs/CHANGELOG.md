@@ -1293,3 +1293,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.291
 - Сборка 0.4.290: OSMetaClass 0xfffffff009156868: +0x10 = суперкласс fffffff00914d428, +0x18 = className OSSymbol ffffffe0005d55e0, classSize 0x90 (имена как строки в этих словах не читались: строка у OSSymbol лежит по +0x10). Диагностика ([meta]): имя класса и цепочка суперклассов до 6 уровней. Поведение не меняется.
+
+## 0.4.292
+- Сборка 0.4.291: регистратор SecureRoot — это IOAESAccelerator::start (0x83d21c4; класс IOAESAcceleratorCommand -> IOCommand -> OSObject — пул из 0x20 команд). Его не вызывают: AppleS8000AES::start печатает "registers at phys 0x235008000/0x23d2d0000", "aes-version: 3", "using-acg: no" и дальше не идёт; AppleMobileApNonce из-за этого пишет "requires AES accelerator". Диагностика: [sepx] по строкам "AppleS8000AES"/"AES" (покрытие) — где обрывается start. Поведение не меняется.

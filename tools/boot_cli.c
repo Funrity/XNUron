@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
       { /* 0.4.197 diagnostic: did the kernel ever run SEP-manager code? Find cstrings starting with "AppleSEP" or "SEP" in the cstring area, then every ADRP+ADD reference to them, and say whether that referencing instruction WAS executed (coverage bitmap) */
         static uint64_t sv[600]; static char sn[600][60]; int ns = 0;
         for (uint64_t pg = 0xfffffff007400000ull; pg < 0xfffffff007700000ull && ns < 600; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
-          for (unsigned o = 1; o + 20 < 0x1000 && ns < 600; o++) if (!q[o - 1] && ({ char t[60]; memcpy(t, q + o, 59); t[59] = 0; strstr(t, "SecureRoot") != NULL || strstr(t, "KeyStore") != NULL || strstr(t, "aes_0") != NULL || strstr(t, "no SEP endpoint") != NULL; })   /* 0.4.221: needle = tunables (PCIe PHY) */) { sv[ns] = pg + o; snprintf(sn[ns], 60, "%.59s", (const char *)(q + o)); ns++; } }
+          for (unsigned o = 1; o + 20 < 0x1000 && ns < 600; o++) if (!q[o - 1] && ({ char t[60]; memcpy(t, q + o, 59); t[59] = 0; strstr(t, "AppleS8000AES") != NULL || strstr(t, "AES") != NULL; })   /* 0.4.221: needle = tunables (PCIe PHY) */) { sv[ns] = pg + o; snprintf(sn[ns], 60, "%.59s", (const char *)(q + o)); ns++; } }
         fprintf(stderr, "[sepx] %d tunable-related cstrings; referencing code (E = executed, - = never executed):\n", ns);
         for (uint64_t a = c->cov_base; a < c->cov_base + c->cov_len; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
           if (a64_virt_to_phys(c, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4))) continue; memcpy(&i1, r1, 4); if ((i1 & 0x9f000000u) != 0x90000000u) continue;
