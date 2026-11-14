@@ -1327,3 +1327,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.302
 - Найдено: AES-драйвер вечно ждёт сервис AppleSmartIO (свойство wait-for у узла aes из настоящего DT). AppleSmartIO — драйвер на RTBuddy (сопроцессор SIO), для него в эмуляторе нет загрузки прошивки RTKit/ответчика почтового ящика.
 - MODELLED/ASSUMPTION: свойство aes/wait-for переименовано в x-wait-for-disabled (`a64_dt_prop_rename`, тесты добавлены). Последствие: AES не ждёт SIO; DMA AES через SIO не работает. Откат: удалить блок 0.4.302 в attempt.c.
+
+## 0.4.303
+- Итог 0.4.302: AES-драйвер прошёл ожидание AppleSmartIO и дошёл до `_iv_dma->setMemoryDescriptor(_iv_bounce)` (AppleS8000AES.cpp:197), где IODARTMapper (mapper-sio) вернул 0xe00002bd (NoMemory) из iovmMapMemory → panic.
+- Диагностика: поиск строки "Map request failed" в памяти ядра, xref (adrp+add) и дамп кода перед первым xref, чтобы разобрать, откуда берётся NoMemory. Поведение эмулятора не менялось.

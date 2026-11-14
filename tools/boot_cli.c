@@ -236,6 +236,20 @@ int main(int argc, char **argv) {
           if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.303 diagnostic: find the format string "Map request failed" in kernel memory, find adrp+add pairs that reference its start (xrefs) and dump the code before the first xref as "[stop] code" lines (for dis.py) */
+        static const char nd2[] = "Map request failed"; uint64_t sva = 0;
+        for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && !sva; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 0; o + sizeof nd2 < 0x1000; o++) if (q[o] == 'M' && !memcmp(q + o, nd2, sizeof nd2 - 1)) { unsigned st = o; while (st > 0 && q[st - 1]) st--; sva = pg + st; break; } }
+        if (!sva) fprintf(stderr, "[xref] string 'Map request failed' not found\n");
+        else { fprintf(stderr, "[xref] string start %llx\n", (unsigned long long)sva); int nx = 0; uint64_t first = 0;
+          for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff009400000ull && nx < 6; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+            for (unsigned o = 0; o + 4 <= 0x1000 - 4 && nx < 6; o += 4) { uint32_t w, w2; memcpy(&w, q + o, 4); memcpy(&w2, q + o + 4, 4);
+              if ((w & 0x9f000000u) != 0x90000000u) continue; int64_t im = (int64_t)(((w >> 5) & 0x7ffffu) << 2 | ((w >> 29) & 3)); if (im & 0x100000) im -= 0x200000;
+              uint64_t tg = ((pg + o) & ~0xfffull) + ((uint64_t)im << 12); if (tg != (sva & ~0xfffull)) continue;
+              if ((w2 & 0xffc00000u) != 0x91000000u || ((w2 >> 5) & 31) != (w & 31) || ((w2 >> 10) & 0xfff) != (sva & 0xfff)) continue;
+              fprintf(stderr, "[xref] %llx\n", (unsigned long long)(pg + o)); if (!first) first = pg + o; nx++; } }
+          if (first) for (uint64_t a = (first & ~0xfull) - 0x500; a < first + 0x80; a += 16) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, a, &pa) || !(q = a64m_ram_at(m, pa, 16))) continue; uint32_t w[4]; memcpy(w, q, 16);
+            fprintf(stderr, "[stop] code 0x%llx (kernel virtual 0x%llx): %x %x %x %x\n", (unsigned long long)a, (unsigned long long)a, w[0], w[1], w[2], w[3]); } } }
       { /* 0.4.204 diagnostic: the kext personality (Info.plist, if the prelinked XML is still in memory) of AppleSEPManager: IOClass key with that value, plus 700 bytes around it (matching keys: IONameMatch, IOProviderClass, IOResourceMatch ...) */
         static const char nd[] = "SmartIO"; int found = 0;
         for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && found < 14; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
