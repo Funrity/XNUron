@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
       { /* 0.4.201 diagnostic: was the code that references "SecureRoot"/"SecureRootCallBack" executed? (instruction addresses of those references; E = executed) */
         static const uint64_t pcs[] = {0xfffffff0083d23f0ull, 0xfffffff0083d272cull, 0xfffffff0089876e4ull};
         (void)pcs;
-        static const uint64_t pc2[] = {0xfffffff0083d23f0ull, 0xfffffff0083d272cull, 0xfffffff0089876e4ull, 0xfffffff00898af7cull, 0xfffffff0088b2f50ull, 0xfffffff008151b58ull};
+        static const uint64_t pc2[] = {0xfffffff0083d23f0ull, 0xfffffff0083d272cull, 0xfffffff0089876e4ull, 0xfffffff00898af7cull, 0xfffffff0088b2f50ull, 0xfffffff008151b58ull, 0xfffffff0083d2124ull, 0xfffffff0083d2160ull, 0xfffffff0083d21c4ull, 0xfffffff0083d2210ull, 0xfffffff0083d2214ull, 0xfffffff0083d22f8ull, 0xfffffff0083d23d0ull, 0xfffffff0083d23f8ull, 0xfffffff0083d26e8ull}; /* 0.4.289: + entry points/stages of the keystore registrar 0x83d21c4 */
         fprintf(stderr, "[skx] reference executed? (E yes / - no):");
         for (unsigned z = 0; z < sizeof pc2 / sizeof pc2[0]; z++) { uint64_t co = pc2[z] - c->cov_base; int ex = c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7))); fprintf(stderr, " %c@%llx", ex ? 'E' : '-', (unsigned long long)(pc2[z] & 0xfffffffffull)); }
         fprintf(stderr, "\n");
