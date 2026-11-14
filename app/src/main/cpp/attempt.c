@@ -580,7 +580,7 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 }
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
-static int dt_has_kw(const char *s) { static const char *const kw[] = { "temp", "tmps", "thermal", "tsens", "dietemp" }; for (size_t i = 0; i < 5; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "wait-for", "wait_for" }; for (size_t i = 0; i < 2; i++) if (strstr(s, kw[i])) return 1; return 0; }
 /* 0.4.117 diagnostic: every property (name, length, first 8 words) of the nodes called `target`, comma separated */
 static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, const char *target, char *out, size_t cap, size_t *len) {
     if (depth > 32 || *pos + 8 > n) return -1;
@@ -609,7 +609,7 @@ static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, cons
     for (uint32_t i = 0; i < np; i++) {
         char nm[33]; memcpy(nm, d + *pos, 32); nm[32] = 0; uint32_t len; memcpy(&len, d + *pos + 32, 4); len &= 0x7FFFFFFFu;
         if (dt_has_kw(nm) && g->len + 80 < g->cap) { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%s/%s(%u)=", me, nm, len);
-            for (uint32_t b = 0; b < len && b < 24 && b + 4 <= len; b += 4) { uint32_t w; memcpy(&w, d + *pos + 36 + b, 4); g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%x,", w); }
+            for (uint32_t b = 0; b < len && b < 24 && b + 4 <= len; b += 4) { uint32_t w; memcpy(&w, d + *pos + 36 + b, 4); g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "%x,", w); } { g->len += (size_t)snprintf(g->out + g->len, g->cap - g->len, "\"%.40s\" ", (const char *)(d + *pos + 36)); }
             if (g->len + 2 < g->cap) g->out[g->len++] = ' ', g->out[g->len] = 0; g->hits++; }
         *pos += 36 + (((size_t)len + 3) & ~(size_t)3);
     }
