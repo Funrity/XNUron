@@ -1331,3 +1331,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.303
 - Итог 0.4.302: AES-драйвер прошёл ожидание AppleSmartIO и дошёл до `_iv_dma->setMemoryDescriptor(_iv_bounce)` (AppleS8000AES.cpp:197), где IODARTMapper (mapper-sio) вернул 0xe00002bd (NoMemory) из iovmMapMemory → panic.
 - Диагностика: поиск строки "Map request failed" в памяти ядра, xref (adrp+add) и дамп кода перед первым xref, чтобы разобрать, откуда берётся NoMemory. Поведение эмулятора не менялось.
+
+## 0.4.304
+- Разбор 0.4.303: IODARTMapper::iovmMapMemory (0x850aXXX) возвращает 0xe00002bd, когда виртуальный метод DART (vtable+0x5c0 или +0x5d0, выделение/отображение DVA) возвращает false. Диагностика: свойства узлов dart-sio и sio из DT (vm-base/vm-size и т.п.). Поведение не менялось.
