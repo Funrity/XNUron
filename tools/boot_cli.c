@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
       }
       { /* 0.4.320 diagnostic: kernel stacks of BLOCKED threads. Scan 16 KiB-aligned stacks in 0xffffffe01a000000..0xffffffe01c000000 for the longest frame-pointer chain (fp,lr pairs, lr in kernel text after stripping PAC) and print its return addresses (low 36 bits). A blocked thread's live frames are the tail of the chain; dead frames below them may be shown first. */
-        A64 *c7 = a64m_cpu(m); int shown = 0;
+        A64 *c7 = a64m_cpu(m); int shown = 0; static uint64_t ul[600]; int nul = 0;
         for (uint64_t sb = 0xffffffe01a000000ull; sb < 0xffffffe01c000000ull && shown < 40; sb += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
@@ -247,8 +247,18 @@ int main(int argc, char **argv) {
               if (fp == 0) break; uint64_t nx = fp - sb; if (fp < sb || nx >= 0x4000 || (nx & 15) || nx <= cur) break; cur = nx; }
             if (d > best) { best = d; bestA = A; } }
           if (best >= 5) { shown++; fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
-            for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); if (!fp) break; cur = fp - sb; }
-            fprintf(stderr, "\n"); } } }
+            for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
+            fprintf(stderr, "\n"); } }
+        for (int u = 0; u < nul; u++) { uint64_t t = 0xfffffff000000000ull | ul[u]; int cnt = 0; char out[600]; size_t on = 0; out[0] = 0;
+          for (uint64_t a = t - 0x400; a < t && cnt < 4; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
+            if (a64_virt_to_phys(c7, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c7, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
+            if ((i1 & 0x9f000000u) != 0x90000000u || (i2 & 0xff800000u) != 0x91000000u || ((i2 >> 5) & 31) != (i1 & 31)) continue;
+            int64_t im = ((int64_t)(((i1 >> 5) & 0x7ffff) << 2 | ((i1 >> 29) & 3)) << 43) >> 43; uint64_t tg = ((a & ~0xfffull) + (uint64_t)(im << 12)) + ((i2 >> 10) & 0xfff);
+            uint64_t sp; uint8_t *sq; char buf[70]; if (a64_virt_to_phys(c7, tg, &sp) || !(sq = a64m_ram_at(m, sp, 64))) continue; memcpy(buf, sq, 64); buf[64] = 0;
+            int good = 1, n = 0; while (n < 64 && buf[n]) { if ((unsigned char)buf[n] < 32 || (unsigned char)buf[n] > 126) good = 0; n++; } if (!good || n < 4) continue;
+            on += (size_t)snprintf(out + on, sizeof out - on, " \"%s\"", buf); cnt++; }
+          if (cnt) fprintf(stderr, "[stks] %llx:%s\n", (unsigned long long)ul[u], out); }
+        }
       if (c->wn[0] && c->wx0[0]) { /* 0.4.310 diagnostic: the DART mapper object: words +0xc0..+0x130 and the physical-range table (count [+0x118], pointer [+0x120], pairs start/end) the check at 0x850b600 walks */
         uint64_t ob = c->wx0[0]; fprintf(stderr, "[dobj] object %llx words +0xc0..+0x130:", (unsigned long long)ob);
         for (unsigned o = 0xc0; o <= 0x130; o += 8) { uint64_t pp; uint8_t *qq; uint64_t w = 0; if (!a64_virt_to_phys(c, ob + o, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&w, qq, 8); fprintf(stderr, " +%x=%llx", o, (unsigned long long)w); }
