@@ -1275,3 +1275,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.285
 - Сборка 0.4.284: код 0x7a6e9e0.. — штатный цикл простоя планировщика (processor idle: проверка runnable-потоков, WFI), т.е. все потоки спят, ядро ждёт событие. Из истории: bsd_init ждёт флаг +0x10b AppleARMPE, который ставит колбэк "SecureRootCallBack" кода keystore (0x83d23f0/0x83d272c); он запускается, когда появляется AppleSEPManager. В 0.4.278 AppleSEPManager::start выполнен — проверяем, дошёл ли keystore. Диагностика: [sepx] по строкам SecureRoot / KeyStore / aes_0 / "no SEP endpoint" (E = выполнялось). Поведение не меняется.
+
+## 0.4.286
+- Сборка 0.4.285 ([sepx]): код keystore выполняется (AppleKeyStore starting, _sep_enabled), SecureRootName/SecureRoot у AppleARMPE выполняются (bsd_init ждёт), но код 0x83d23f0 ("SecureRoot") и 0x83d272c ("SecureRootCallBack") — тот, что должен вызвать колбэк, — не выполняется; 0x898af7c/0x89876e4 тоже нет. Диагностика: выгрузка кода 0x83d2100..0x83d2e00, чтобы прочитать условие, при котором этот код запускается. Поведение не меняется.
