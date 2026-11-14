@@ -236,6 +236,13 @@ int main(int argc, char **argv) {
           if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
         fprintf(stderr, "\n");
       }
+      if (c->wn[0] && c->wx0[0]) { /* 0.4.310 diagnostic: the DART mapper object: words +0xc0..+0x130 and the physical-range table (count [+0x118], pointer [+0x120], pairs start/end) the check at 0x850b600 walks */
+        uint64_t ob = c->wx0[0]; fprintf(stderr, "[dobj] object %llx words +0xc0..+0x130:", (unsigned long long)ob);
+        for (unsigned o = 0xc0; o <= 0x130; o += 8) { uint64_t pp; uint8_t *qq; uint64_t w = 0; if (!a64_virt_to_phys(c, ob + o, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&w, qq, 8); fprintf(stderr, " +%x=%llx", o, (unsigned long long)w); }
+        uint64_t pp, cnt = 0, tb = 0; uint8_t *qq; if (!a64_virt_to_phys(c, ob + 0x118, &pp) && (qq = a64m_ram_at(m, pp, 8))) cnt = *(uint32_t *)qq; if (!a64_virt_to_phys(c, ob + 0x120, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&tb, qq, 8);
+        fprintf(stderr, "\n[dobj] range table count %llu at %llx:", (unsigned long long)cnt, (unsigned long long)tb);
+        for (uint64_t i = 0; i < cnt && i < 16; i++) { uint64_t a[2] = {0, 0}; for (int j = 0; j < 2; j++) if (!a64_virt_to_phys(c, tb + i * 16 + j * 8, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&a[j], qq, 8); fprintf(stderr, " [%llx..%llx]", (unsigned long long)a[0], (unsigned long long)a[1]); }
+        fprintf(stderr, "\n"); }
       { for (int wi = 0; wi < 4; wi++) if (c->wpc[wi]) fprintf(stderr, "[wcall] pc %llx last target %llx executions %u\n", (unsigned long long)(c->wpc[wi] & 0xfffffffffull), (unsigned long long)c->wtg[wi], c->wn[wi]); }
       { /* 0.4.305 diagnostic: (a) which parts of IODARTMapper::iovmMapMemory (0x850b0c8) ran: executed ranges 0x850b0c0..0x850b440; (b) where in memory is its vtable slot (qword whose low 36 bits = 0x850b0c8) and 400 qwords around it (low 36 bits), to read DART virtual methods +0x5c0/+0x5d0 */
         { const uint64_t lo = 0xfffffff00850b680ull, hi = 0xfffffff00850bc00ull; int run = -1; uint64_t rs = lo; fprintf(stderr, "[dmx] executed ranges in iovmMapMemory:");
