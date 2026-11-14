@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
       }
       { /* 0.4.202 diagnostic: executed/never-executed instruction ranges of AppleSEPKeyStore::start (code around 0x898ac48 where "_sep_enabled" is printed) - where does start() stop? */
-        const uint64_t lo = 0xfffffff008a6b600ull, hi = 0xfffffff008a6c000ull; int run = -1; uint64_t rs = lo;
+        const uint64_t lo = 0xfffffff008075e40ull, hi = 0xfffffff008076200ull; int run = -1; uint64_t rs = lo;
         fprintf(stderr, "[ksx] executed ranges (E) in %llx..%llx:", (unsigned long long)(lo & 0xfffffffffull), (unsigned long long)(hi & 0xfffffffffull));
         for (uint64_t a = lo; a <= hi; a += 4) { uint64_t co = a - c->cov_base; int ex = a < hi && c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
           if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
