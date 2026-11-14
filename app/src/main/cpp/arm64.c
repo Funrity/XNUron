@@ -1003,6 +1003,7 @@ static int exec(A64 *c, uint32_t i, uint64_t *next) {
             if (op3 && opc == 2 && rn != 31) return undef(c, i);
             uint64_t t = (op3 && opc == 2) ? c->x[30] : R(c, rn, false);   /* RETAA/RETAB return through LR */
             if (opc == 1) c->x[30] = pc + 4;
+            for (int wi = 0; wi < 4; wi++) if (c->wpc[wi] && c->wpc[wi] == pc) { c->wtg[wi] = t & 0xfffffffffull; c->wn[wi]++; }
             *next = t;
             return 0;
         }

@@ -375,6 +375,7 @@ static uint64_t g_ref_va[4]; static unsigned g_ref_n;
 void a64m_set_coverage(A64Machine *m, uint64_t base, uint64_t len) {
     free(m->cpu.cov); free(m->cpu.callseen); m->cpu.cov = calloc((size_t)(len / 32 + 1), 1); m->cpu.callseen = calloc((size_t)(len / 32 + 1), 1);
     m->cpu.cov_base = base; m->cpu.cov_len = len; m->cpu.call_total = 0;
+    m->cpu.wpc[0] = 0xfffffff00850b244ull; m->cpu.wpc[1] = 0xfffffff00850b2e8ull; m->cpu.wpc[2] = 0xfffffff00850b160ull;   /* 0.4.306 diagnostic: indirect calls in IODARTMapper::iovmMapMemory (vtable+0x5c0 at +0x17c, +0x5d0, +0x610) */
     if (!m->cpu.cov || !m->cpu.callseen) { free(m->cpu.cov); free(m->cpu.callseen); m->cpu.cov = m->cpu.callseen = NULL; m->cpu.cov_len = 0; }
 }
 void a64m_set_ref_scan(A64Machine *m, unsigned idx, uint64_t va) { (void)m; if (idx < 4) { g_ref_va[idx] = va; if (idx + 1 > g_ref_n) g_ref_n = idx + 1; } }
