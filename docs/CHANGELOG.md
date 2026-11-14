@@ -1296,3 +1296,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.292
 - Сборка 0.4.291: регистратор SecureRoot — это IOAESAccelerator::start (0x83d21c4; класс IOAESAcceleratorCommand -> IOCommand -> OSObject — пул из 0x20 команд). Его не вызывают: AppleS8000AES::start печатает "registers at phys 0x235008000/0x23d2d0000", "aes-version: 3", "using-acg: no" и дальше не идёт; AppleMobileApNonce из-за этого пишет "requires AES accelerator". Диагностика: [sepx] по строкам "AppleS8000AES"/"AES" (покрытие) — где обрывается start. Поведение не меняется.
+
+## 0.4.293
+- Сборка 0.4.292 ([sepx]): AppleS8000AESAccelerator::start выполнил сообщения "registers at phys", "aes-version: 3", "using-acg: no" (0x8a6b870..0x8a6b954), но дальше "using DART Mapper" (0x8a6ba04) и всё остальное не выполнялось — start обрывается/возвращает false между ними без своих сообщений. Диагностика: выгрузка кода 0x8a6b900..0x8a6bb00, чтобы увидеть проверку. Поведение не меняется.
