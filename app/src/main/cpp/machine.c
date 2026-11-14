@@ -316,9 +316,10 @@ static A64Machine *alloc_m(A64MachineKind k, uint64_t base, uint64_t size) {
     return m;
 }
 
-A64Machine *a64m_create_system(uint64_t ram_size) {
+A64Machine *a64m_create_system(uint64_t ram_size) { return a64m_create_system_at(ram_size, A64M_RAM_BASE); }
+A64Machine *a64m_create_system_at(uint64_t ram_size, uint64_t base) {
     g_diag_dumped = 0;
-    A64Machine *m = alloc_m(A64M_KIND_SYSTEM, A64M_RAM_BASE, ram_size);
+    A64Machine *m = alloc_m(A64M_KIND_SYSTEM, base, ram_size);
     if (!m) return NULL;
     a64_system_init(&m->cpu);
     A64Dev d[4] = {
@@ -328,7 +329,7 @@ A64Machine *a64m_create_system(uint64_t ram_size) {
         { A64M_SYSCON, 0x1000, sys_r, sys_w, m, "syscon" },
     };
     for (int k = 0; k < 4; k++) a64_add_device(&m->cpu, &d[k]);
-    m->cpu.pc = m->entry = A64M_RAM_BASE;
+    m->cpu.pc = m->entry = base;
     return m;
 }
 A64Machine *a64m_create_user(uint64_t base, uint64_t size) {

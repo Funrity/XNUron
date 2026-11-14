@@ -25,6 +25,7 @@ extern "C" {
 #endif
 
 #define A64M_RAM_BASE   0x40000000ull
+#define A64M_IOS_RAM_BASE 0x800000000ull   /* 0.4.311 ASSUMPTION: DRAM base of the real A12 (0x800000000) used for the iOS boot attempt; 0.4.310 showed the SIO DART bypasses its allowed-physical-range check only for addresses >= 2^35, so RAM at 0x40000000 made AppleS8000AES's DART mapping fail (-2) */
 #define A64M_UART_BASE  0x09000000ull
 #define A64M_FB_BASE    0x0A000000ull
 #define A64M_TOUCH_BASE 0x0A001000ull
@@ -48,6 +49,7 @@ typedef enum { A64M_CREATED, A64M_RUNNING, A64M_IDLE, A64M_POWEROFF, A64M_FAULT,
 
 /* System machine (a64virt). ram_size is rounded to 64 KiB. NULL on failure. */
 A64Machine *a64m_create_system(uint64_t ram_size);
+A64Machine *a64m_create_system_at(uint64_t ram_size, uint64_t base);
 /* User-mode machine: guest RAM [base, base+size), HLE syscalls, output -> log. */
 A64Machine *a64m_create_user(uint64_t base, uint64_t size);
 void a64m_destroy(A64Machine *m);

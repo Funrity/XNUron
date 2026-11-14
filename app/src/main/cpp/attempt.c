@@ -891,12 +891,12 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
      * if the host cannot give that much. RAM is lazily committed by the host (calloc), only touched pages cost memory. */
     A64Machine *sys = NULL;
     { static const uint64_t want[2] = { 768ull << 20, 640ull << 20 };
-      for (int wi = 0; wi < 2 && !sys; wi++) if (want[wi] > ram) { sys = a64m_create_system(want[wi]); if (sys) ram = want[wi]; }
-      if (!sys) sys = a64m_create_system(ram); }
+      for (int wi = 0; wi < 2 && !sys; wi++) if (want[wi] > ram) { sys = a64m_create_system_at(want[wi], A64M_IOS_RAM_BASE); if (sys) ram = want[wi]; }
+      if (!sys) sys = a64m_create_system_at(ram, A64M_IOS_RAM_BASE); }
     if (!sys) { free(kern); free(dt); return dead("out of memory for guest RAM", "step 6", m); }
     { char b[65536]; size_t off = 0, k; while ((k = a64m_log_read(log_only, off, b, sizeof b)) > 0) { for (size_t q = 0; q < k; q += 400) { char t[401]; size_t c = k - q < 400 ? k - q : 400; memcpy(t, b + q, c); t[c] = 0; a64m_log(sys, "%s", t); } off += k; } }
     a64m_destroy(log_only); m = sys;
-    uint64_t kphys = A64M_RAM_BASE + kbase_off;
+    uint64_t kphys = A64M_IOS_RAM_BASE + kbase_off;
     for (int i = 0; i < mo.nseg; i++) {
         const A64Seg *s = &mo.seg[i];
         if (!s->vmsize || !strcmp(s->name, "__PAGEZERO")) continue;
@@ -992,7 +992,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     if (entry_v < mo.lowest_vm || entry_v >= mo.highest_vm) { free(dt); a64m_abort(m, "step 7 - entry point lies outside the kernel image"); return m; }
 
     /* boot_args, laid out as in XNU's public pexpert/arm64/boot.h as far as I know it (unverified here) */
-    uint64_t ba = A64M_RAM_BASE + 0x1000, dtp = A64M_RAM_BASE + 0x10000;
+    uint64_t ba = A64M_IOS_RAM_BASE + 0x1000, dtp = A64M_IOS_RAM_BASE + 0x10000;
     uint8_t *b = a64m_ram_at(m, ba, 0x400);
     uint16_t rev = 2, ver = 2; memcpy(b, &rev, 2); memcpy(b + 2, &ver, 2);
     uint64_t v;
@@ -1006,13 +1006,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
            region. So the DT must sit between the end of the kernel image and topOfKernelData, and deviceTreeP is a kernel VIRTUAL address. */
         dtp = kend; top = (kend + dtlen + 0x3FFFull) & ~0x3FFFull;
         if (rdk) { rdpa = top; top = (rdpa + rdlen + 0x3FFFull) & ~0x3FFFull; rd_on = 1; }   /* 0.4.122: the RAM disk lies between the DT and topOfKernelData, i.e. inside the kernel-data region iBoot reserves */
-        if (top + 0x20000 > A64M_RAM_BASE + ram) { free(dt); a64m_abort(m, "step 7 - no room for the DeviceTree above the kernel"); return m; }
+        if (top + 0x20000 > A64M_IOS_RAM_BASE + ram) { free(dt); a64m_abort(m, "step 7 - no room for the DeviceTree above the kernel"); return m; }
     }
     /* 0.4.28 (MODELLED): iBoot hands the kernel a linear framebuffer in boot_args.Video {baseAddr(40) display(48) rowBytes(56) width(64) height(72) depth(80)}.
        Here: 540x960 by default (0.4.51; was 270x480), the size is a setting since 0.4.85, 32 bpp BGRX, rowBytes 2160, at the very top of RAM, excluded from memSize so the kernel does not hand those pages out as free memory.
        Real iBoot gives the panel size (1125x2436) and has drawn the logo already; this one starts black, everything on it is drawn by the kernel itself. */
     const uint32_t fbw = (uint32_t)a64m_video_w(), fbh = (uint32_t)a64m_video_h(), fbrb = fbw * 4; uint64_t fbsz = ((uint64_t)fbrb * fbh + 0x3FFFull) & ~0x3FFFull;
-    uint64_t fbpa = A64M_RAM_BASE + ram - fbsz;
+    uint64_t fbpa = A64M_IOS_RAM_BASE + ram - fbsz;
     v = fbpa - kphys; memcpy(b + 24, &v, 8);   /* memSize counts from physBase (the kernel computes end = physBase + memSize; 0.3.37 trace); the framebuffer lies above it */
     { uint64_t vd[6] = { fbpa, 0, fbrb, fbw, fbh, 32 }; memcpy(b + 40, vd, sizeof vd); a64m_set_video(m, fbpa, fbw, fbh, fbrb);
       LOG("[boot] MODELLED framebuffer: %ux%u, 32 bpp BGRX, rowBytes %u at physical 0x%llx, handed over in boot_args.Video; starts black, only the kernel draws on it (verbose boot '-v' is set, so kernel text should appear once its console is up)\n", fbw, fbh, fbrb, (unsigned long long)fbpa); }
@@ -1222,7 +1222,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     }
     if (have_boot_reg) a64m_set_mpidr(m, 0x80000000ull | boot_reg);
     if (dt_virt) LOG("[boot] DeviceTree placed at physical 0x%llx, boot_args.deviceTreeP = virtual 0x%llx (MODELLED convention: a kernel virtual address pointing at the DT, placed right behind the kernel image, below topOfKernelData 0x%llx)\n", (unsigned long long)dtp, (unsigned long long)(mo.lowest_vm + (dtp - kphys)), (unsigned long long)top);
-    LOG("[boot] step 7: RAM %llu MiB at 0x40000000; boot_args at 0x%llx; entering the kernel at physical 0x%llx (virtual 0x%llx), EL1, MMU off, x0=boot_args\n",
+    LOG("[boot] step 7: RAM %llu MiB at 0x800000000 (0.4.311 ASSUMPTION: real A12 DRAM base; before: 0x40000000); boot_args at 0x%llx; entering the kernel at physical 0x%llx (virtual 0x%llx), EL1, MMU off, x0=boot_args\n",
         (unsigned long long)(ram >> 20), (unsigned long long)ba, (unsigned long long)entry_p, (unsigned long long)entry_v);
     LOG("[boot] not provided: Apple SoC peripherals, MMU, SIMD/PAC, iBoot's device-tree fix-ups. Executing for real now:\n");
     (void)r64;
