@@ -236,6 +236,16 @@ int main(int argc, char **argv) {
           if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } }
         fprintf(stderr, "\n");
       }
+      { /* 0.4.305 diagnostic: (a) which parts of IODARTMapper::iovmMapMemory (0x850b0c8) ran: executed ranges 0x850b0c0..0x850b440; (b) where in memory is its vtable slot (qword whose low 36 bits = 0x850b0c8) and 400 qwords around it (low 36 bits), to read DART virtual methods +0x5c0/+0x5d0 */
+        { const uint64_t lo = 0xfffffff00850b0c0ull, hi = 0xfffffff00850b440ull; int run = -1; uint64_t rs = lo; fprintf(stderr, "[dmx] executed ranges in iovmMapMemory:");
+          for (uint64_t a = lo; a <= hi; a += 4) { uint64_t co = a - c->cov_base; int ex = a < hi && c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
+            if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } } fprintf(stderr, "\n"); }
+        int nsl = 0;
+        for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && nsl < 3; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;
+          for (unsigned o = 0; o < 0x1000 && nsl < 3; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != 0x850b0c8ull) continue; nsl++; uint64_t sl = pg + o;
+            fprintf(stderr, "[dmx] slot at %llx; qwords from -100..+300 (low 36 bits):", (unsigned long long)(sl & 0xfffffffffull));
+            for (int k = -100; k < 300; k++) { uint64_t va = sl + (int64_t)k * 8, pp; uint8_t *qq; uint64_t w = 0; if (!a64_virt_to_phys(c, va, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&w, qq, 8); fprintf(stderr, " %d:%llx", k, (unsigned long long)(w & 0xfffffffffull)); } fprintf(stderr, "\n"); } }
+        if (!nsl) fprintf(stderr, "[dmx] no vtable slot with 0x850b0c8 found\n"); }
       { /* 0.4.303 diagnostic: find the format string "Map request failed" in kernel memory, find adrp+add pairs that reference its start (xrefs) and dump the code before the first xref as "[stop] code" lines (for dis.py) */
         static const char nd2[] = "Map request failed"; uint64_t sva = 0;
         for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00b000000ull && !sva; pg += 0x1000) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c, pg, &pa) || !(q = a64m_ram_at(m, pa, 0x1000))) continue;

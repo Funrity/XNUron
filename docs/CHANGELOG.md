@@ -1334,3 +1334,7 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.304
 - Разбор 0.4.303: IODARTMapper::iovmMapMemory (0x850aXXX) возвращает 0xe00002bd, когда виртуальный метод DART (vtable+0x5c0 или +0x5d0, выделение/отображение DVA) возвращает false. Диагностика: свойства узлов dart-sio и sio из DT (vm-base/vm-size и т.п.). Поведение не менялось.
+
+## 0.4.305
+- DT dart-sio (настоящий): sids=0x8001, vm-base=0, vm-size=0xfc000000, pio-vm-base=0xfd000000, pio-vm-size=0x2000000, page-size=0x4000, bypass=0x8000, dart-options=0xd.
+- Диагностика: карта выполнения iovmMapMemory и слот vtable (+400 qword вокруг), чтобы найти виртуальные методы DART +0x5c0/+0x5d0, возвращающие false. Поведение не менялось.
