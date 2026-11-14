@@ -477,6 +477,28 @@ int a64_dt_node_add_empty_prop(uint8_t *d, size_t *n, size_t cap, const char *no
     memset(d + na.ins, 0, 36); strncpy((char *)d + na.ins, prop, 31);   /* length field stays 0 */
     np++; memcpy(d + na.hdr, &np, 4); *n += 36; return 1;
 }
+/* 0.4.302: rename property `oldp` to `newp` in the first node whose "name" is `node` (same-size field, the value stays). Used to disable one property of a real DeviceTree without deleting data. 1 renamed, 0 not found, -1 malformed. */
+static int dt_ren_walk(uint8_t *d, size_t n, size_t *pos, int depth, const char *node, const char *oldp, const char *newp, int *done) {
+    if (depth > 32 || *pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
+    if (np > 4096 || nc > 4096) return -1;
+    char me[40] = "?"; size_t save = *pos;
+    for (uint32_t i = 0; i < np; i++) { if (*pos + 36 > n) return -1; uint32_t l; memcpy(&l, d + *pos + 32, 4); l &= 0x7FFFFFFFu;
+        size_t adv = 36 + (((size_t)l + 3) & ~(size_t)3); if (*pos + adv > n) return -1;
+        if (!memcmp(d + *pos, "name\0", 5) && l < 39) { memcpy(me, d + *pos + 36, l); me[l] = 0; } *pos += adv; }
+    size_t after = *pos; *pos = save;
+    if (!*done && !strcmp(me, node)) for (uint32_t i = 0; i < np; i++) { uint32_t l; memcpy(&l, d + *pos + 32, 4); l &= 0x7FFFFFFFu;
+        if (!strncmp((const char *)d + *pos, oldp, 32) && strlen(oldp) < 32) { memset(d + *pos, 0, 32); memcpy(d + *pos, newp, strlen(newp)); *done = 1; break; }
+        *pos += 36 + (((size_t)l + 3) & ~(size_t)3); }
+    *pos = after;
+    for (uint32_t i = 0; i < nc; i++) if (dt_ren_walk(d, n, pos, depth + 1, node, oldp, newp, done) < 0) return -1;
+    return 0;
+}
+int a64_dt_prop_rename(uint8_t *d, size_t n, const char *node, const char *oldp, const char *newp) {
+    if (strlen(newp) >= 32) return -1; size_t pos = 0; int done = 0;
+    if (dt_ren_walk(d, n, &pos, 0, node, oldp, newp, &done) < 0) return -1;
+    return done;
+}
 /* 0.4.275: remove a whole node (with its subtree) called `node` from the flattened DeviceTree and fix the parent's child count. The node name is the "name" property. 1 removed (the first match), 0 not found, -1 malformed. Never removes the root. */
 static char dt_sub_compat[64];   /* 0.4.277: "compatible" of the node dt_sub parsed last at depth of the call (set only when nm != NULL) */
 static int dt_sub(const uint8_t *d, size_t n, size_t pos, int depth, char *nm, size_t *end) {
@@ -840,6 +862,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         { /* 0.4.275 MODELLED (ASSUMPTION): the camera ISP and the video decoder (AVD) are not needed to reach /sbin/launchd, but their drivers panic when the hardware does not answer (0.4.259: AppleH10CamIn fISPVersion assert; 0.4.274: RTBuddy 'No response received' for the AVD coprocessor). The DeviceTree is built here, not by a real iBoot, so these nodes (and their DARTs) are removed. This is NOT what iBoot does on a real phone; it just means the kernel never sees these devices. Revert by deleting this block. */
             static const char *const rmn[] = { "isp", "avd", "dart-isp", "dart-avd", "pmp", "pmp0" }; char rl[160] = ""; int nrm = 0;   /* 0.4.276: + pmp, pmp0 (0.4.275 log: after avd/isp were gone the next RTBuddy, PMP, panicked with "No response received") */
             for (int ri = 0; ri < 6; ri++) { int rr = a64_dt_node_remove(dt, &dtlen, rmn[ri]); if (rr == 1) { size_t l = strlen(rl); snprintf(rl + l, sizeof rl - l, "%s%s", nrm ? "," : "", rmn[ri]); nrm++; } else if (rr < 0) LOG("[boot] WARNING: DeviceTree malformed while removing '%s'\n", rmn[ri]); }
+            { int rr = a64_dt_prop_rename(dt, dtlen, "aes", "wait-for", "x-wait-for-disabled"); LOG("[boot] DeviceTree fix-up (MODELLED, ASSUMPTION; NOT what iBoot does, 0.4.302): property 'wait-for' of node 'aes' (= \"AppleSmartIO\", real value from the IPSW DeviceTree) renamed to 'x-wait-for-disabled' (result %d). Reason: AppleS8000AES::start waits for the service AppleSmartIO forever; AppleSmartIO is an RTBuddy (RTKit coprocessor SIO) driver and the emulator has no RTKit firmware boot / mailbox responder for SIO. Consequence: the AES driver does not wait for the SIO coprocessor; any AES DMA through SIO would NOT work. Reversible: delete this block.\n", rr); }
             { char pl[200]; int np2 = a64_dt_node_remove_match(dt, &dtlen, "apcie", pl, sizeof pl); LOG("[boot] DeviceTree fix-up (MODELLED, ASSUMPTION; NOT what iBoot does, 0.4.283): removed %d node(s) whose name or compatible contains 'apcie' (PCIe/NVMe flash controller; the root is the RAM disk md0, and 0.4.282 shows the kernel spinning forever polling bit 2 of register 0 at physical 0x600080000, an apcie range, with no timeout): %s\n", np2, pl); }
             { char ml[200]; int nm2 = a64_dt_node_remove_match(dt, &dtlen, "ad5860", ml, sizeof ml); LOG("[boot] DeviceTree fix-up (MODELLED, ASSUMPTION; NOT what iBoot does, 0.4.277): removed %d node(s) whose name or compatible contains 'ad5860' (audio amplifier on i2c0; 0.4.276 log: its driver retries failed I2C transfers for hundreds of millions of steps): %s\n", nm2, ml); }
             LOG("[boot] DeviceTree fix-up (MODELLED, ASSUMPTION; NOT what iBoot does): removed %d node(s): %s\n", nrm, rl); }

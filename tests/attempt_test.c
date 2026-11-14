@@ -221,6 +221,18 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "y") == 1 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "avd", "y") == 1, "siblings after the removed node are intact and parsable");
         CHECK(a64_dt_node_remove(dt, &q, "avd") == 1 && a64_dt_node_remove(dt, &q, "avd") == 0 && a64_dt_node_add_empty_prop(dt, &q, sizeof dt, "uart", "z") == 1, "last child removed; second removal finds nothing");
     }
+    { /* 0.4.302: rename a property of a named node */
+        uint8_t dt[2048]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u;
+        NODE(2, 1); PROP("name", 5, "root"); PROP("wait-for", 5, "keep"); NODE(2, 0); PROP("name", 4, "aes"); PROP("wait-for", 13, "AppleSmartIO");
+        CHECK(a64_dt_prop_rename(dt, q, "nosuch", "wait-for", "x") == 0, "unknown node: 0");
+        CHECK(a64_dt_prop_rename(dt, q, "aes", "nosuch", "x") == 0, "unknown property: 0");
+        CHECK(a64_dt_prop_rename(dt, q, "aes", "wait-for", "x-off") == 1, "renamed in aes");
+        int64_t pl = -1; char lg[600];
+        CHECK(a64_dt_node_info(dt, q, "aes", "wait-for", &pl, lg, sizeof lg) != 1 || pl < 0, "aes has no wait-for any more");
+        CHECK(a64_dt_node_info(dt, q, "aes", "x-off", &pl, lg, sizeof lg) == 1 && pl == 13, "value kept under the new name");
+        CHECK(a64_dt_node_info(dt, q, "root", "wait-for", &pl, lg, sizeof lg) == 1 && pl == 5, "same-named property of the root untouched");
+        CHECK(a64_dt_prop_rename(dt, 10, "aes", "wait-for", "x") == -1, "truncated tree -> -1");
+    }
     { /* 0.4.277: remove nodes by name/compatible substring */
         uint8_t dt[2048]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u; char lg[100];
         NODE(1, 1); PROP("name", 5, "root"); NODE(1, 3); PROP("name", 7, "arm-io");
