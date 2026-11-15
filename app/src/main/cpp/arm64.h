@@ -99,7 +99,7 @@ typedef struct {
     uint64_t exc_count;      /* exceptions taken (diagnostics) */
     struct { uint32_t esr; int kind; uint64_t elr, far, steps; } exc_first[8];   /* the first exceptions taken (diagnostics) */
     uint64_t exc0_x[31], exc0_sp; bool exc0_valid; uint64_t exc0_pc[A64_PC_HIST]; unsigned exc0_pcn;       /* registers at the very first exception */
-    int exc_first_n; uint64_t exc_last_step; unsigned exc_burst;
+    int exc0_k; int exc_first_n; uint64_t exc_last_step; unsigned exc_burst;
     uint64_t pc_hist[A64_PC_HIST]; unsigned pc_hist_i;
     #define A64_ACC_HIST 40
     struct A64Acc { uint64_t pc, va, val; uint8_t wr, sz; } acc[A64_ACC_HIST], exc0_acc[A64_ACC_HIST]; unsigned acc_i, exc0_acc_n;   /* ring of the latest data accesses (diagnostic) */

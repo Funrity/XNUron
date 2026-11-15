@@ -546,14 +546,14 @@ static void dump_exceptions(A64Machine *m) {
         else a64m_log(m, "[stop]  #%d at instr %llu: interrupt ELR=0x%llx\n", k, (unsigned long long)c->exc_first[k].steps, (unsigned long long)c->exc_first[k].elr);
     }
     if (c->exc0_valid) {
-        a64m_log(m, "[stop] registers at the FIRST exception (ELR=0x%llx):\n", (unsigned long long)c->exc_first[0].elr);
+        a64m_log(m, "[stop] registers at the captured exception (#%d: the first one that is not a kernel-VA translation fault) (ELR=0x%llx):\n", c->exc0_k, (unsigned long long)c->exc_first[c->exc0_k].elr);
         for (int i = 0; i < 31; i += 4) {
             char b[200]; int n = 0;
             for (int k = i; k < i + 4 && k < 31; k++) n += snprintf(b + n, sizeof b - (size_t)n, "x%-2d=%016llx ", k, (unsigned long long)c->exc0_x[k]);
             a64m_log(m, "[stop]  %s\n", b);
         }
         a64m_log(m, "[stop]  sp=%016llx\n", (unsigned long long)c->exc0_sp);
-        dump_code(m, c->exc_first[0].elr, c->exc_first[0].elr);
+        dump_code(m, c->exc_first[c->exc0_k].elr, c->exc_first[c->exc0_k].elr);
         a64m_log(m, "[stop] call chain at the first exception (frame pointer: return address):");
         { char cb[400]; int cn = 0; for (unsigned q = 0; q < c->exc0_chain_n; q++) cn += snprintf(cb + cn, sizeof cb - (size_t)cn, " %llx:%llx", (unsigned long long)c->exc0_chain[q][0], (unsigned long long)c->exc0_chain[q][1]); a64m_log(m, "%s\n", cb); }
         for (int r = 0; r < 8; r++) {
@@ -568,7 +568,7 @@ static void dump_exceptions(A64Machine *m) {
                 }
             }
         }
-        if ((c->exc_first[0].esr >> 26) != 0 && !g_quiet_exc) {   /* an undefined-instruction first exception is the guest's own panic trap: these lists would only be noise */
+        if ((c->exc_first[c->exc0_k].esr >> 26) != 0 && !g_quiet_exc) {   /* an undefined-instruction first exception is the guest's own panic trap: these lists would only be noise */
         a64m_log(m, "[stop] the last %u data accesses before the first exception (pc: R/W size virtual-address = value):\n", c->exc0_acc_n);
         for (unsigned q = 0; q < c->exc0_acc_n; q += 2) {
             char ab[300]; int an = 0;
@@ -583,7 +583,7 @@ static void dump_exceptions(A64Machine *m) {
         }
         }
         char w[400];
-        if (c->exc_first[0].esr >> 26 == 0x25 || c->exc_first[0].esr >> 26 == 0x24) { a64_walk_trace((A64 *)c, c->exc_first[0].far, w, sizeof w); a64m_log(m, "[stop] first fault address: %s\n", w); }
+        if (c->exc_first[c->exc0_k].esr >> 26 == 0x25 || c->exc_first[c->exc0_k].esr >> 26 == 0x24) { a64_walk_trace((A64 *)c, c->exc_first[c->exc0_k].far, w, sizeof w); a64m_log(m, "[stop] first fault address: %s\n", w); }
     }
 }
 /* text strings referenced by ADRP + ADD pairs in a code window (they name the function: panic texts, log messages) */
