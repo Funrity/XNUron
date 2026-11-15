@@ -963,7 +963,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           if ((w1 & 0x9f000000u) != 0x90000000u || (w2 & 0xffc00000u) != 0x91000000u || (w1 & 31) != ((w2 >> 5) & 31)) continue;
           int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
           uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
-          if (tgt == sva2) { if (!xr) xr = pc; hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
+          if (tgt == sva2) { if (!xr || (!(xr >= 0xfffffff007ed0000ull && xr < 0xfffffff007ee0000ull) && pc >= 0xfffffff007ed0000ull && pc < 0xfffffff007ee0000ull)) xr = pc; /* 0.4.343: prefer the reference in 0x7ed0000..0x7ee0000 (load_init_program), not the first one found (a kext/policy at 0x8e7ef14) */ hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
       LOG("%s\n", hl);
       if (xr) { /* 0.4.159: who calls the function that references '/sbin/launchd'? breadth-first, 5 levels, function start = nearest preceding pacibsp (ASSUMPTION; a heuristic) */
         uint64_t cur[8], nxt[8]; int ncur = 0, nnx; g_ch_n = 0;
