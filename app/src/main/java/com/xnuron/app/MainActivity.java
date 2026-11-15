@@ -280,7 +280,28 @@ public class MainActivity extends Activity {
     private void refreshEmuView() { emuView.setText(emuText.length() > 0 ? tail(emuText) : diagText); }
 
     /** The last VIEW_TAIL_CHARS characters (the views are not meant to hold the whole log; Copy uses the full text). */
-    private static CharSequence tail(StringBuilder sb) { return sb.length() <= VIEW_TAIL_CHARS ? sb : sb.substring(sb.length() - VIEW_TAIL_CHARS); }
+    private static CharSequence tail(StringBuilder sb) { return redUnsupported(sb.length() <= VIEW_TAIL_CHARS ? sb.toString() : sb.substring(sb.length() - VIEW_TAIL_CHARS)); }
+
+    private static final String UNSUPPORTED_TAG = "[UNSUPPORTED]";
+    private boolean warnedUnsupported;
+
+    /** 0.4.338: lines that carry the [UNSUPPORTED] tag (iOS version / device the project was not developed against) are shown in bold red. The attempt itself still runs. */
+    private static CharSequence redUnsupported(String s) {
+        if (!s.contains(UNSUPPORTED_TAG)) return s;
+        android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(s);
+        int i = 0;
+        while (true) {
+            int k = s.indexOf(UNSUPPORTED_TAG, i);
+            if (k < 0) break;
+            int st = s.lastIndexOf('\n', k) + 1;
+            int en = s.indexOf('\n', k);
+            if (en < 0) en = s.length();
+            b.setSpan(new android.text.style.ForegroundColorSpan(0xFFD32F2F), st, en, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            b.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), st, en, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            i = en;
+        }
+        return b;
+    }
 
     private ImageView iconButton(Ui t, int res, String desc) {
         ImageView b = new ImageView(this);
@@ -412,7 +433,7 @@ public class MainActivity extends Activity {
     private void startEmulation() {
         if (handle != 0) return;
         final int src = effectiveSource();
-        kernelText.setLength(0); emuText.setLength(0); kernelOffset[0] = 0; emuOffset[0] = 0;
+        warnedUnsupported = false; kernelText.setLength(0); emuText.setLength(0); kernelOffset[0] = 0; emuOffset[0] = 0;
         kernelView.setText(""); refreshEmuView(); lastFrame = -1;
         { int[] rs = Ui.RES[Ui.resolution(this)]; Native.setVideoSize(rs[0], rs[1]); emu.resize(Native.fbWidth(), Native.fbHeight()); }   // 0.4.85: resolution setting, applies from this start
         emu.clear("No display output");
@@ -508,6 +529,7 @@ public class MainActivity extends Activity {
             emuText.append(e); gotE = true;
         }
         if (emuText.length() > MAX_LOG_CHARS) emuText.delete(0, emuText.length() - MAX_LOG_CHARS);
+        if (gotE && !warnedUnsupported && emuText.indexOf(UNSUPPORTED_TAG) >= 0) { warnedUnsupported = true; Toast.makeText(this, "Unsupported iOS version or device: see the Emulator log (the attempt still runs)", Toast.LENGTH_LONG).show(); }
         if (gotE) { emuView.setText(tail(emuText)); if (tab == TAB_EMU) emuScroll.post(() -> emuScroll.fullScroll(View.FOCUS_DOWN)); }
         String stt = stateName(Native.state(h)) + " - " + Native.steps(h) + " instructions";
         status.setText(stt); runStatus.setText(stt);

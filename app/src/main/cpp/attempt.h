@@ -42,6 +42,8 @@ int a64_dt_node_remove_match(uint8_t *d, size_t *n, const char *sub, char *log, 
 int a64_dt_node_add_zero_prop(uint8_t *d, size_t *n, size_t cap, const char *node, const char *prop, size_t len);   /* 0.4.74: add a zero-filled property of len bytes; 1 added, 0 exists, -1 no room, -2 no node */
 int a64_dt_patch_u64x2(uint8_t *d, size_t n, const char *prop, uint64_t a, uint64_t b);   /* 0.4.122 */
 int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, size_t cap);   /* 0.4.122 */
+int a64_plist_string_value(const char *p, size_t n, const char *key, char *out, size_t cap);   /* 0.4.338 */
+int a64_ios_version_supported(const char *v);   /* 0.4.338: 1 only for iOS 12.x */
 int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth);   /* 0.4.159 diagnostic: callers chain of the code that references '/sbin/launchd' */
 int a64_attempt_bsdinit(int chain_i, int j, uint64_t *site, uint64_t *target);   /* 0.4.160 diagnostic */
 const char *a64_attempt_symbolize(uint64_t va, uint64_t *off);   /* 0.4.170: name of the kernelcache symbol at or below va (NULL if none) */

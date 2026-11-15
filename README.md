@@ -33,6 +33,12 @@ This is a research project. It is **not** an iOS emulator you can use, and it ne
 Several IOKit threads still wait for platform functions (`function-*`) whose providers (GPIO, SMC, PMU, accessory port) need real hardware that XNUron does not model. Finding out which of these actually blocks `launchd` is the current work.
 The detailed, version-by-version story, with every stop analysed, is in [`docs/CHANGELOG.md`](docs/CHANGELOG.md) (Russian).
 
+## ✦ Supported firmware
+
+**Only one build family is supported: iOS 12.x for the iPhone XS Max (`iPhone11,4`).** That is the only target the project is developed and tested against (a specific `kernelcache.release.iphone11`).
+Other iOS 12 builds and other A12 iPhones may start or may stop early with different errors; this is untested and not promised.
+Anything that is not iOS 12 is **not supported**. If you feed XNUron such an IPSW, the log says so in red (`[UNSUPPORTED] iOS 13.x … is NOT supported`) and the app shows a notice, but the attempt still runs, so you can see how far it gets.
+
 ## ✦ The ground rules
 
 - **No faked boots.** If the kernel stops, the log says where and why.

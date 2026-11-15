@@ -52,11 +52,11 @@ jobs:
           gh release create "v$V" "XNUron-$V.apk" --target "$GITHUB_SHA" --prerelease \
             --title "XNUron $V" \
             --notes "Automated build of commit ${GITHUB_SHA::7}. Experimental: it does not run iOS, see the README. / Автоматическая сборка коммита ${GITHUB_SHA::7}. Экспериментальный проект: iOS не запускается, см. README."
-      - name: Prune old builds (keep the newest 5)
+      - name: Prune old builds (keep only the newest)
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
-          jq -r '[.[][] | select(.tag_name | test("^v[0-9]"))] | sort_by(.created_at) | reverse | .[5:][] | .tag_name' |
+          jq -r '[.[][] | select(.tag_name | test("^v[0-9]"))] | sort_by(.created_at) | reverse | .[1:][] | .tag_name' |
           while read -r tag; do gh release delete "$tag" --yes --cleanup-tag || true; done

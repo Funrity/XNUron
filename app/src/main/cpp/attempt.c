@@ -677,6 +677,19 @@ int a64_plist_first_path(const char *p, size_t n, const char *key, char *out, si
     if (!z || (size_t)(z - a) + 1 > cap) return 0;
     memcpy(out, a, (size_t)(z - a)); out[z - a] = 0; return 1;
 }
+/* 0.4.338: the <string> value that directly follows '<key>`key`</key>' (plain key/string pair, e.g. ProductVersion in BuildManifest.plist). 1 found, 0 not found/too long. */
+int a64_plist_string_value(const char *p, size_t n, const char *key, char *out, size_t cap) {
+    char pat[96]; snprintf(pat, sizeof pat, "<key>%s</key>", key); size_t pl = strlen(pat);
+    for (size_t i = 0; i + pl <= n; i++) if (!memcmp(p + i, pat, pl)) {
+        const char *v = p + i + pl, *e = p + n; while (v < e && (*v == ' ' || *v == '\t' || *v == '\n' || *v == '\r')) v++;
+        if (v + 8 > e || memcmp(v, "<string>", 8)) continue;
+        const char *a = v + 8, *z = NULL; for (const char *q = a; q + 9 <= e; q++) if (!memcmp(q, "</string>", 9)) { z = q; break; }
+        if (!z || (size_t)(z - a) + 1 > cap) return 0;
+        memcpy(out, a, (size_t)(z - a)); out[z - a] = 0; return 1; }
+    return 0;
+}
+/* 0.4.338: 1 = the version string "12.x[.y]" is a supported iOS major (12), 0 = another/unparsable. Only iOS 12.x on iPhone11,4 was ever tested; the attempt still runs for anything else. */
+int a64_ios_version_supported(const char *v) { return v && v[0] == '1' && v[1] == '2' && (v[2] == '.' || v[2] == 0); }
 #define TEMPSENSOR_RAW 0x8c0ull   /* PLACEHOLDER raw reading: the kernel converts raw*100*(1/64) (double constant 0x3f90000000000000 at 0x706f4a0, 0.4.144 dump) -> raw 0x8c0 = 35.0 (units: 1/64 degree, ASSUMPTION) */
 static uint64_t g_ch_fn[48], g_ch_site[48]; static int g_ch_d[48], g_ch_n;   /* 0.4.159 diagnostic: callers chain of the code referencing '/sbin/launchd' */
 int a64_attempt_chain(int i, uint64_t *fn, uint64_t *site, int *depth) { if (i < 0 || i >= g_ch_n) return 0; *fn = g_ch_fn[i]; *site = g_ch_site[i]; *depth = g_ch_d[i]; return 1; }
@@ -800,7 +813,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         ZEnt me2; char rname[160] = "";
         if (zip_find(rd, ud, total, pick_manifest, 0, &me2, why, sizeof why) == 0 && me2.usz < (32u << 20)) {
             uint8_t *mf = zip_extract(rd, ud, &me2, why, sizeof why);
-            if (mf) { if (!a64_plist_first_path((const char *)mf, (size_t)me2.usz, "RestoreRamDisk", rname, sizeof rname)) rname[0] = 0; free(mf); }
+            if (mf) { { char ver[32] = "", bld[32] = ""; int hv = a64_plist_string_value((const char *)mf, (size_t)me2.usz, "ProductVersion", ver, sizeof ver); a64_plist_string_value((const char *)mf, (size_t)me2.usz, "ProductBuildVersion", bld, sizeof bld);
+                  int dev_ok = 0; for (size_t qi = 0; qi + 10 <= (size_t)me2.usz && !dev_ok; qi++) if (!memcmp(mf + qi, "iPhone11,4", 10)) dev_ok = 1;
+                  if (!hv) LOG("[boot] [UNSUPPORTED] iOS version could not be read from BuildManifest.plist; only iOS 12.x on iPhone11,4 was ever tested. The attempt still runs.\n");
+                  else if (!a64_ios_version_supported(ver)) LOG("[boot] [UNSUPPORTED] iOS %s (build %s) is NOT supported: only iOS 12.x on iPhone11,4 was ever tested. The attempt still runs, but expect it to fail early.\n", ver, bld[0] ? bld : "?");
+                  else LOG("[boot] iOS %s (build %s): major version 12, the version this project is developed against.\n", ver, bld[0] ? bld : "?");
+                  if (!dev_ok) LOG("[boot] [UNSUPPORTED] this IPSW does not list iPhone11,4 (iPhone XS Max): only that device was ever tested. The attempt still runs.\n"); }
+              if (!a64_plist_first_path((const char *)mf, (size_t)me2.usz, "RestoreRamDisk", rname, sizeof rname)) rname[0] = 0; free(mf); }
         }
         if (!rname[0]) LOG("[boot] RAM disk: BuildManifest.plist or its RestoreRamDisk entry not found, no root device is provided\n");
         else {

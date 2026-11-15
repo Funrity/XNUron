@@ -233,6 +233,16 @@ int main(int argc, char **argv) {
         CHECK(a64_dt_node_info(dt, q, "root", "wait-for", &pl, lg, sizeof lg) == 1 && pl == 5, "same-named property of the root untouched");
         CHECK(a64_dt_prop_rename(dt, 10, "aes", "wait-for", "x") == -1, "truncated tree -> -1");
     }
+    { /* 0.4.338: ProductVersion parsing and the iOS-12-only support check */
+        const char *pl = "<dict><key>ProductBuildVersion</key>\n<string>16G201</string>\n<key>ProductVersion</key><string>12.5.7</string></dict>"; char o[32];
+        CHECK(a64_plist_string_value(pl, strlen(pl), "ProductVersion", o, sizeof o) == 1 && !strcmp(o, "12.5.7"), "ProductVersion: '%s'", o);
+        CHECK(a64_plist_string_value(pl, strlen(pl), "ProductBuildVersion", o, sizeof o) == 1 && !strcmp(o, "16G201"), "build: '%s'", o);
+        CHECK(a64_plist_string_value(pl, strlen(pl), "Nope", o, sizeof o) == 0, "missing key: 0");
+        CHECK(a64_plist_string_value(pl, strlen(pl), "ProductVersion", o, 3) == 0, "small buffer: 0");
+        CHECK(a64_plist_string_value("<key>K</key><dict></dict>", 25, "K", o, sizeof o) == 0, "a dict value is not a string");
+        CHECK(a64_ios_version_supported("12.0") && a64_ios_version_supported("12.5.7") && a64_ios_version_supported("12"), "12.x supported");
+        CHECK(!a64_ios_version_supported("13.0") && !a64_ios_version_supported("11.4") && !a64_ios_version_supported("112.0") && !a64_ios_version_supported("1") && !a64_ios_version_supported("") && !a64_ios_version_supported(NULL), "others not supported");
+    }
     { /* 0.4.331: node "*" renames the property in every node */
         uint8_t dt[2048]; memset(dt, 0, sizeof dt); size_t q = 0; uint32_t u; int64_t pl = -1; char lg[600];
         NODE(2, 1); PROP("name", 5, "root"); PROP("function-reset", 5, "aaaa"); NODE(2, 0); PROP("name", 4, "lcd"); PROP("function-reset", 5, "bbbb");
