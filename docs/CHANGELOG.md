@@ -1454,3 +1454,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.336
 - Разбор окна 0.4.335: функция 0x82bc344 (метод драйвера start) вызывает this->vtable[0x568] (режим); при значении 1 вызывает vtable[0x538], получает NULL и разыменовывает. Строки, которые она использует, лежат около 0xfffffff00750a03b / 0x750a8e6 / 0x750a948. Диагностика `[avdstr]` теперь печатает 0x750a000..0x750aa40, чтобы узнать имя драйвера.
+
+## 0.4.337
+- Лог 0.4.336: упавший код — IOAccessoryManager::start в режиме downstream (рядом строка "downstream manager has no upstream manager"): vtable[0x538] (upstream manager) возвращает NULL и разыменовывается. Причина: я скрыл `function-dock_parent` (провайдер 'accP'). Теперь `function-dock_parent` НЕ скрывается (потоки iap/portmicro/smc-charger будут ждать провайдера, как до 0.4.331). Остальные скрытые функции: MODELLED/ASSUMPTION.
