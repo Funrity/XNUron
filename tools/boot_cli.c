@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n"); }
       { for (int wi = 0; wi < 4; wi++) if (c->wpc[wi]) fprintf(stderr, "[wcall] pc %llx last target %llx executions %u\n", (unsigned long long)(c->wpc[wi] & 0xfffffffffull), (unsigned long long)c->wtg[wi], c->wn[wi]); }
       { /* 0.4.305 diagnostic: (a) which parts of IODARTMapper::iovmMapMemory (0x850b0c8) ran: executed ranges 0x850b0c0..0x850b440; (b) where in memory is its vtable slot (qword whose low 36 bits = 0x850b0c8) and 400 qwords around it (low 36 bits), to read DART virtual methods +0x5c0/+0x5d0 */
-        { const uint64_t lo = 0xfffffff007ec8000ull, hi = 0xfffffff007ed2000ull; int run = -1; uint64_t rs = lo; fprintf(stderr, "[dmx] executed ranges in iovmMapMemory:");
+        { const uint64_t lo = 0xfffffff007ed0800ull, hi = 0xfffffff007ed2000ull; int run = -1; uint64_t rs = lo; fprintf(stderr, "[dmx] executed ranges 7ed0800-7ed2000 (around load_init_program):");
           for (uint64_t a = lo; a <= hi; a += 4) { uint64_t co = a - c->cov_base; int ex = a < hi && c->cov && co < c->cov_len && (c->cov[co >> 5] & (1u << ((co >> 2) & 7)));
             if (ex != run) { if (run == 1) fprintf(stderr, " %llx-%llx", (unsigned long long)(rs & 0xfffffffffull), (unsigned long long)((a - 4) & 0xfffffffffull)); run = ex; rs = a; } } fprintf(stderr, "\n"); }
         int nsl = 0;
