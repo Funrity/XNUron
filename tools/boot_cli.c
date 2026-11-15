@@ -253,12 +253,12 @@ int main(int argc, char **argv) {
           for (uint64_t sb2 = 0xffffffe01a000000ull; sb2 < 0xffffffe01c000000ull; sb2 += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
             for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb2 + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
             if (!ok) continue;
-            for (uint64_t A = 0x100; A + 16 <= 0x4000; A += 16) { uint64_t lr; memcpy(&lr, stk + A + 8, 8); if ((lr & 0xfffffffffull) != 0x800d280ull) continue;
+            for (uint64_t A = 0x100; A + 16 <= 0x4000; A += 16) { uint64_t lr; memcpy(&lr, stk + A + 8, 8); if ((lr & 0xfffffffffull) != 0x800d280ull) continue; { uint64_t pl2; memcpy(&pl2, stk + A - 8, 8); if ((pl2 & 0xfffffffffull) != 0x803aff0ull) continue; }
               fprintf(stderr, "[lockw] stack %llx frame +%llx (return into 800d280):", (unsigned long long)(sb2 & 0xfffffffffull), (unsigned long long)A);
               for (uint64_t W = A - 0x90; W < A + 0x20; W += 8) { uint64_t v; memcpy(&v, stk + W, 8); fprintf(stderr, " [%+d]%llx", (int)W - (int)A, (unsigned long long)v); }
               fprintf(stderr, "\n");
               for (uint64_t W = A - 0x90; W < A + 0x20; W += 8) { uint64_t v, pp2; memcpy(&v, stk + W, 8); uint8_t *dq;
-                if ((v >> 36) != 0xffffffe00ull && (v >> 36) != 0xfffffff00ull) continue; if (v >= 0xfffffff007000000ull && v < 0xfffffff00a800000ull) continue;
+                if ((v >> 36) != 0xffffffeull && (v >> 36) != 0xfffffffull) continue; if (v >= 0xfffffff007000000ull && v < 0xfffffff008ffffffull) continue; if ((v >> 12) == ((uint64_t)sb2 >> 12) || (v & 0xfffffffffffc0000ull) == (sb2 & 0xfffffffffffc0000ull)) continue;
                 if (a64_virt_to_phys(c7, v, &pp2) || !(dq = a64m_ram_at(m, pp2, 32))) continue; uint64_t w4[4]; memcpy(w4, dq, 32);
                 fprintf(stderr, "[lockw]   ptr %llx [%+d]: %llx %llx %llx %llx\n", (unsigned long long)v, (int)W - (int)A, (unsigned long long)w4[0], (unsigned long long)w4[1], (unsigned long long)w4[2], (unsigned long long)w4[3]); } } } }
         { /* 0.4.329: for frames whose lr is 0x814a91c (the platform-function wait helper): saved x19 = property key (OSSymbol/OSString, C string at +0x10), x21 = nub */
