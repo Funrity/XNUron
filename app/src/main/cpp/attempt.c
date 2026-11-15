@@ -965,6 +965,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t pc = g->vmaddr + o, tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff);
           if (tgt == sva2) { if (!xr || (!(xr >= 0xfffffff007ed0000ull && xr < 0xfffffff007ee0000ull) && pc >= 0xfffffff007ed0000ull && pc < 0xfffffff007ee0000ull)) xr = pc; /* 0.4.343: prefer the reference in 0x7ed0000..0x7ee0000 (load_init_program), not the first one found (a kext/policy at 0x8e7ef14) */ hn += (size_t)snprintf(hl + hn, sizeof hl - hn, " 0x%llx", (unsigned long long)pc); } } }
       LOG("%s\n", hl);
+      xr = 0xfffffff007ed1db0ull;   /* 0.4.344 diagnostic, ASSUMPTION specific to this build (iOS 12.0 16A366): the load_init_program reference found by the [vs] scan (adrp/add not adjacent, so the pair scan above misses it) */
       if (xr) { /* 0.4.159: who calls the function that references '/sbin/launchd'? breadth-first, 5 levels, function start = nearest preceding pacibsp (ASSUMPTION; a heuristic) */
         uint64_t cur[8], nxt[8]; int ncur = 0, nnx; g_ch_n = 0;
         { uint64_t f = xr; for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (xr >= g->vmaddr && xr < g->vmaddr + g->filesize && mo.slice_off + g->fileoff + g->filesize <= klen) { for (uint64_t o = xr - g->vmaddr; o >= 4 && xr - g->vmaddr - o < 0x4000; o -= 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if (w == 0xd503237fu) { f = g->vmaddr + o; break; } } break; } }
