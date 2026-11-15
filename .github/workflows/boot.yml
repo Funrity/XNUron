@@ -3,16 +3,19 @@ on:
   workflow_dispatch:
     inputs:
       kernel_size:
-        description: "compressed size of kernelcache.release.iphone11 in the IPSW (bytes), from the app log"
+        description: "Compressed size of kernelcache.release.iphone11 in the IPSW (bytes), from the app log"
         default: "16875356"
       device:
         description: "ipsw.me device identifier"
         default: "iPhone11,4"
       max_msteps:
-        description: "step limit, millions"
+        description: "Step limit, millions"
         default: "4000"
 permissions:
-  contents: write   # to publish the log as a release asset (the session can download release assets)
+  contents: write   # publish the log as a release asset
+concurrency:
+  group: boot-attempt
+  cancel-in-progress: false
 jobs:
   boot:
     runs-on: ubuntu-latest
@@ -52,4 +55,4 @@ jobs:
         run: |
           gh release delete boot-log --yes --cleanup-tag 2>/dev/null || true
           gh release create boot-log boot.log boot.err ipsw.txt --target "$GITHUB_SHA" --prerelease --title "Headless boot log" \
-            --notes "Лог headless-запуска попытки загрузки (коммит ${GITHUB_SHA::7}). Не прошивка и не загрузка iOS."
+            --notes "Log of the headless boot attempt (commit ${GITHUB_SHA::7}). Not firmware and not a booted iOS. / Лог headless-попытки загрузки (коммит ${GITHUB_SHA::7}). Не прошивка и не загрузка iOS."

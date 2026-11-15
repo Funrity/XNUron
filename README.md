@@ -1,37 +1,77 @@
-<p align="center"><img src="docs/xnuron.png" width="160" alt="XNUron"></p>
+<p align="center"><img src="docs/banner.svg" alt="XNUron" width="100%"></p>
 
-# XNUron (раньше — A64 Lab)
+<p align="center">
+  <b>English</b> · <a href="README.ru.md">Русский</a>
+</p>
 
-Собственный интерпретатор ARM64 (AArch64) на C + Android-оболочка. Экспериментальная платформа в сторону «iOS на Android».
+<p align="center">
+  <img alt="Language: C" src="https://img.shields.io/badge/core-C-6750A4?style=for-the-badge&labelColor=EADDFF">
+  <img alt="Target: Android" src="https://img.shields.io/badge/shell-Android%20%2F%20Java-7D5260?style=for-the-badge&labelColor=FFD8E4">
+  <img alt="Arch: AArch64" src="https://img.shields.io/badge/arch-AArch64%20EL0%2FEL1-4F378B?style=for-the-badge&labelColor=E8DEF8">
+  <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-B3261E?style=for-the-badge&labelColor=F9DEDC">
+</p>
 
-**Честно: настоящую iOS это не загружает.** Подробно почему и что дальше — [docs/FEASIBILITY.md](docs/FEASIBILITY.md).
+# XNUron
 
-Что есть: EL0/EL1-эмуляция с исключениями/IRQ/таймером, виртуальная машина `a64virt` (RAM, UART, экран, касание),
-собственное тестовое гостевое ядро, запуск самодостаточных Mach-O arm64 через эмуляцию BSD-сисколов, инспектор
-Mach-O/IMG4/IPSW с объяснением, почему файл не запустится, Android-интерфейс (старт/стоп, экран, журнал, диагностика).
+**An AArch64 interpreter written in C, wrapped in an Android app, that tries – honestly – to boot the kernel of a real iPhone from its public IPSW.**
 
-Тесты на ПК (нужны gcc, clang, ld.lld, llvm-objcopy, python3; java — по желанию):
+The target is the iPhone XS Max (D331AP, `iPhone11,4`, A12, iOS 12.x): `kernelcache.release.iphone11`, as far as `/sbin/launchd`.
+This is a research project. It is **not** an iOS emulator you can use, and it never will pretend to be one.
 
-    tests/run_all.sh
+---
 
-## Сборка и скачивание APK
+## ✦ Where it stands
 
-Каждый push в `main` запускает GitHub Actions («Build APK»): тесты на хосте, затем `gradle assembleDebug`.
-Готовый APK появляется в **Releases** (тег `v<версия>`, pre-release) и как артефакт запуска `xnuron-apk-<версия>`.
-Локально: открыть в Android Studio или `gradle assembleDebug`.
-
-## Структура
-
-| Путь | Что |
+| Stage | State |
 |---|---|
-| `app/src/main/cpp` | интерпретатор AArch64, виртуальная машина, загрузчики, попытка загрузки IPSW (C) |
-| `app/src/main/java` | Android-оболочка (Java) |
-| `tests/` | тесты на хосте (`tests/run_all.sh`) |
-| `guest/`, `tools/` | тестовое гостевое ядро и скрипты его сборки |
-| `docs/` | документация; `docs/CHANGELOG.md` — подробная история версий и разбор остановок |
+| AArch64 core (EL0/EL1, MMU with 16 KiB pages, exceptions, IRQ, timer, FP/SIMD, exclusives) | ✅ working, covered by host tests. Pointer authentication is *modelled*: signatures are not computed, `AUT*` always succeeds |
+| Loading the real kernelcache from the IPSW (IMG4 → LZFSE → Mach-O) | ✅ working |
+| XNU boot: `kernel_bootstrap`, IOKit matching, dozens of Apple drivers start | ✅ reaches the scheduler idle loop |
+| Root filesystem (RAM disk) mounted by `bsd_init` | ✅ `hfs: mounted …CustomerRamDisk` |
+| `/sbin/launchd` started | ❌ **not yet** |
 
-## Правила проекта
+Several IOKit threads still wait for platform functions (`function-*`) whose providers (GPIO, SMC, PMU, accessory port) need real hardware that XNUron does not model. Finding out which of these actually blocks `launchd` is the current work.
+The detailed, version-by-version story, with every stop analysed, is in [`docs/CHANGELOG.md`](docs/CHANGELOG.md) (Russian).
 
-Никаких подделанных загрузок, выдуманной прошивки, обхода шифрования или подписей; всё смоделированное помечается MODELLED, допущения — ASSUMPTION; на каждое изменение есть тест.
+## ✦ The ground rules
 
-Пересборка тестового гостя: `tools/build_guest.sh` (обновляет `guest_image.h`).
+- **No faked boots.** If the kernel stops, the log says where and why.
+- **No invented firmware values presented as real.** Everything modelled is labelled `MODELLED`, every assumption `ASSUMPTION`, every invented value `PLACEHOLDER`.
+- **No decryption or signature bypass.** SecureRoot-style cryptographic checks are not faked; if the kernel needs data we do not have (keys, a real SEP answer), the log says so.
+- **A test for every change.**
+- Apple firmware is **never** stored in this repository. The headless workflow downloads the public IPSW from Apple's servers at run time.
+
+## ✦ Try it
+
+### Android app
+Every push to `main` builds an APK and publishes it under **[Releases](../../releases)** (tag `v<version>`, pre-release).
+Open it, point it at an IPSW, and read the log.
+
+### Host tests
+Needs `gcc`, `clang`, `ld.lld`, `llvm-objcopy`, `python3` (Java optional).
+
+```sh
+tests/run_all.sh        # prints ALL TEST GROUPS PASSED on success
+```
+
+### Headless boot attempt (GitHub Actions)
+**Actions → Boot attempt (headless) → Run workflow.** It builds the same C sources as the APK, fetches the public IPSW, runs the boot attempt and publishes `boot.log` / `boot.err` to the `boot-log` release.
+
+## ✦ Repository map
+
+| Path | What lives there |
+|---|---|
+| `app/src/main/cpp` | AArch64 interpreter, virtual machine, loaders, the IPSW boot attempt (C) |
+| `app/src/main/java` | Android shell (Java) |
+| `tests/` | Host tests (`tests/run_all.sh`) |
+| `tools/` | Headless runner (`boot_cli.c`), IPSW helpers, guest build scripts |
+| `guest/` | Small self-made test guest kernel |
+| `docs/` | [`FEASIBILITY.md`](docs/FEASIBILITY.md) (the original honest analysis), [`CHANGELOG.md`](docs/CHANGELOG.md) (full history) |
+
+## ✦ Legal
+
+XNUron contains no Apple firmware, keys or signing material and does not circumvent any protection. You supply the firmware; Apple's licence terms for iOS apply to it. Nothing here is legal advice.
+`app/src/main/cpp/lzfse` is Apple's open-source LZFSE decoder under its own BSD licence (see `lzfse/LICENSE`).
+This repository does not yet carry a project licence file; until one is added, all rights are reserved by the author.
+
+> XNUron was formerly called *A64 Lab*.
