@@ -238,7 +238,7 @@ int main(int argc, char **argv) {
       }
       { /* 0.4.320 diagnostic: kernel stacks of BLOCKED threads. Scan 16 KiB-aligned stacks in 0xffffffe01a000000..0xffffffe01c000000 for the longest frame-pointer chain (fp,lr pairs, lr in kernel text after stripping PAC) and print its return addresses (low 36 bits). A blocked thread's live frames are the tail of the chain; dead frames below them may be shown first. */
         A64 *c7 = a64m_cpu(m); int shown = 0; static uint64_t ul[600]; int nul = 0;
-        for (uint64_t sb = 0xffffffe01a000000ull; sb < 0xffffffe01c000000ull && shown < 40; sb += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
+        for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe01c000000ull && shown < 90; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
           int best = 0; uint64_t bestA = 0;
