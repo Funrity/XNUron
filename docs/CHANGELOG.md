@@ -1441,3 +1441,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.332
 - Лог 0.4.331: после скрытия функций потоки пошли дальше, но AppleM68Buttons::handleStart паникует ("failed to instantiate function-button_volup"): эта функция обязательна. `function-button_volup` больше НЕ скрывается (её поток продолжит ждать провайдера). Добавлен `function-bb_rst` (новый ожидающий). Остальные скрытые функции MODELLED/ASSUMPTION как в 0.4.331.
 - Замечено отдельно: при панике обработчик паники получает data abort по адресу рядом с основанием стека (guard page, FAR=0xffffffe01b37fc58) и зацикливается — разберу, если паника повторится.
+
+## 0.4.333
+- Лог 0.4.332: гость дошёл дальше (6463 байта вывода), но AppleSOCTuner::start паникует (AppleSOCTuner.cpp:97 REQUIRE `_dispIdleCtrlFunction`): function-dispidle_ctrl обязательна, больше НЕ скрывается. Новые ожидающие функции: function-pmp_control, function-acc_pwr (пока не трогаю). Скрытые остальные: MODELLED/ASSUMPTION, как раньше.
