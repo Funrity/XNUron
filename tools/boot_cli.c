@@ -249,6 +249,17 @@ int main(int argc, char **argv) {
           if (best >= 5) { shown++; fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.329: for frames whose lr is 0x814a91c (the platform-function wait helper): saved x19 = property key (OSSymbol/OSString, C string at +0x10), x21 = nub */
+          static uint64_t seen[64]; int ns = 0;
+          for (uint64_t sb2 = 0xffffffe01a000000ull; sb2 < 0xffffffe01c000000ull; sb2 += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
+            for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb2 + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
+            if (!ok) continue;
+            for (uint64_t A = 0x40; A + 16 <= 0x4000; A += 16) { uint64_t lr; memcpy(&lr, stk + A + 8, 8); if ((lr & 0xfffffffffull) != 0x814a91cull) continue;
+              uint64_t x19, x21; memcpy(&x19, stk + A - 8, 8); memcpy(&x21, stk + A - 0x18, 8);
+              char ks[48] = "?"; uint64_t sp1, pp, kp = 0; uint8_t *kq; if (!a64_virt_to_phys(c7, x19 + 0x10, &sp1) && (kq = a64m_ram_at(m, sp1, 8))) memcpy(&kp, kq, 8);
+              if (kp && !a64_virt_to_phys(c7, kp, &pp) && (kq = a64m_ram_at(m, pp, 40))) { memcpy(ks, kq, 40); ks[40] = 0; for (int z = 0; z < 40 && ks[z]; z++) if ((unsigned char)ks[z] < 32 || (unsigned char)ks[z] > 126) ks[z] = '.'; }
+              fprintf(stderr, "[fnwait] stack %llx key obj %llx \"%s\" nub %llx\n", (unsigned long long)(sb2 & 0xfffffffffull), (unsigned long long)x19, ks, (unsigned long long)x21); ns++; } }
+          (void)seen; (void)ns; }
         for (int u = 0; u < nul; u++) { uint64_t t = 0xfffffff000000000ull | ul[u]; int cnt = 0; char out[600]; size_t on = 0; out[0] = 0;
           for (uint64_t a = t - 0x400; a < t && cnt < 4; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
             if (a64_virt_to_phys(c7, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c7, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
