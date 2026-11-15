@@ -249,6 +249,18 @@ int main(int argc, char **argv) {
           if (best >= 5) { shown++; fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.341 diagnostic: the thread blocked on an rw lock under OSMetaClass "Classes" (frames 7ba7904 <- 803aff0 <- 800d280): raw stack words around the 803aff0 frame; every pointer into kernel data is dereferenced (4 qwords) to find the lock and its state */
+          for (uint64_t sb2 = 0xffffffe01a000000ull; sb2 < 0xffffffe01c000000ull; sb2 += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
+            for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb2 + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
+            if (!ok) continue;
+            for (uint64_t A = 0x100; A + 16 <= 0x4000; A += 16) { uint64_t lr; memcpy(&lr, stk + A + 8, 8); if ((lr & 0xfffffffffull) != 0x800d280ull) continue;
+              fprintf(stderr, "[lockw] stack %llx frame +%llx (return into 800d280):", (unsigned long long)(sb2 & 0xfffffffffull), (unsigned long long)A);
+              for (uint64_t W = A - 0x90; W < A + 0x20; W += 8) { uint64_t v; memcpy(&v, stk + W, 8); fprintf(stderr, " [%+d]%llx", (int)W - (int)A, (unsigned long long)v); }
+              fprintf(stderr, "\n");
+              for (uint64_t W = A - 0x90; W < A + 0x20; W += 8) { uint64_t v, pp2; memcpy(&v, stk + W, 8); uint8_t *dq;
+                if ((v >> 36) != 0xffffffe00ull && (v >> 36) != 0xfffffff00ull) continue; if (v >= 0xfffffff007000000ull && v < 0xfffffff00a800000ull) continue;
+                if (a64_virt_to_phys(c7, v, &pp2) || !(dq = a64m_ram_at(m, pp2, 32))) continue; uint64_t w4[4]; memcpy(w4, dq, 32);
+                fprintf(stderr, "[lockw]   ptr %llx [%+d]: %llx %llx %llx %llx\n", (unsigned long long)v, (int)W - (int)A, (unsigned long long)w4[0], (unsigned long long)w4[1], (unsigned long long)w4[2], (unsigned long long)w4[3]); } } } }
         { /* 0.4.329: for frames whose lr is 0x814a91c (the platform-function wait helper): saved x19 = property key (OSSymbol/OSString, C string at +0x10), x21 = nub */
           static uint64_t seen[64]; int ns = 0;
           for (uint64_t sb2 = 0xffffffe01a000000ull; sb2 < 0xffffffe01c000000ull; sb2 += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
