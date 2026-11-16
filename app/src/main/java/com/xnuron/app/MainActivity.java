@@ -449,7 +449,7 @@ public class MainActivity extends Activity {
                     try (ParcelFileDescriptor pfd = getContentResolver().openFileDescriptor(chosen, "r")) {
                         h = Native.createIpswAttempt(pfd.getFd(), pfd.getStatSize());
                     }
-                    if (h == 0) why = "Out of memory while preparing the attempt.";
+                    if (h == 0) { String ce = Native.createError(); why = (ce != null && !ce.isEmpty()) ? ce : "Out of memory while preparing the attempt."; }
                     name = chosenName + " (EXPERIMENTAL IPSW boot attempt - NOT iOS)";
                 } else if (src == 3) {
                     if ((chosenFlags & Native.FLAG_RUNNABLE_USER) == 0)

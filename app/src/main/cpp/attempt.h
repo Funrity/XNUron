@@ -14,6 +14,7 @@ extern "C" {
 
 /* Always returns a machine (NULL only on out-of-memory).  If a step cannot be completed the
  * machine is already in the FAULT state with the reason in its log. */
+extern char g_attempt_last[200];
 A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total);
 
 /* Pieces, exposed for tests. */

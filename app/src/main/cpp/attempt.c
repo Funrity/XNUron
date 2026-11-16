@@ -726,7 +726,8 @@ static uint8_t *zip_extract(A64ReadAt rd, void *ud, const ZEnt *z, char *why, si
 }
 
 /* ------------------------------------------------------------- the attempt */
-#define LOG(...) a64m_log(m, __VA_ARGS__)
+char g_attempt_last[200];   /* 0.4.355: last boot-log line start, read by the JNI crash guard to say where a native crash happened */
+#define LOG(...) (snprintf(g_attempt_last, sizeof g_attempt_last, __VA_ARGS__), a64m_log(m, __VA_ARGS__))
 
 static A64Machine *dead(const char *why, const char *step, A64Machine *m) {
     if (!m) m = a64m_create_system(1u << 20);

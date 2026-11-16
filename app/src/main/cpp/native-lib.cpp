@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
+#include <csetjmp>
+#include <csignal>
 #include "arm64.h"
 #include "a64demo.h"
 #include "machine.h"
@@ -82,10 +84,21 @@ JNI(jlong, createRaw)(JNIEnv *env, jclass, jbyteArray image) {
 /* Experimental: tries to boot the kernelcache inside an IPSW (zip) given as a file descriptor.
  * Always returns a machine whose log tells what happened; it may already be in the FAULT state. */
 static int fd_read(void *ud, uint64_t off, void *buf, size_t len);
+/* 0.4.355: a native crash while preparing the attempt (e.g. an IPSW of another device/iOS whose layout the code did not expect) must not kill the app.
+   The fault is caught, reported with the last boot-log line and the creation fails cleanly. This hides nothing: the message says it is a crash. */
+static sigjmp_buf g_jb; static volatile sig_atomic_t g_guard = 0; static volatile uintptr_t g_fault_addr = 0; static std::string g_create_err;
+static void segv_h(int sig, siginfo_t *si, void *) { if (g_guard) { g_fault_addr = (uintptr_t)si->si_addr; g_guard = 0; siglongjmp(g_jb, sig); } signal(sig, SIG_DFL); raise(sig); }
 JNI(jlong, createIpswAttempt)(JNIEnv *, jclass, jint fd, jlong size) {
-    int f = fd;
-    return (jlong)(intptr_t)a64_attempt_ipsw(fd_read, &f, (uint64_t)size);
+    int f = fd; g_create_err.clear(); g_attempt_last[0] = 0;
+    struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = segv_h; sa.sa_flags = SA_SIGINFO | SA_NODEFER; sigemptyset(&sa.sa_mask);
+    struct sigaction o1, o2; sigaction(SIGSEGV, &sa, &o1); sigaction(SIGBUS, &sa, &o2);
+    jlong r = 0; volatile int sig = sigsetjmp(g_jb, 1);
+    if (sig == 0) { g_guard = 1; r = (jlong)(intptr_t)a64_attempt_ipsw(fd_read, &f, (uint64_t)size); g_guard = 0; }
+    else { char b[400]; snprintf(b, sizeof b, "NATIVE CRASH (signal %d, fault address 0x%llx) while preparing the IPSW attempt. Last boot step: %s", (int)sig, (unsigned long long)g_fault_addr, g_attempt_last[0] ? g_attempt_last : "(none)"); g_create_err = b; r = 0; }
+    sigaction(SIGSEGV, &o1, nullptr); sigaction(SIGBUS, &o2, nullptr);
+    return r;
 }
+JNI(jstring, createError)(JNIEnv *env, jclass) { return env->NewStringUTF(g_create_err.c_str()); }
 
 JNI(void, destroy)(JNIEnv *, jclass, jlong h) { a64m_destroy(reinterpret_cast<A64Machine *>(h)); }
 JNI(void, stop)(JNIEnv *, jclass, jlong h) { a64m_request_stop(reinterpret_cast<A64Machine *>(h)); }

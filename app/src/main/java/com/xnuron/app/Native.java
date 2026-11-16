@@ -19,6 +19,7 @@ public final class Native {
     public static native long createRaw(byte[] image);
     /** Experimental IPSW boot attempt; always returns a machine (its log explains where it stopped). */
     public static native long createIpswAttempt(int fd, long size);
+    public static native String createError();
     public static native void destroy(long h);
     public static native void stop(long h);
     /** Runs up to {@code steps} instructions on the calling thread; returns the machine state. */
