@@ -1197,6 +1197,7 @@ static int step(A64 *c) {
     }
     uint32_t i; memcpy(&i, p, 4);
     c->pc_hist[c->pc_hist_i++ % A64_PC_HIST] = pc;
+    if (__builtin_expect(c->cap_pc != 0, 0) && pc == c->cap_pc && !c->cap_n) { c->cap_n = 1; for (int ci = 0; ci < 4; ci++) c->cap_x[ci] = c->x[ci]; }
     if (__builtin_expect(c->hk_pc != 0, 0) && pc == c->hk_pc && c->x[19] >= 0x1000) { c->hk_n++; (void)st(c, c->x[19] + 0x10b, 1, 1); (void)st(c, c->x[19] + 0x10c, 1, 0); }   /* 0.4.354 MODELLED hook */
     if (c->cov) {
         uint64_t co = pc - c->cov_base; if (co < c->cov_len) { uint8_t bm = (uint8_t)(1u << ((co >> 2) & 7)); if (!(c->cov[co >> 5] & bm)) { unsigned q = c->nw_n++ % 96; c->nw_pc[q] = pc; c->nw_step[q] = c->steps; c->nw_x0[q] = c->x[0]; c->nw_x1[q] = c->x[1]; c->nw_lr[q] = c->x[30]; } c->cov[co >> 5] |= bm; }

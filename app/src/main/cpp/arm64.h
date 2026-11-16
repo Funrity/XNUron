@@ -107,6 +107,7 @@ typedef struct {
     uint64_t mpidr; uint64_t exc0_chain[8][2]; unsigned exc0_chain_n; uint64_t tp_log[6][2]; unsigned tp_n;   /* frame chain at first exception; first TPIDR_EL1 writes (pc,value) */
     struct { uint64_t lo, hi; unsigned n; struct { uint64_t pc, addr, val; uint8_t sz; } e[8]; } swb[2];   /* diagnostic: first stores to two more kernel globals */
     uint64_t xab_pa; unsigned xab_n; int xab_w;   /* diagnostic: first access that hit no RAM and no device (physical address) */
+    uint64_t cap_pc, cap_x[4]; unsigned cap_n;   /* 0.4.357 diagnostic: x0..x3 at the first execution of pc==cap_pc */
     uint64_t hk_pc; unsigned hk_n;   /* 0.4.354 MODELLED hook: when pc==hk_pc, store byte [x19+0x10b]=1 and [x19+0x10c]=0 (see attempt.c; used for the missing SEP key store answer) */
     uint64_t wpc[4], wtg[4], wx0[4], wx1[4]; unsigned wn[4];   /* 0.4.306 diagnostic: for an indirect call at pc==wpc[i] remember the last target (low 36 bits) and the number of executions */
     uint8_t *cov, *callseen; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
