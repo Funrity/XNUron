@@ -923,6 +923,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     if (!sys) { free(kern); free(dt); return dead("out of memory for guest RAM", "step 6", m); }
     { char b[65536]; size_t off = 0, k; while ((k = a64m_log_read(log_only, off, b, sizeof b)) > 0) { for (size_t q = 0; q < k; q += 400) { char t[401]; size_t c = k - q < 400 ? k - q : 400; memcpy(t, b + q, c); t[c] = 0; a64m_log(sys, "%s", t); } off += k; } }
     a64m_destroy(log_only); m = sys;
+    /* 0.4.354 MODELLED, ASSUMPTION (NOT what a real device does): the kernel's IOSecureBSDRoot asks AppleARMPE ("SecureRootName") whether the root is secure; the platform expert then WAITS for the SEP key store (the module that logs "Creating Special Keys Twice") to answer with "SecureRootCallBack". There is no SEP and no AES engine here, so that answer never comes and bsd_init never reaches launchd (log 0.4.352: the answering branch ran 0 times). The hook answers on its behalf with the ONLY honest outcome available: it sets the "answered" flag [obj+0x10b]=1 and the "secure" result [obj+0x10c]=0, so the platform function returns kIOReturnNotPrivileged = "root NOT verified secure". The secure-root check is NOT passed and NO cryptography is faked; the kernel continues the way it does for a non-secure root. The hook fires at the first flag test, pc 0x8151c9c, specific to this kernelcache (iOS 12.0 16A366). Reversible: delete this block. */
+    LOG("[boot] MODELLED hook (ASSUMPTION, 0.4.354): no SEP/AES here, so AppleARMPE's SecureRootName request is answered as 'root NOT verified secure' (kIOReturnNotPrivileged) at pc 0xfffffff008151c9c. The secure-root check is NOT passed; no cryptography is faked.\n");
+    a64m_cpu(m)->hk_pc = 0xfffffff008151c9cull;
     uint64_t kphys = A64M_IOS_RAM_BASE + kbase_off;
     for (int i = 0; i < mo.nseg; i++) {
         const A64Seg *s = &mo.seg[i];

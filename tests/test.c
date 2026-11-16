@@ -47,6 +47,21 @@ int main(void) {
     memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000;
     CHECK(a64_run(&c, 1000) == 1, "infinite loop stops at step limit");
 
+    /* 5. 0.4.354 MODELLED hook: at hk_pc the bytes [x19+0x10b]=1 and [x19+0x10c]=0 are stored before the instruction executes */
+    memset(&a, 0, sizeof a);
+    a_movz(&a, 19, 0x2000);
+    a_e(&a, 0x39400000u | (0x10bu << 10) | (19u << 5) | 10u);   /* ldrb w10, [x19, #0x10b] */   /* hook pc = this instruction */
+    a_e(&a, 0x39400000u | (0x10cu << 10) | (19u << 5) | 11u);   /* ldrb w11, [x19, #0x10c] */
+    a_movz(&a, 8, 93); a_svc(&a, 0); a_finish(&a);
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; mem[0x2000 + 0x10c] = 5; c.hk_pc = 0x1004;
+    rc = a64_run(&c, 100);
+    CHECK(rc == 0 && c.x[10] == 1 && c.x[11] == 0 && c.hk_n == 1, "hook stores [x19+0x10b]=1 and [x19+0x10c]=0 once");
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; mem[0x2000 + 0x10c] = 5;
+    rc = a64_run(&c, 100);
+    CHECK(rc == 0 && c.x[10] == 0 && c.x[11] == 5 && c.hk_n == 0, "no hook set: memory untouched");
+
     printf(fails ? "\n%d FAILED\n" : "\nALL PASSED\n", fails);
     return fails != 0;
 }
