@@ -287,7 +287,9 @@ int main(int argc, char **argv) {
             on += (size_t)snprintf(out + on, sizeof out - on, " \"%s\"", buf); cnt++; }
           if (cnt) fprintf(stderr, "[stks] %llx:%s\n", (unsigned long long)ul[u], out); }
         }
-      if (c->wn[0] && c->wx0[0]) { /* 0.4.310 diagnostic: the DART mapper object: words +0xc0..+0x130 and the physical-range table (count [+0x118], pointer [+0x120], pairs start/end) the check at 0x850b600 walks */
+      for (int wi = 0; wi < 4; wi++) if (c->wpc[wi] && c->wn[wi]) { /* 0.4.352: x1 of the watched indirect call as a C string */ char sx[64] = "?"; uint64_t pq; uint8_t *qq; if (!a64_virt_to_phys(c, c->wx1[wi], &pq) && (qq = a64m_ram_at(m, pq, 48))) { memcpy(sx, qq, 48); sx[48] = 0; for (int z = 0; z < 48; z++) if ((unsigned char)sx[z] && ((unsigned char)sx[z] < 32 || (unsigned char)sx[z] > 126)) sx[z] = '.'; }
+        fprintf(stderr, "[wsym] pc %llx calls=%u last target %llx x0=%llx x1=%llx \"%s\"\n", (unsigned long long)c->wpc[wi], c->wn[wi], (unsigned long long)c->wtg[wi], (unsigned long long)c->wx0[wi], (unsigned long long)c->wx1[wi], sx); }
+      if (c->wpc[0] == 0xfffffff008149510ull && c->wn[0] && c->wx0[0]) { /* 0.4.310 diagnostic: the DART mapper object: words +0xc0..+0x130 and the physical-range table (count [+0x118], pointer [+0x120], pairs start/end) the check at 0x850b600 walks */
         uint64_t ob = c->wx0[0]; fprintf(stderr, "[dobj] object %llx words +0xc0..+0x130:", (unsigned long long)ob);
         for (unsigned o = 0xc0; o <= 0x130; o += 8) { uint64_t pp; uint8_t *qq; uint64_t w = 0; if (!a64_virt_to_phys(c, ob + o, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&w, qq, 8); fprintf(stderr, " +%x=%llx", o, (unsigned long long)w); }
         uint64_t pp, cnt = 0, tb = 0; uint8_t *qq; if (!a64_virt_to_phys(c, ob + 0x118, &pp) && (qq = a64m_ram_at(m, pp, 8))) cnt = *(uint32_t *)qq; if (!a64_virt_to_phys(c, ob + 0x120, &pp) && (qq = a64m_ram_at(m, pp, 8))) memcpy(&tb, qq, 8);
