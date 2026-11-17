@@ -99,7 +99,7 @@ static int take_exc(A64 *c, int kind, uint32_t esr, uint64_t ret_pc) {
         return fatal(c, m, esr);
     }
     if (c->mode == A64_MODE_SYSTEM && kind == 0) {          /* synchronous exceptions only: interrupts are legitimately frequent */
-        if ((esr >> 26) == 0x15) { if (c->svc_n < 96) { c->svc_nr[c->svc_n] = (uint32_t)c->x[16]; c->svc_pc[c->svc_n] = ret_pc; } c->svl_nr[c->svc_n & 1023] = (uint32_t)c->x[16]; c->svl_pc[c->svc_n & 1023] = ret_pc; c->svl_x0[c->svc_n & 1023] = c->x[0]; c->svl_x1[c->svc_n & 1023] = c->x[1]; c->svl_x2[c->svc_n & 1023] = c->x[2]; c->svl_x3[c->svc_n & 1023] = c->x[3]; c->svl_ret[c->svc_n & 1023] = ~0ull - 1; c->svc_pend = c->svc_n + 1; c->svc_n++; }
+        if ((esr >> 26) == 0x15) { if (c->svc_n < 96) { c->svc_nr[c->svc_n] = (uint32_t)c->x[16]; c->svc_pc[c->svc_n] = ret_pc; } c->svl_nr[c->svc_n & 4095] = (uint32_t)c->x[16]; c->svl_pc[c->svc_n & 4095] = ret_pc; c->svl_x0[c->svc_n & 4095] = c->x[0]; c->svl_x1[c->svc_n & 4095] = c->x[1]; c->svl_x2[c->svc_n & 4095] = c->x[2]; c->svl_x3[c->svc_n & 4095] = c->x[3]; c->svl_ret[c->svc_n & 4095] = ~0ull - 1; c->svc_pend = c->svc_n + 1; c->svc_n++; }
         if ((esr >> 26) == 0x20 || (esr >> 26) == 0x24) { unsigned q = c->el0l_n++ & 7; c->el0l[q].esr = esr; c->el0l[q].elr = ret_pc; c->el0l[q].far = c->far_el1; c->el0l[q].steps = c->steps; c->el0l[q].x0 = c->x[0]; c->el0l[q].x1 = c->x[1]; c->el0l[q].sp0 = c->sp; }
         if ((esr >> 26) == 0x20 || (esr >> 26) == 0x24) { memcpy(c->el0r.x, c->x, sizeof c->el0r.x); c->el0r.codeva = (ret_pc & ~15ull) - 16; c->el0r.ok = 1; for (int q = 0; q < 8; q++) if (!peek64(c, c->el0r.codeva + 8u * (uint64_t)q, &c->el0r.code[q])) { c->el0r.ok = 0; break; } }
         if (((esr >> 26) == 0x20 || (esr >> 26) == 0x24) && c->exc_el0_n < 12) { unsigned q = c->exc_el0_n++; c->exc_el0[q].esr = esr; c->exc_el0[q].elr = ret_pc; c->exc_el0[q].far = c->far_el1; c->exc_el0[q].steps = c->steps; c->exc_el0[q].x0 = c->x[0]; c->exc_el0[q].x1 = c->x[1]; c->exc_el0[q].sp0 = c->sp; }
@@ -998,7 +998,7 @@ static int exec(A64 *c, uint32_t i, uint64_t *next) {
                 c->daif = (s >> 6) & 0xF;
                 c->pan = (s >> 22) & 1;
                 c->excl_valid = false;
-                if (el == 0 && c->svc_pend) { c->svl_ret[(c->svc_pend - 1) & 1023] = c->x[0]; { uint64_t av = 0; c->svl_aux[(c->svc_pend - 1) & 1023] = peek64(c, c->svl_x1[(c->svc_pend - 1) & 1023], &av) ? av : 0xdeadull; } c->svc_pend = 0; }   /* 0.4.384 diagnostic: x0 at the return to user mode after an SVC */
+                if (el == 0 && c->svc_pend) { c->svl_ret[(c->svc_pend - 1) & 4095] = c->x[0]; { uint64_t av = 0; c->svl_aux[(c->svc_pend - 1) & 4095] = peek64(c, c->svl_x1[(c->svc_pend - 1) & 4095], &av) ? av : 0xdeadull; } c->svc_pend = 0; }   /* 0.4.384 diagnostic: x0 at the return to user mode after an SVC */
                 *next = c->elr_el1;
                 return 0;
             }
