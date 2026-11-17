@@ -75,7 +75,7 @@ typedef struct {
     uint64_t fpcr, fpsr;
     uint64_t vr[32][2];      /* SIMD&FP registers V0..V31 (little-endian 128 bit) */
     /* MMU (stage 1, EL1&0): software TLB at 4 KiB granularity, keyed by virtual page (bit 63 = valid) */
-    uint64_t tlb_tag[256], tlb_pa[256];
+    uint64_t tlb_tag[256], tlb_pa[256]; uint8_t tlb_ro[256], last_ro; uint64_t ro_faults;
     bool if_valid; uint64_t if_pg, if_pa;        /* last instruction-fetch page */
     uint64_t pac_key[10];    /* PAC key registers (stored, but signatures are not computed: see exec) */
     uint64_t actlr_el1, amair_el1, par_el1, cntkctl_el1, csselr_el1;

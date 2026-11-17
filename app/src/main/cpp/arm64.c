@@ -162,7 +162,7 @@ static uint8_t *ptr(A64 *c, uint64_t a, uint64_t n);
 
 static void tlb_flush(A64 *c) { memset(c->tlb_tag, 0, sizeof c->tlb_tag); c->if_valid = false; }
 
-static int walk(A64 *c, uint64_t va, uint64_t *pa, bool update) {
+static int walk(A64 *c, uint64_t va, uint64_t *pa, bool update, uint8_t *ro) {
     uint64_t tcr = c->tcr_el1;
     int sel = (int)((va >> 55) & 1);
     int tsz = (int)(sel ? (tcr >> 16) & 63 : tcr & 63);
@@ -194,6 +194,7 @@ static int walk(A64 *c, uint64_t va, uint64_t *pa, bool update) {
             if (!((tcr >> 39) & 1)) return 0x08 | lvl;
             if (update) { d |= 1ull << 10; memcpy(p, &d, 8); }
         }
+        if (ro) *ro = (uint8_t)(((d >> 7) & 1) | (lvl << 1));   /* AP[2]: read-only (0.4.394) */
         uint64_t oa = d & 0x0000FFFFFFFFFFFFull & ~((1ull << shift) - 1);
         *pa = oa | (va & ((1ull << shift) - 1));
         return -1;
@@ -208,9 +209,10 @@ static int xlate(A64 *c, uint64_t va, uint64_t *pa) {
     if (((va >> 55) & 1) ? ((tcr >> 38) & 1) : ((tcr >> 37) & 1)) v = ((va >> 55) & 1) ? (va | 0xFF00000000000000ull) : (va & 0x00FFFFFFFFFFFFFFull);
     unsigned slot = (unsigned)((v >> 12) & 255);
     uint64_t tag = (v >> 12) | (1ull << 63);
-    if (c->tlb_tag[slot] == tag) { *pa = c->tlb_pa[slot] | (v & 0xFFF); return -1; }
-    uint64_t out; int f = walk(c, v, &out, true);
+    if (c->tlb_tag[slot] == tag) { *pa = c->tlb_pa[slot] | (v & 0xFFF); c->last_ro = c->tlb_ro[slot]; return -1; }
+    uint64_t out; uint8_t ro = 0; int f = walk(c, v, &out, true, &ro);
     if (f >= 0) return f;
+    c->last_ro = ro; c->tlb_ro[slot] = ro;
     c->tlb_tag[slot] = tag; c->tlb_pa[slot] = out & ~0xFFFull;
     *pa = out; return -1;
 }
@@ -250,7 +252,7 @@ int a64_virt_to_phys(A64 *c, uint64_t va, uint64_t *pa) {
     if (!MMU_ON(c)) { *pa = va; return 0; }
     uint64_t tcr = c->tcr_el1, v = va;
     if (((va >> 55) & 1) ? ((tcr >> 38) & 1) : ((tcr >> 37) & 1)) v = ((va >> 55) & 1) ? (va | 0xFF00000000000000ull) : (va & 0x00FFFFFFFFFFFFFFull);
-    return walk(c, v, pa, false) < 0 ? 0 : -1;
+    return walk(c, v, pa, false, NULL) < 0 ? 0 : -1;
 }
 
 static uint8_t *ptr(A64 *c, uint64_t a, uint64_t n) {
@@ -368,6 +370,8 @@ static int st(A64 *c, uint64_t a, int sz, uint64_t v) {
         }
         int f = xlate(c, a, &a);
         if (f >= 0) return abort_data(c, va, true, (unsigned)f);
+        /* 0.4.394 MODELLED: stage-1 write permission for user-half (TTBR0) pages. AP[2]=1 means read-only; XNU maps copy-on-write pages that way and relies on the permission fault to copy the page. Kernel-half pages are not checked (Apple APRR re-meaning, not modelled). */
+        if ((c->last_ro & 1) && !((va >> 55) & 1)) { c->ro_faults++; return abort_data(c, va, true, 0x0C | (c->last_ro >> 1)); }
     }
     uint8_t *p = ptr(c, a, 1u << sz);
     if (p) { if (c->vw_val && c->vw_n < 8 && ((sz == 3 && v == c->vw_val) || (sz == 2 && v == (c->vw_val & 0xFFFFFFFFull)))) { unsigned k = c->vw_n++; c->vw[k].pc = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 1) % A64_PC_HIST]; c->vw[k].va = va; c->vw[k].pa = a; c->vw[k].sz = (uint8_t)(1u << sz); c->vw[k].lr = c->x[30]; for (int q = 0; q < 4; q++) c->vw[k].x[q] = c->x[q]; }

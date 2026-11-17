@@ -161,6 +161,34 @@ zfill:
     CHECKEQ x2, 0xFFFFFFFFFFFFFFFF, 22
     mrs x2, dczid_el0
     CHECKEQ x2, 4, 23
+    /* 11. write permission (0.4.394): TTBR0 L1[3] = read-only block (AP[2]=1) onto RAM; a load works, a store gives permission fault level 1 (0x0D) with WnR and leaves memory unchanged */
+    ldr x1, =0x40000481
+    str x1, [x20, #24]
+    tlbi vmalle1
+    dsb ish
+    isb
+    ldr x7, =0xC0310000
+    ldr x2, [x7]
+    mov x12, #0
+    ldr x3, =0x5555555555555555
+    str x3, [x7]
+    cmp x12, #1
+    b.eq 5f
+    mov x0, #24
+    b fail
+5:  and x1, x10, #0x3F
+    CHECKEQ x1, 0x0D, 25
+    tst x10, #0x40
+    b.ne 6f
+    mov x0, #26
+    b fail
+6:  ldr x8, =0x40310000
+    ldr x2, [x8]
+    cmp x2, x3
+    b.ne 7f
+    mov x0, #27
+    b fail
+7:
     /* done */
     mov x0, #0
 fail:
