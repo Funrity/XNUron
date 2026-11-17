@@ -355,6 +355,10 @@ int main(int argc, char **argv) {
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
           fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; }
       }
+      { /* 0.4.380 diagnostic: look for the kernel's panic log text in guest RAM ("panic(cpu N caller ...): <message>") - scan physical RAM in 1 MiB chunks */
+        int hits = 0; for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 3; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
+          for (uint32_t o = 0; o + 12 < 0x100000 && hits < 3; o++) if (q[o] == 'p' && !memcmp(q + o, "panic(cpu ", 10)) { char sx[600]; int n = 0; while (n < 599 && o + n < 0x100000 && q[o + n] >= 9 && q[o + n] < 127) { sx[n] = (char)q[o + n]; n++; } sx[n] = 0; fprintf(stderr, "[ptext] phys %llx: %s\n", (unsigned long long)(pa + o), sx); hits++; } }
+        if (!hits) fprintf(stderr, "[ptext] no 'panic(cpu ' text found in the first 3 GiB of RAM\n"); }
       { /* 0.4.212 diagnostic: frame chain at the FIRST entry into panic() (0x7a44164), i.e. the code that triggered the first panic ("thread_invoke: preemption_level 1 ...") */
         if (!c->snap_n) fprintf(stderr, "[pfirst] panic() was never entered\n");
         else { fprintf(stderr, "[pfirst] panic() first entered at step %llu: lr=%llx sp=%llx x0=%llx\n", (unsigned long long)c->snap_step, (unsigned long long)(c->snap_lr & 0xfffffffffull), (unsigned long long)c->snap_sp, (unsigned long long)c->snap_x0);
