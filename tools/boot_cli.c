@@ -355,6 +355,9 @@ int main(int argc, char **argv) {
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
           fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; }
       }
+      { /* 0.4.381: syscalls (SVC) and aborts from user mode (EL0) */
+        fprintf(stderr, "[el0] SVC count %u; first syscall numbers (x16@pc):", c->svc_n); for (unsigned q = 0; q < c->svc_n && q < 96; q++) fprintf(stderr, " %d@%llx", (int)c->svc_nr[q], (unsigned long long)(c->svc_pc[q] & 0xfffffffffull)); fprintf(stderr, "\n");
+        for (unsigned q = 0; q < c->exc_el0_n; q++) fprintf(stderr, "[el0] abort #%u step %llu esr=%x elr=%llx far=%llx x0=%llx x1=%llx sp_el0=%llx\n", q, (unsigned long long)c->exc_el0[q].steps, c->exc_el0[q].esr, (unsigned long long)c->exc_el0[q].elr, (unsigned long long)c->exc_el0[q].far, (unsigned long long)c->exc_el0[q].x0, (unsigned long long)c->exc_el0[q].x1, (unsigned long long)c->exc_el0[q].sp0); }
       { /* 0.4.380 diagnostic: look for the kernel's panic log text in guest RAM ("panic(cpu N caller ...): <message>") - scan physical RAM in 1 MiB chunks */
         int hits = 0; for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 3; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
           for (uint32_t o = 0; o + 12 < 0x100000 && hits < 3; o++) if (q[o] == 'p' && !memcmp(q + o, "panic(cpu ", 10)) { char sx[600]; int n = 0; while (n < 599 && o + n < 0x100000 && q[o + n] >= 9 && q[o + n] < 127) { sx[n] = (char)q[o + n]; n++; } sx[n] = 0; fprintf(stderr, "[ptext] phys %llx: %s\n", (unsigned long long)(pa + o), sx); hits++; } }
