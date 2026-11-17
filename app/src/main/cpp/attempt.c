@@ -1053,7 +1053,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         if (pr == 1) LOG("[boot] DeviceTree fix-up (MODELLED, NOT what iBoot is known to do): 'pmgr' has #bridges=%u and optional-bridge-mask=0x%x but no 'bridge-settings-<i>' for %u of the bridges; the kernel (ApplePMGR.cpp:843) requires one of the two for every bridge, so those bridges were marked optional: mask 0x%x -> 0x%x. ASSUMPTION: the real settings (which iBoot or the hardware would supply) are unknown here; nothing is invented except the optional flag\n", pnb, pom, pmiss, pom, pnm);
         else if (pr == 0) LOG("[boot] DeviceTree 'pmgr': every one of the %u bridges already has bridge-settings or an optional bit (mask 0x%x), nothing changed\n", pnb, pom);
         else LOG("[boot] WARNING: 'pmgr' node with #bridges / optional-bridge-mask not found or the tree is malformed (%d), the ApplePMGR bridge check is not prepared\n", pr); }
-    if (rd_on) { int pr2 = a64_dt_patch_u64x2(dt, dtlen, "RAMDisk", rdpa, (uint64_t)rdlen);
+    if (rd_on) { /* 0.4.366 (ASSUMPTION, MODELLED): the 0.4.365 log shows buf_biowait (0x7bc79d8) returning b_error 6 (ENXIO) for HFS reads on md0, and the image is 0x651aa00 bytes = not a multiple of 4 KiB; the kernel sizes the RAM disk in pages, so the unaligned tail (alternate volume header etc.) would lie past its end. The size handed over is rounded UP to a 4 KiB page; the extra bytes are zero. Real iBoot behaviour is not known. */
+    uint64_t rdsz_pg = ((uint64_t)rdlen + 0xFFFull) & ~0xFFFull;
+    if (rd_on) LOG("[boot] MODELLED (ASSUMPTION 0.4.366): RAMDisk size handed over is rounded up to a 4 KiB page: %zu -> %llu bytes (tail zero)\n", rdlen, (unsigned long long)rdsz_pg);
+    int pr2 = a64_dt_patch_u64x2(dt, dtlen, "RAMDisk", rdpa, rdsz_pg);
         if (pr2 == 1) { memcpy(a64m_ram_at(m, rdpa, rdlen), rdk, rdlen); LOG("[boot] MODELLED (iBoot does this): RAM disk placed at physical 0x%llx (%zu bytes), /chosen/memory-map RAMDisk = {0x%llx, 0x%zx}, boot-arg rd=md0\n", (unsigned long long)rdpa, rdlen, (unsigned long long)rdpa, rdlen); }
         else { rd_on = 0; LOG("[boot] RAM disk NOT handed over: the 'RAMDisk' property could not be patched (%d)\n", pr2); } }
     free(rdk); rdk = NULL;
