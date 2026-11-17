@@ -358,6 +358,9 @@ int main(int argc, char **argv) {
       { /* 0.4.212 diagnostic: frame chain at the FIRST entry into panic() (0x7a44164), i.e. the code that triggered the first panic ("thread_invoke: preemption_level 1 ...") */
         if (!c->snap_n) fprintf(stderr, "[pfirst] panic() was never entered\n");
         else { fprintf(stderr, "[pfirst] panic() first entered at step %llu: lr=%llx sp=%llx x0=%llx\n", (unsigned long long)c->snap_step, (unsigned long long)(c->snap_lr & 0xfffffffffull), (unsigned long long)c->snap_sp, (unsigned long long)c->snap_x0);
+          { /* 0.4.379: the first panic's x0 as text, and as a pointer to text */
+            uint64_t cand[2] = { c->snap_x0, 0 }; uint64_t pa0, pv = 0; uint8_t *q0; if (!a64_virt_to_phys(c, c->snap_x0, &pa0) && (q0 = a64m_ram_at(m, pa0, 8))) { memcpy(&pv, q0, 8); cand[1] = pv; }
+            for (int ci = 0; ci < 2; ci++) { uint64_t pq; uint8_t *qq; char sx[260]; if (cand[ci] > 0x1000 && !a64_virt_to_phys(c, cand[ci], &pq) && (qq = a64m_ram_at(m, pq, 256))) { int n = 0; while (n < 255 && qq[n] >= 9 && qq[n] < 127) { sx[n] = (char)qq[n]; n++; } sx[n] = 0; if (n >= 4) fprintf(stderr, "[pfirst] x0%s as text: \"%s\"\n", ci ? " -> pointer" : "", sx); } } }
           uint64_t fp = c->snap_fp;
           for (int d = 0; d < 20 && fp; d++) { uint64_t pa, nf = 0, lr = 0; uint8_t *q; if (a64_virt_to_phys(c, fp, &pa) || !(q = a64m_ram_at(m, pa, 16))) break; memcpy(&nf, q, 8); memcpy(&lr, q + 8, 8);
             uint64_t t = 0xfffffff000000000ull | (lr & 0xfffffffffull); fprintf(stderr, "[pfirst] #%d lr %llx", d, (unsigned long long)(t & 0xfffffffffull));
