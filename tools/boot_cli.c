@@ -249,11 +249,15 @@ int main(int argc, char **argv) {
           if (best >= 5) { shown++; fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
-        { /* 0.4.367 diagnostic: who stores ENXIO (6) as b_error ([bp+84])? every 'str wN,[xM,#84]' whose register N was loaded with 'mov wN,#6' (0x528000c0|N) in the 8 instructions before; also 'orr wN,wzr,#6' is not searched */
-          int nh = 0; for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 60; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
-            for (uint32_t o = 8 * 4; o < 0x1000 && nh < 60; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc003e0u) != 0xb9000000u || ((w >> 10) & 0xfff) != 21) continue; uint32_t rt = w & 31;
-              int hit = 0; for (int k = 1; k <= 8; k++) { uint32_t pw; memcpy(&pw, q8 + o - 4 * (uint32_t)k, 4); if (pw == (0x528000c0u | rt)) hit = 1; }
-              if (hit) { fprintf(stderr, "[e6] %llx: str w%u,[x%u,#84] with mov w%u,#6 just before\n", (unsigned long long)((pg + o) & 0xfffffffffull), rt, (w >> 5) & 31, rt); nh++; } } } }
+        { /* 0.4.368 diagnostic: [e6] scan found no direct stores of 6 into [bp+84]. Find (1) 'str w1,[x0,#84]' (buf_seterror-like setter) and (2) 'mov w1,#6' followed within 3 instructions by a BL whose target contains such a str within 0x30 bytes of its start */
+          int nh = 0; uint64_t setter[8]; int ns = 0;
+          for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if (w == 0xb9005401u && ns < 8) { setter[ns++] = pg + o; fprintf(stderr, "[e6s] str w1,[x0,#84] at %llx\n", (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
+          for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 80; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000 - 16 && nh < 80; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if (w != 0x528000c1u) continue;
+              for (int k = 1; k <= 3; k++) { uint32_t bw; memcpy(&bw, q8 + o + 4 * (uint32_t)k, 4); if ((bw & 0xfc000000u) != 0x94000000u) continue; int64_t off = (int64_t)((int32_t)(bw << 6) >> 6) * 4; uint64_t tg = pg + o + 4 * (uint64_t)k + (uint64_t)off;
+                for (int z = 0; z < ns; z++) if (tg <= setter[z] && setter[z] - tg < 0x40) { fprintf(stderr, "[e6c] %llx: mov w1,#6 ; bl %llx (setter %llx)\n", (unsigned long long)((pg + o) & 0xfffffffffull), (unsigned long long)(tg & 0xfffffffffull), (unsigned long long)(setter[z] & 0xfffffffffull)); nh++; }
+                break; } } } }
         { /* 0.4.341 diagnostic: the thread blocked on an rw lock under OSMetaClass "Classes" (frames 7ba7904 <- 803aff0 <- 800d280): raw stack words around the 803aff0 frame; every pointer into kernel data is dereferenced (4 qwords) to find the lock and its state */
           for (uint64_t sb2 = 0xffffffe01a000000ull; sb2 < 0xffffffe01c000000ull; sb2 += 0x4000) { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
             for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb2 + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
