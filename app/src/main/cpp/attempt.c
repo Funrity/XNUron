@@ -1234,6 +1234,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     strcpy((char *)b + 108, rd_on ? "-v rd=md0 cpus=1" : "-v cpus=1");
     LOG("[boot] boot_args.CommandLine (offset 108) = \"%s\"\n", (const char *)b + 108);
     a64m_mark_attempt(m, mo.lowest_vm, kphys);
+    a64m_set_store_watch2(m, 0, kphys + (0xfffffff00912e490ull + 8 - mo.lowest_vm), 8);   /* 0.4.376 diagnostic: md device 0 table entry (size, flags): who sets mdInited and who clears it */
     a64m_set_pc(m, entry_p); a64m_set_boot_arg(m, ba);
     if (dt_virt) { a64m_set_dt_phys(m, dtp); /* 0.4.14: code/caller/refs/data windows dropped (the log is cut at 20000 characters; they are known now) */   /* 0.4.13: first_avail reaches avail_end BEFORE pmap_startup (0x7b53ed0): the loop that consumes every page stores from pc 0x7b53e50 inside this function */   /* 0.3.41 panic: "Invalid waitq" - the function that panicked (return address 0x7ab26ec) */
         /* 0.4.14: caller/refs/data windows dropped (the log is cut at 20000 characters) */
