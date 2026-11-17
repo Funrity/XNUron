@@ -998,7 +998,7 @@ static int exec(A64 *c, uint32_t i, uint64_t *next) {
                 c->daif = (s >> 6) & 0xF;
                 c->pan = (s >> 22) & 1;
                 c->excl_valid = false;
-                if (el == 0 && c->svc_pend) { c->svl_ret[(c->svc_pend - 1) & 63] = c->x[0]; c->svc_pend = 0; }   /* 0.4.384 diagnostic: x0 at the return to user mode after an SVC */
+                if (el == 0 && c->svc_pend) { c->svl_ret[(c->svc_pend - 1) & 63] = c->x[0]; { uint64_t av = 0; c->svl_aux[(c->svc_pend - 1) & 63] = peek64(c, c->svl_x1[(c->svc_pend - 1) & 63], &av) ? av : 0xdeadull; } c->svc_pend = 0; }   /* 0.4.384 diagnostic: x0 at the return to user mode after an SVC */
                 *next = c->elr_el1;
                 return 0;
             }
