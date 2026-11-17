@@ -62,6 +62,18 @@ int main(void) {
     rc = a64_run(&c, 100);
     CHECK(rc == 0 && c.x[10] == 0 && c.x[11] == 5 && c.hk_n == 0, "no hook set: memory untouched");
 
+    /* 6. 0.4.378 MODELLED redirect: the instruction at jmp_pc is skipped and execution continues at jmp_to */
+    memset(&a, 0, sizeof a);
+    a_movz(&a, 0, 1); a_movz(&a, 0, 2); a_movz(&a, 0, 3); a_movz(&a, 1, 7); a_movz(&a, 8, 93); a_svc(&a, 0); a_finish(&a);
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.jmp_pc = 0x1004; c.jmp_to = 0x100c;
+    rc = a64_run(&c, 100);
+    CHECK(rc == 0 && c.x[0] == 1 && c.x[1] == 7 && c.jmp_n == 1, "redirect skips the instructions between jmp_pc and jmp_to");
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000;
+    rc = a64_run(&c, 100);
+    CHECK(rc == 0 && c.x[0] == 3 && c.jmp_n == 0, "no redirect set: program runs straight through");
+
     printf(fails ? "\n%d FAILED\n" : "\nALL PASSED\n", fails);
     return fails != 0;
 }

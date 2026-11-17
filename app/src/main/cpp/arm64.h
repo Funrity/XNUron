@@ -110,6 +110,7 @@ typedef struct {
     uint64_t cap_pc, cap_x[4], cap_hist[A64_PC_HIST]; unsigned cap_n;
     uint64_t ret_pc[512], ret_x0[512], ret_snap_pc[512], ret_snap_x0[512]; unsigned ret_i;   /* 0.4.360 diagnostic: ring of (pc of RET, x0); snapshot at cap_pc */   /* 0.4.357 diagnostic: x0..x3 at the first execution of pc==cap_pc */
     uint64_t e6_pc, e6_lr, e6_x0, e6_hist[64], e6_reg[31]; unsigned e6_n, e6_arm;   /* 0.4.369: first execution of pc==e6_pc with x1==6 */
+    uint64_t jmp_pc, jmp_to; unsigned jmp_n;   /* 0.4.378 MODELLED redirect: when pc==jmp_pc the instruction is NOT executed and execution continues at jmp_to */
     uint64_t hk_pc; unsigned hk_n;   /* 0.4.354 MODELLED hook: when pc==hk_pc, store byte [x19+0x10b]=1 and [x19+0x10c]=0 (see attempt.c; used for the missing SEP key store answer) */
     uint64_t wpc[4], wtg[4], wx0[4], wx1[4]; unsigned wn[4];   /* 0.4.306 diagnostic: for an indirect call at pc==wpc[i] remember the last target (low 36 bits) and the number of executions */
     uint8_t *cov, *callseen; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
