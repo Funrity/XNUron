@@ -1198,6 +1198,7 @@ static int step(A64 *c) {
     }
     uint32_t i; memcpy(&i, p, 4);
     c->pc_hist[c->pc_hist_i++ % A64_PC_HIST] = pc;
+    if (__builtin_expect(c->e6_pc != 0, 0) && pc == c->e6_pc && c->x[1] == 6 && !c->e6_n) { c->e6_n = 1; c->e6_lr = c->x[30]; c->e6_x0 = c->x[0]; for (unsigned hi = 0; hi < 64; hi++) c->e6_hist[hi] = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 64 + hi) % A64_PC_HIST]; }
     if (__builtin_expect(c->cap_pc != 0, 0) && pc == c->cap_pc && !c->cap_n) { c->cap_n = 1; for (int ci = 0; ci < 4; ci++) c->cap_x[ci] = c->x[ci]; for (unsigned hi = 0; hi < 512; hi++) { c->ret_snap_pc[hi] = c->ret_pc[(c->ret_i + hi) & 511]; c->ret_snap_x0[hi] = c->ret_x0[(c->ret_i + hi) & 511]; } for (unsigned hi = 0; hi < A64_PC_HIST; hi++) c->cap_hist[hi] = c->pc_hist[(c->pc_hist_i + hi) % A64_PC_HIST]; }
     if (__builtin_expect(c->hk_pc != 0, 0) && pc == c->hk_pc && c->x[19] >= 0x1000) { c->hk_n++; (void)st(c, c->x[19] + 0x10b, 1, 1); (void)st(c, c->x[19] + 0x10c, 1, 0); }   /* 0.4.354 MODELLED hook */
     if (c->cov) {
