@@ -355,6 +355,14 @@ int main(int argc, char **argv) {
             fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
           fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; }
       }
+      { /* 0.4.393 diagnostic: find the kernel's vm_map entries of the user processes by their (start,end) qword pair and print the map (entry = {prev,next,start,end,...}) */
+        static const uint64_t pats[2][2] = { { 0x105aa8000ull, 0x105ad8000ull }, { 0x102698000ull, 0x10269c000ull } };
+        for (int pi = 0; pi < 2; pi++) { int hits = 0; for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 3; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
+            for (uint32_t o = 16; o + 16 <= 0x100000 && hits < 3; o += 8) { uint64_t w0, w1; memcpy(&w0, q + o, 8); if (w0 != pats[pi][0]) continue; memcpy(&w1, q + o + 8, 8); if (w1 != pats[pi][1]) continue; uint64_t prv, nxt; memcpy(&prv, q + o - 16, 8); memcpy(&nxt, q + o - 8, 8); if ((prv >> 36) != 0xffffffeull && (prv >> 36) != 0xfffffffull) continue; if ((nxt >> 36) != 0xffffffeull && (nxt >> 36) != 0xfffffffull) continue;
+              hits++; fprintf(stderr, "[vmmap] pattern %d found at phys %llx (entry links prev=%llx next=%llx); walking back to the head and forward:\n[vmmap]", pi, (unsigned long long)(pa + o - 16), (unsigned long long)prv, (unsigned long long)nxt);
+              uint64_t cur = prv; int steps = 0; uint64_t first = 0; while (steps++ < 400) { uint64_t pq; uint8_t *qq; if (a64_virt_to_phys(c, cur, &pq) || !(qq = a64m_ram_at(m, pq, 32))) break; uint64_t l[4]; memcpy(l, qq, 32); first = cur; if (l[0] == cur || l[0] < 0xffffffe000000000ull) break; cur = l[0]; if (steps > 380) break; }
+              uint64_t e = first; for (int st = 0; st < 400; st++) { uint64_t pq; uint8_t *qq; if (a64_virt_to_phys(c, e, &pq) || !(qq = a64m_ram_at(m, pq, 32))) break; uint64_t l[4]; memcpy(l, qq, 32); fprintf(stderr, " [%llx-%llx]", (unsigned long long)l[2], (unsigned long long)l[3]); e = l[1]; if (e == first) break; }
+              fprintf(stderr, "\n"); } } } }
       { /* 0.4.381: syscalls (SVC) and aborts from user mode (EL0) */
         fprintf(stderr, "[el0] SVC count %u; first syscall numbers (x16@pc):", c->svc_n); for (unsigned q = 0; q < c->svc_n && q < 96; q++) fprintf(stderr, " %d@%llx", (int)c->svc_nr[q], (unsigned long long)(c->svc_pc[q] & 0xfffffffffull)); fprintf(stderr, "\n");
         if (c->el0r.ok || c->el0l_n) { fprintf(stderr, "[el0r] regs at the last EL0 abort:"); for (int q = 0; q < 31; q++) fprintf(stderr, " x%d=%llx", q, (unsigned long long)c->el0r.x[q]); fprintf(stderr, "\n[el0r] code at %llx (%s):", (unsigned long long)c->el0r.codeva, c->el0r.ok ? "readable" : "NOT readable"); for (int q = 0; q < 8; q++) fprintf(stderr, " %016llx", (unsigned long long)c->el0r.code[q]); fprintf(stderr, "\n"); }
