@@ -1005,17 +1005,17 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         seenh[cnt] = h; cnt++; nn += (size_t)snprintf(nl + nn, sizeof nl - nn, " %zx:%.*s |", b, (int)(e - b), (const char *)kern + b); o = e; }
       LOG("%s (%d)\n", nl, cnt); }
     { /* 0.4.411 diagnostic (changes nothing): where does the kernel call IOService::publishResource? Find the string "_publishIOResource: " (AppleCredentialManager), its ADRP+ADD xrefs, and dump the code around the first two (0x1c0 bytes before .. 0x200 after) so the bl to publishResource can be identified offline. */
-      static const char key[] = "AppleUSBRestrictedModeTimeout"; uint64_t saddr = 0;
+      static const char key[] = "Found (ANS2) provider, returning score"; uint64_t saddr = 0;
       for (size_t o = 0; o + sizeof key < klen && !saddr; o++) if (!memcmp(kern + o, key, sizeof key - 1)) for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (mo.slice_off + g->fileoff <= o && o < mo.slice_off + g->fileoff + g->filesize) { saddr = g->vmaddr + (o - mo.slice_off - g->fileoff); break; } }
-      LOG("[boot] diagnostic (changes nothing): string 'AppleUSBRestrictedModeTimeout' at virtual 0x%llx (0.4.411)\n", (unsigned long long)saddr);
+      LOG("[boot] diagnostic (changes nothing): string 'Found (ANS2) provider, returning score' at virtual 0x%llx (0.4.411)\n", (unsigned long long)saddr);
       int nx = 0;
       for (int q = 0; q < mo.nseg && saddr && nx < 2; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize && nx < 2; o += 4) { uint64_t pc = g->vmaddr + o; uint32_t w1, w2; memcpy(&w1, kern + mo.slice_off + g->fileoff + o, 4); memcpy(&w2, kern + mo.slice_off + g->fileoff + o + 4, 4);
           if ((w1 & 0x9f000000u) != 0x90000000u || (w2 & 0xffc00000u) != 0x91000000u || (w1 & 31) != ((w2 >> 5) & 31)) continue;
           int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
-          uint64_t tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff); if (tgt < saddr || tgt >= saddr + 20) continue;
-          nx++; LOG("[boot] diagnostic (changes nothing): xref #%d of 'AppleUSBRestrictedModeTimeout' at pc 0x%llx\n", nx, (unsigned long long)pc);
-          for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x400; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
+          uint64_t tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff); if (tgt + 64 < saddr || tgt > saddr) continue;
+          nx++; LOG("[boot] diagnostic (changes nothing): xref #%d of 'Found (ANS2) provider...' at pc 0x%llx\n", nx, (unsigned long long)pc);
+          for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x80; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
             if (a2 >= g->vmaddr && a2 + 0x80 <= g->vmaddr + g->filesize) { for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a2 - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } LOG("%s\n", dl); } } } } }
     { /* 0.4.410 diagnostic (changes nothing): all printable strings (>=3 chars) in two kernelcache windows around the NVRAM controller class names (offsets from 0.4.408): which names does AppleARMCHRPNVRAM / IONVRAMController sit next to? */
       static const size_t win[2][2] = { { 0x4d2080, 0x4d2300 }, { 0x4cfe00, 0x4d0000 } }; char wl[3500]; size_t wn = 0;
