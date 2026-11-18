@@ -1004,6 +1004,7 @@ static int exec(A64 *c, uint32_t i, uint64_t *next) {
                 c->daif = (s >> 6) & 0xF;
                 c->pan = (s >> 22) & 1;
                 c->excl_valid = false;
+                if (el == 0 && c->ex_seen && c->tpidr_el1 == c->ex_thr) { memcpy(c->ex_sr, c->ex_rt, sizeof c->ex_sr); c->ex_sri = c->ex_ri; c->ex_sret = c->elr_el1; c->ex_sx0 = c->x[0]; c->ex_sn++; }   /* 0.4.405: ring of the last return to EL0 */
                 if (el == 0 && c->svc_pend) { c->svl_ret[(c->svc_pend - 1) & 4095] = c->x[0]; { uint64_t av = 0; c->svl_aux[(c->svc_pend - 1) & 4095] = peek64(c, c->svl_x1[(c->svc_pend - 1) & 4095], &av) ? av : 0xdeadull; } c->svc_pend = 0; }   /* 0.4.384 diagnostic: x0 at the return to user mode after an SVC */
                 *next = c->elr_el1;
                 return 0;

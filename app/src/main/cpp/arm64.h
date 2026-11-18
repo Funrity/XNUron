@@ -114,7 +114,7 @@ typedef struct {
     uint64_t jmp_pc, jmp_to; unsigned jmp_n;   /* 0.4.378 MODELLED redirect: when pc==jmp_pc the instruction is NOT executed and execution continues at jmp_to */
     uint64_t hk_pc; unsigned hk_n;   /* 0.4.354 MODELLED hook: when pc==hk_pc, store byte [x19+0x10b]=1 and [x19+0x10c]=0 (see attempt.c; used for the missing SEP key store answer) */
     uint64_t wpc[4], wtg[4], wx0[4], wx1[4]; unsigned wn[4];   /* 0.4.306 diagnostic: for an indirect call at pc==wpc[i] remember the last target (low 36 bits) and the number of executions */
-    uint8_t *cov, *callseen, *ex_seen; uint64_t ex_list[1500], ex_far, ex_thr, ex_rs[256], ex_rt[256]; unsigned ex_n, ex_ri; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
+    uint8_t *cov, *callseen, *ex_seen; uint64_t ex_list[1500], ex_far, ex_thr, ex_rs[256], ex_rt[256], ex_sr[256], ex_sret, ex_sx0, ex_sn; unsigned ex_sri; unsigned ex_n, ex_ri; uint64_t cov_base, cov_len; uint64_t callring[160]; unsigned call_total;   /* diagnostic: 1 bit per executed instruction word in [cov_base, cov_base+cov_len) */
     uint64_t tr_pc; unsigned tr_n; int tr_on; uint64_t tr_pcs[400];   /* diagnostic: the 400 pcs executed from the first execution of tr_pc on */
     uint64_t ctr_pc; int ctr_mode; unsigned ctr_total; unsigned ctr_n; uint64_t ctr[40][8];
     uint64_t nw_pc[96]; unsigned nw_n; uint64_t nw_step[96], nw_x0[96], nw_x1[96], nw_lr[96];   /* 0.4.171 diagnostic: ring of the most recently FIRST-executed instructions (the frontier of new code) */
