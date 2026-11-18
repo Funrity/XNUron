@@ -2,6 +2,7 @@
 #include "arm64.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define M32 0xFFFFFFFFull
 
