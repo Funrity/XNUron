@@ -1031,7 +1031,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     if (g_xref[0] && g_xref[2]) { /* 0.4.128: strings referenced (ADRP+ADD) by that window, in address order: which DT properties / boot-args does the root selection read? */
-      static const uint64_t sw[4] = { 0xfffffff008d24000ull, 0xfffffff008d25000ull, 0xfffffff008d26000ull, 0xfffffff008cbf000ull }; uint64_t lo = sw[0], hi = sw[0] + 0x1000; char sl[4000]; size_t sn = 0; int nsr = 0;
+      static const uint64_t sw[4] = { 0xfffffff008ca0000ull, 0xfffffff008d24000ull, 0xfffffff008d25000ull, 0xfffffff008d26000ull }; uint64_t lo = sw[0], hi = sw[0] + 0x1000; char sl[12000]; size_t sn = 0; int nsr = 0;
       sn += (size_t)snprintf(sl, sizeof sl, "[boot] diagnostic (changes nothing): strings referenced (0.4.154) by 0x%llx / 0x%llx / 0x%llx / 0x%llx (+0x200 each, @=low address bits of the referencing code):", (unsigned long long)sw[0], (unsigned long long)sw[1], (unsigned long long)sw[2], (unsigned long long)sw[3]); (void)lo; (void)hi;
       for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize; o += 4) { uint64_t pc = g->vmaddr + o; { int inw = 0; for (int wq = 0; wq < 4; wq++) if (pc >= sw[wq] && pc < sw[wq] + 0x1000) inw = 1; if (!inw) continue; }
