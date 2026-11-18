@@ -1015,7 +1015,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           int64_t imm = (int64_t)((((w1 >> 5) & 0x7ffffu) << 2) | ((w1 >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000;
           uint64_t tgt = ((pc & ~0xfffull) + (uint64_t)(imm << 12)) + ((w2 >> 10) & 0xfff); if (tgt < saddr || tgt >= saddr + 20) continue;
           nx++; LOG("[boot] diagnostic (changes nothing): xref #%d of 'AppleUSBRestrictedModeTimeout' at pc 0x%llx\n", nx, (unsigned long long)pc);
-          for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x200; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
+          for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x400; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
             if (a2 >= g->vmaddr && a2 + 0x80 <= g->vmaddr + g->filesize) { for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a2 - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } LOG("%s\n", dl); } } } } }
     { /* 0.4.410 diagnostic (changes nothing): all printable strings (>=3 chars) in two kernelcache windows around the NVRAM controller class names (offsets from 0.4.408): which names does AppleARMCHRPNVRAM / IONVRAMController sit next to? */
       static const size_t win[2][2] = { { 0x4d2080, 0x4d2300 }, { 0x4cfe00, 0x4d0000 } }; char wl[3500]; size_t wn = 0;
