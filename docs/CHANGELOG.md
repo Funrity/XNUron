@@ -1770,3 +1770,7 @@ CI падал не на коде эмулятора, а на тестовых с
 - Результат 0.4.420 (строки кода у probe, 0x8cbf000): здесь `AppleANS2NVMeController::start`, `WaitDeviceActive()`, `AppleEmbeddedNVMeNVRAM::sync()` — то есть это и есть драйвер NAND/NVRAM («IODeviceTree:/defaults» → «dual-spi-nand», «product-name» → «FastSim», «burnin-size», **«ANS2Endpoint1»**, поля fSlaveProcessor, fAKFIOPNub (IOP-nub RTBuddy), fARMIODevice, fBaseRegisterMap). Буфер строк был полон и дальше 0x8cbffe0 не показал.
 - Один из заблокированных потоков (стек …8ca0b50 → 8075e84 → 806cb60 → 7a5a3e0 → ожидание) — из блока кода 0x8ca0… того же расширения, вызывает ожидание службы (рядом с IOService::publishResource).
 - Диагностика: окна строк теперь 0x8ca0000, 0x8d24000, 0x8d25000, 0x8d26000, буфер увеличен до 12000 байт.
+
+## 0.4.422
+- Результат 0.4.421: заблокированный поток из 0x8ca0… — это `NVMeSEPNotifier::WaitForNVMe()`, он ждёт службу «AppleEmbeddedNVMeController» (потребитель, а не сам драйвер). Сам `AppleANS2NVMeController::start` пока не наблюдался (нет обращений к MMIO ans).
+- Диагностика `[cov-ans]`: какие инструкции в коде драйвера 0x8cbf000..0x8cc3000 реально выполнялись (по покрытию), — видно, доходит ли start() и где останавливается.
