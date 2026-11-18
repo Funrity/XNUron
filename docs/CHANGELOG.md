@@ -1714,3 +1714,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.407
 - ВАЖНЫЙ результат 0.4.406 (консоль пользовательского процесса): запущенный из RAM-диска PID 1 — это образ **восстановления (Restore ramdisk)**: `restored exited normally with status 1 - rebooting`, `CHECKPOINT NOTICE: NVRAM access is not currently available`, и бесконечно `waiting for matching IOKit service: {IOProviderClass = IOResources, IOResourceMatch = IONVRAM}`. То есть launchd и restored работают, но ждут сервис IONVRAM, которого в ядре нет.
 - MODELLED/PLACEHOLDER: в /chosen добавляется `nvram-proxy-data` — пустой (нулевой) образ 8 КиБ, как у ни разу не программированной NVRAM (iBoot передал бы настоящий образ устройства). Никакого содержимого не выдумываем. Цель — проверить, публикует ли ядро IONVRAM после этого.
+
+## 0.4.408
+- Результат 0.4.407: пустой `nvram-proxy-data` в /chosen сам по себе IONVRAM не публикует (консоль запущенного restored та же: «waiting for matching IOKit service … IONVRAM»). Свойство оставлено (безвредно, MODELLED/PLACEHOLDER).
+- Диагностика (ничего не меняет): печать строк ядра, содержащих «nvram» (классы/свойства), с файловыми смещениями — чтобы понять, какой драйвер должен опубликовать IONVRAM на этом ядре и чего ему не хватает.
