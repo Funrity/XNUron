@@ -994,6 +994,16 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         for (int q = 0; q < mo.nseg && !okd; q++) { const A64Seg *g = &mo.seg[q]; if (a >= g->vmaddr && a + 0x80 <= g->vmaddr + g->filesize && mo.slice_off + g->fileoff + (a - g->vmaddr) + 0x80 <= klen) { okd = 1;
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
+    { /* 0.4.408 diagnostic (changes nothing): printable strings of the kernelcache that contain 'nvram' (any case), distinct, with file offsets: which classes / properties does this kernel have for NVRAM? */
+      char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings containing 'nvram' (0.4.408, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
+      for (size_t o = 0; o + 5 < klen && cnt < 90 && nn < sizeof nl - 200; o++) {
+        if ((kern[o] | 32) != 'n' || (kern[o + 1] | 32) != 'v' || (kern[o + 2] | 32) != 'r' || (kern[o + 3] | 32) != 'a' || (kern[o + 4] | 32) != 'm') continue;
+        size_t b = o; while (b > 0 && o - b < 60 && kern[b - 1] >= 32 && kern[b - 1] < 127) b--;
+        size_t e = o; while (e < klen && e - o < 80 && kern[e] >= 32 && kern[e] < 127) e++;
+        if (e - b < 6) continue; uint64_t h = 1469598103934665603ull; for (size_t q = b; q < e; q++) h = (h ^ kern[q]) * 1099511628211ull;
+        int dup = 0; for (int q = 0; q < cnt && q < 512; q++) if (seenh[q] == h) { dup = 1; break; } if (dup) { o = e; continue; }
+        seenh[cnt] = h; cnt++; nn += (size_t)snprintf(nl + nn, sizeof nl - nn, " %zx:%.*s |", b, (int)(e - b), (const char *)kern + b); o = e; }
+      LOG("%s (%d)\n", nl, cnt); }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
       uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fc00ull;   /* 0.4.135: dump done; was hi=..fe80, 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
       static const uint64_t rg[4][2] = { { 0xfffffff007b84580ull, 0xfffffff007b84680ull }, { 0xfffffff007b859b0ull, 0xfffffff007b85ab0ull }, { 0xfffffff007b863a0ull, 0xfffffff007b86440ull }, { 0xfffffff007b83e60ull, 0xfffffff007b83f20ull } };   /* 0.4.172: the lck_mtx code where the newest never-before-executed instructions are (0.4.171 [new]) */ (void)lo; (void)hi;
