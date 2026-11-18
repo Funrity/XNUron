@@ -1758,3 +1758,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.418
 - Результат 0.4.417: трасса `[ans-trace]` ПУСТА — драйверы ANS/SART за 3 млрд шагов к своим регистрам не обращались (ни 'ans', ни 'sart-ans' среди 53 затронутых блоков, ни aop/sio/smc). Значит, пуск ASC для ANS не там, где «RTBuddy(ANS2): start»: драйвер NVMe-контроллера, видимо, ещё не дошёл до start() (заблокирован раньше). Свойства узла `ans`: interrupts (20 байт = 5 прерываний), nvme-interrupt-idx, nvme-coastguard, namespaces(96), iommu-parent, power-gates/clock-gates — их драйвер включает перед пуском.
 - Диагностика: вместо ключа «AppleUSBRestrictedModeTimeout» ищется ссылка на строку «Found (ANS2) provider, returning score» — адрес probe() AppleANS2NVMeController в ядре; по нему можно искать заблокированные потоки этого драйвера среди `[stk]`.
+
+## 0.4.419
+- Результат 0.4.418: строка «Found (ANS2) provider, returning score» в ядре не найдена (адрес 0) — формат, видимо, «Found (%s) provider, …». Теперь ищется «provider, returning score» (до 6 ссылок, окно 160 байт до начала строки), дамп по 0x80 байт у каждой ссылки.
