@@ -918,8 +918,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
      * global waitq with 0 free pages -> "Invalid waitq". A real iPhone XS has 4 GiB, so the guest gets more RAM: 768 MiB, then 640 MiB, then the minimum
      * if the host cannot give that much. RAM is lazily committed by the host (calloc), only touched pages cost memory. */
     A64Machine *sys = NULL;
-    { static const uint64_t want[2] = { 768ull << 20, 640ull << 20 };
-      for (int wi = 0; wi < 2 && !sys; wi++) if (want[wi] > ram) { sys = a64m_create_system_at(want[wi], A64M_IOS_RAM_BASE); if (sys) ram = want[wi]; }
+    { static const uint64_t want[5] = { 2048ull << 20, 1536ull << 20, 1024ull << 20, 768ull << 20, 640ull << 20 };   /* 0.4.396 ASSUMPTION: more guest RAM (a real XS has 4 GiB) because with 768 MiB the first user VM fault starves (see CHANGELOG) */
+      for (int wi = 0; wi < 5 && !sys; wi++) if (want[wi] > ram) { sys = a64m_create_system_at(want[wi], A64M_IOS_RAM_BASE); if (sys) ram = want[wi]; }
       if (!sys) sys = a64m_create_system_at(ram, A64M_IOS_RAM_BASE); }
     if (!sys) { free(kern); free(dt); return dead("out of memory for guest RAM", "step 6", m); }
     { char b[65536]; size_t off = 0, k; while ((k = a64m_log_read(log_only, off, b, sizeof b)) > 0) { for (size_t q = 0; q < k; q += 400) { char t[401]; size_t c = k - q < 400 ? k - q : 400; memcpy(t, b + q, c); t[c] = 0; a64m_log(sys, "%s", t); } off += k; } }
