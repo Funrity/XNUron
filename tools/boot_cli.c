@@ -238,6 +238,7 @@ int main(int argc, char **argv) {
       }
       { /* 0.4.320 diagnostic: kernel stacks of BLOCKED threads. Scan 16 KiB-aligned stacks in 0xffffffe01a000000..0xffffffe01c000000 for the longest frame-pointer chain (fp,lr pairs, lr in kernel text after stripping PAC) and print its return addresses (low 36 bits). A blocked thread's live frames are the tail of the chain; dead frames below them may be shown first. */
         A64 *c7 = a64m_cpu(m); int shown = 0; static uint64_t ul[600]; int nul = 0;
+        static uint64_t th[0x300 / 8 * 2]; int thok = 0; { uint64_t tv = c7->el0r.tp1; thok = tv != 0; for (uint64_t o = 0; o < 0x600 && thok; o += 8) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c7, tv + o, &pa) || !(q = a64m_ram_at(m, pa, 8))) { thok = 0; break; } memcpy(&th[o / 8], q, 8); } }   /* 0.4.400: the thread of the last EL0 abort: which kernel stack does its struct point to? */
         for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe040000000ull && shown < 90; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
@@ -246,7 +247,8 @@ int main(int argc, char **argv) {
             while (d < 40) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); uint64_t l36 = lr & 0xfffffffffull; if (l36 < 0x007000000ull || l36 > 0x00a800000ull) break; d++;
               if (fp == 0) break; uint64_t nx = fp - sb; if (fp < sb || nx >= 0x4000 || (nx & 15) || nx <= cur) break; cur = nx; }
             if (d > best) { best = d; bestA = A; } }
-          if (best >= 3) { shown++; fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
+          if (best >= 3) { shown++; { int mine = 0; if (thok) for (int u = 0; u < 0x600 / 8; u++) if (th[u] >= sb && th[u] < sb + 0x4000) mine = 1; if (mine) fprintf(stderr, "[stk-last-el0-thread] "); }
+          fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
         { /* 0.4.368 diagnostic: [e6] scan found no direct stores of 6 into [bp+84]. Find (1) 'str w1,[x0,#84]' (buf_seterror-like setter) and (2) 'mov w1,#6' followed within 3 instructions by a BL whose target contains such a str within 0x30 bytes of its start */
