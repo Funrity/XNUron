@@ -1118,6 +1118,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           if (!shown) LOG("[boot] diagnostic (0.4.195): no /arm-io node with 'sep' or 'mailbox' in name or compatible\n");
           char sl[2400]; int64_t spl = -1; int sr = a64_dt_node_info(dt, dtlen, "sep", "nonexistent-prop", &spl, sl, sizeof sl);
           LOG("[boot] diagnostic (0.4.195): node 'sep' lookup %d: %s\n", sr, sr >= 0 ? sl : "");
+          { char il[5000]; size_t in = (size_t)snprintf(il, sizeof il, "[boot] diagnostic (changes nothing, 0.4.416): DeviceTree nodes with compatible 'iop'/'ascwrap'/'sart'/'ans'/'nvme' or name 'ans*'/'sart*'/'nvme*' (name compat @physical+size):");
+            for (int z = 0; z < na2 && in < sizeof il - 200; z++) if (strstr(all2[z].compat, "iop") || strstr(all2[z].compat, "ascwrap") || strstr(all2[z].compat, "sart") || strstr(all2[z].compat, "ans") || strstr(all2[z].compat, "nvme") || !strncmp(all2[z].name, "ans", 3) || !strncmp(all2[z].name, "sart", 4) || !strncmp(all2[z].name, "nvme", 4)) in += (size_t)snprintf(il + in, sizeof il - in, " | %s %s @0x%llx+0x%llx", all2[z].name, all2[z].compat, (unsigned long long)all2[z].pa, (unsigned long long)all2[z].size);
+            LOG("%s\n", il); }
           for (int z = 0; z < na2; z++) if (!strcmp(all2[z].name, "pmp")) LOG("[boot] diagnostic (0.4.208): DT node 'pmp' compatible '%s' physical 0x%llx size 0x%llx\n", all2[z].compat, (unsigned long long)all2[z].pa, (unsigned long long)all2[z].size);
           { static const char *nn[2] = {"pmp", "pmgr"}; for (int z = 0; z < 2; z++) { static char pl[6000]; int64_t ppl = -1; int pr = a64_dt_node_info(dt, dtlen, nn[z], "nonexistent-prop", &ppl, pl, sizeof pl);
               LOG("[boot] diagnostic (0.4.206): node '%s' lookup %d: %s\n", nn[z], pr, pr >= 0 ? pl : ""); } }
