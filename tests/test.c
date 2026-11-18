@@ -74,6 +74,14 @@ int main(void) {
     rc = a64_run(&c, 100);
     CHECK(rc == 0 && c.x[0] == 3 && c.jmp_n == 0, "no redirect set: program runs straight through");
 
+    /* 7. 0.4.414 MODELLED one-shot call: at ch_pc the emulator calls ch_target with x1/x2, which returns to ch_pc; ch_pc then runs normally (once) */
+    memset(&a, 0, sizeof a);
+    a_movz(&a, 5, 1); a_movz(&a, 6, 2); a_movz(&a, 8, 93); a_svc(&a, 0); a_finish(&a);
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
+    memcpy(mem + 0x1000, a.w, a.n * 4); { uint32_t sub[3] = { 0xAA0103E7u, 0xAA0203E9u, 0xD65F03C0u }; memcpy(mem + 0x1100, sub, sizeof sub); }
+    c.pc = 0x1000; c.ch_pc = 0x1004; c.ch_target = 0x1100; c.ch_x1 = 0x55; c.ch_x2 = 0x66;
+    rc = a64_run(&c, 100);
+    CHECK(rc == 0 && c.x[5] == 1 && c.x[6] == 2 && c.x[7] == 0x55 && c.x[9] == 0x66 && c.ch_n == 1, "one-shot call passes x1/x2, returns to ch_pc and runs it once");
     printf(fails ? "\n%d FAILED\n" : "\nALL PASSED\n", fails);
     return fails != 0;
 }
