@@ -1004,6 +1004,12 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         int dup = 0; for (int q = 0; q < cnt && q < 512; q++) if (seenh[q] == h) { dup = 1; break; } if (dup) { o = e; continue; }
         seenh[cnt] = h; cnt++; nn += (size_t)snprintf(nl + nn, sizeof nl - nn, " %zx:%.*s |", b, (int)(e - b), (const char *)kern + b); o = e; }
       LOG("%s (%d)\n", nl, cnt); }
+    { /* 0.4.410 diagnostic (changes nothing): all printable strings (>=3 chars) in two kernelcache windows around the NVRAM controller class names (offsets from 0.4.408): which names does AppleARMCHRPNVRAM / IONVRAMController sit next to? */
+      static const size_t win[2][2] = { { 0x4d2080, 0x4d2300 }, { 0x4cfe00, 0x4d0000 } }; char wl[3500]; size_t wn = 0;
+      for (int wi = 0; wi < 2; wi++) { wn += (size_t)snprintf(wl + wn, sizeof wl - wn, "[boot] diagnostic (changes nothing): kernelcache strings in file window 0x%zx..0x%zx (0.4.410):", win[wi][0], win[wi][1]);
+        for (size_t o = win[wi][0]; o < win[wi][1] && o < klen && wn < sizeof wl - 150;) { size_t e = o; while (e < klen && e < win[wi][1] && kern[e] >= 32 && kern[e] < 127) e++; if (e - o >= 3) { wn += (size_t)snprintf(wl + wn, sizeof wl - wn, " %.*s |", (int)(e - o), (const char *)kern + o); o = e; } else o++; }
+        wn += (size_t)snprintf(wl + wn, sizeof wl - wn, "\n"); }
+      LOG("%s", wl); }
     if (g_xref[0] && g_xref[2]) { /* 0.4.127: the code between/around the two references, straight from the kernel image (the run no longer stops, so no stop-report dump) */
       uint64_t hi0 = (g_xref[0] > g_xref[2] ? g_xref[0] : g_xref[2]) + 0x1c0, lo = 0xfffffff00863fc00ull, hi = 0xfffffff00863fc00ull;   /* 0.4.135: dump done; was hi=..fe80, 0.4.134: spin loop 0x863fe1c..0x863fe30 (headless [cpu] state after the root mount), caller lr 0x863fc90 */ (void)hi0;   /* 0.4.129: the part after the 0.4.127 window (0x80e9fac..) */
       static const uint64_t rg[4][2] = { { 0xfffffff007b84580ull, 0xfffffff007b84680ull }, { 0xfffffff007b859b0ull, 0xfffffff007b85ab0ull }, { 0xfffffff007b863a0ull, 0xfffffff007b86440ull }, { 0xfffffff007b83e60ull, 0xfffffff007b83f20ull } };   /* 0.4.172: the lck_mtx code where the newest never-before-executed instructions are (0.4.171 [new]) */ (void)lo; (void)hi;
