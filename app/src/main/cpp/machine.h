@@ -77,6 +77,7 @@ int a64m_unknown_ts_window(A64Machine *m, uint64_t block_pa, uint64_t base_off);
 int a64m_unknown_ts_read(A64Machine *m, uint64_t block_pa, uint64_t off, uint64_t val);   /* 0.4.150 MODELLED fixed read of a sensor register */
 const char *a64m_tempsensor_trace(void);
 const char *a64m_i2c_trace(void);
+const char *a64m_ans_trace(void);   /* 0.4.417 */
 int a64m_unknown_rw(A64Machine *m, uint64_t pa, int w, uint64_t off, uint64_t v, uint64_t *rv);   /* 0.4.218, for tests */   /* 0.4.217 diagnostic */   /* 0.4.147 diagnostic: first accesses to the temperature sensor windows */
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val);   /* MODELLED fixed read value at an offset of an unknown block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */

@@ -130,6 +130,10 @@ const char *a64m_tempsensor_trace(void) { static char b[2600]; size_t l = 0; b[0
 static struct { char w, lab[12]; uint64_t off, v; } g_i2r[300]; static unsigned g_i2n;
 static void i2_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { if (!strstr(d->label, "aes")) return; unsigned i = g_i2n++ % 300; g_i2r[i].w = (char)(w ? 'w' : 'r'); snprintf(g_i2r[i].lab, sizeof g_i2r[i].lab, "%.10s", d->label + 1); g_i2r[i].off = off; g_i2r[i].v = v; }
 const char *a64m_i2c_trace(void) { static char b[13000]; size_t l = 0; b[0] = 0; unsigned n = g_i2n < 300 ? g_i2n : 300, st = g_i2n < 300 ? 0 : g_i2n % 300; for (unsigned k = 0; k < n && l < sizeof b - 50; k++) { unsigned i = (st + k) % 300; l += (size_t)snprintf(b + l, sizeof b - l, " %s:%c+0x%llx=0x%llx", g_i2r[i].lab, g_i2r[i].w, (unsigned long long)g_i2r[i].off, (unsigned long long)g_i2r[i].v); } return b; }
+/* 0.4.417 diagnostic: trace of the accesses to the ANS2 / sart-ans blocks (the NAND/NVMe coprocessor path): first 700 distinct consecutive accesses with PC; identical repeats (polling) are counted, not stored */
+static struct { char w; uint64_t pa, off, v, pc; unsigned rep; } g_an[700]; static unsigned g_ann;
+static void an_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { if (!strstr(d->label, "ans")) return; if (g_ann && g_an[g_ann - 1].w == (char)w && g_an[g_ann - 1].pa == d->pa && g_an[g_ann - 1].off == off && g_an[g_ann - 1].v == v) { g_an[g_ann - 1].rep++; return; } if (g_ann >= 700) return; g_an[g_ann].w = (char)(w ? 'w' : 'r'); g_an[g_ann].pa = d->pa; g_an[g_ann].off = off; g_an[g_ann].v = v; g_an[g_ann].pc = d->m->cpu.pc; g_an[g_ann].rep = 0; g_ann++; }
+const char *a64m_ans_trace(void) { static char b[60000]; size_t l = 0; b[0] = 0; for (unsigned k = 0; k < g_ann && l < sizeof b - 90; k++) { l += (size_t)snprintf(b + l, sizeof b - l, " %c%llx+%llx=%llx@%llx", g_an[k].w, (unsigned long long)g_an[k].pa, (unsigned long long)g_an[k].off, (unsigned long long)g_an[k].v, (unsigned long long)g_an[k].pc & 0xfffffffffull); if (g_an[k].rep) l += (size_t)snprintf(b + l, sizeof b - l, "x%u", g_an[k].rep + 1); } return b; }
 static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
@@ -146,12 +150,12 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     if (!fixed && d->ps) for (int k = 0; k < d->ps_n; k++) if (d->ps_off[k] == off) { uint32_t w = d->ps_val[k]; val = (w & ~0xf0u) | ((w & 0xfu) << 4); fixed = 3; }   /* 0.4.110 power-state mirror, see a64m_unknown_set_psmirror */
     if (d->n < d->cap && d->n < 8) { size_t l = strlen(d->ac); d->n++; if (l < sizeof d->ac - 40) snprintf(d->ac + l, sizeof d->ac - l, " r+0x%llx=0x%llx", (unsigned long long)off, (unsigned long long)val); }   /* 0.4.71: first accesses are kept for the stop report instead of one log line each */
     if (d->ts_n) ts_trace(d, 0, off, val);
-    i2_trace(d, 0, off, val);
+    i2_trace(d, 0, off, val); an_trace(d, 0, off, val);
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
-    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v);
+    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v); an_trace(d, 1, off, v);
     if (d->is_aic && !(off >= 0x3000 && off < 0x4000 && !v)) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; aic_update(d); }
     if (d->is_spmi && off >= 0x720 && off < 0x740) d->sp_en[(off - 0x720) >> 2] = (uint32_t)v;
