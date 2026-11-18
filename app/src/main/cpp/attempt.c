@@ -995,9 +995,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     { /* 0.4.408 diagnostic (changes nothing): printable strings of the kernelcache that contain 'nvram' (any case), distinct, with file offsets: which classes / properties does this kernel have for NVRAM? */
-      char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings containing 'nvram' (0.4.408, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
-      for (size_t o = 0; o + 5 < klen && cnt < 90 && nn < sizeof nl - 200; o++) {
-        if ((kern[o] | 32) != 'n' || (kern[o + 1] | 32) != 'v' || (kern[o + 2] | 32) != 'r' || (kern[o + 3] | 32) != 'a' || (kern[o + 4] | 32) != 'm') continue;
+      char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings containing 'ndpoi' = endpoint (0.4.426, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
+      for (size_t o = 0; o + 5 < klen && cnt < 120 && nn < sizeof nl - 200; o++) {
+        if ((kern[o] | 32) != 'n' || (kern[o + 1] | 32) != 'd' || (kern[o + 2] | 32) != 'p' || (kern[o + 3] | 32) != 'o' || (kern[o + 4] | 32) != 'i') continue;   /* 0.4.426: 'ndpoi' (endpoint) instead of 'nvram' */
         size_t b = o; while (b > 0 && o - b < 60 && kern[b - 1] >= 32 && kern[b - 1] < 127) b--;
         size_t e = o; while (e < klen && e - o < 80 && kern[e] >= 32 && kern[e] < 127) e++;
         if (e - b < 6) continue; uint64_t h = 1469598103934665603ull; for (size_t q = b; q < e; q++) h = (h ^ kern[q]) * 1099511628211ull;
