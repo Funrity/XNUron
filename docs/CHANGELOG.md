@@ -1725,3 +1725,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.410
 - Результат 0.4.409 (строки ядра с «nvram»): в ядре есть `IODTNVRAM`, `IONVRAMController`, `nvram-proxy-data`, `AppleARMCHRPNVRAM`, а также `IONVMeFamily` («nvme: Unable to create NVRAM device», «Set NVRAM NSID», «Failed to restore NVRAM shadow») и `AppleSEPARTStorage`/`AppleMobileApNonce`, которые сами ждут NVRAM. Вероятно, на A12 NVRAM лежит на NAND через контроллер ANS (NVMe) — аппаратуры, которой в эмуляторе нет; пустой proxy-образ (0.4.407) сервис не поднял.
 - Диагностика (ничего не меняет): печать строк рядом с именами контроллеров NVRAM (окна 0x4d2080–0x4d2300 и 0x4cfe00–0x4d0000), чтобы увидеть, по каким именам/свойствам их подбирает ядро.
+
+## 0.4.411
+- Решение пользователя: делаем MODELLED-заглушку публикации IOResource «IONVRAM» (настоящий источник — ANS2 NVMe + сопроцессор ANS с RTKit, которых у эмулятора нет; это будет честно помечено MODELLED и не считаться загрузкой).
+- Шаг 1 (диагностика, ничего не меняет): в ядре ищется строка `_publishIOResource: ` (AppleCredentialManager) и её ADRP+ADD-ссылки, выводится код вокруг них — оттуда видно, какой функцией ядро публикует IOResource (IOService::publishResource).
