@@ -250,6 +250,7 @@ int main(int argc, char **argv) {
           for (uint64_t o = 0; o < 0x300 && ook; o += 8) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c7, ow + o, &pa) || !(q = a64m_ram_at(m, pa, 8))) { ook = 0; break; } memcpy(&ot[o / 8], q, 8); }
           fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
         { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
+          fprintf(stderr, "[ionvram-standin] ch_pc=%llx fired=%u (MODELLED one-shot publishResource IONVRAM)\n", (unsigned long long)c7->ch_pc, c7->ch_n);
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
