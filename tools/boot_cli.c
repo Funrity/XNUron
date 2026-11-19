@@ -251,6 +251,7 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
         { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
+          fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
           for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15;
             fprintf(stderr, "[wait%u] x0=%llx x1=%llx lr=%llx:", k, (unsigned long long)c7->wp_x0[k], (unsigned long long)c7->wp_x1[k], (unsigned long long)c7->wp_lr[k] & 0xfffffffffull);
