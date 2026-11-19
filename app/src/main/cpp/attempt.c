@@ -621,6 +621,21 @@ static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, cons
     for (uint32_t i = 0; i < nc; i++) { if (dt_dump_node(d, n, pos, depth + 1, target, out, cap, len) < 0) return -1; }
     return 0;
 }
+/* 0.4.445 diagnostic: every node whose AAPL,phandle equals `want` (name + compatible + parent name) */
+static int dt_find_phandle(const uint8_t *d, size_t n, size_t *pos, int depth, const char *parent, uint32_t want, char *out, size_t cap, size_t *len) {
+    if (depth > 32 || *pos + 8 > n) return -1;
+    uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
+    char me[40] = "?", comp[48] = "?"; uint32_t ph = 0xffffffffu; size_t save = *pos;
+    for (uint32_t i = 0; i < np; i++) { if (*pos + 36 > n) return -1; uint32_t l; memcpy(&l, d + *pos + 32, 4); l &= 0x7FFFFFFFu;
+        if (!memcmp(d + *pos, "name\0", 5) && l < 39) { memcpy(me, d + *pos + 36, l); me[l] = 0; }
+        if (!memcmp(d + *pos, "compatible\0", 11) && l < 47) { memcpy(comp, d + *pos + 36, l); comp[l] = 0; }
+        if (!memcmp(d + *pos, "AAPL,phandle\0", 13) && l == 4) memcpy(&ph, d + *pos + 36, 4);
+        *pos += 36 + (((size_t)l + 3) & ~(size_t)3); }
+    (void)save;
+    if (ph == want && *len + 200 < cap) *len += (size_t)snprintf(out + *len, cap - *len, "[node '%s' compatible '%s' parent '%s'] ", me, comp, parent);
+    for (uint32_t i = 0; i < nc; i++) { if (dt_find_phandle(d, n, pos, depth + 1, me, want, out, cap, len) < 0) return -1; }
+    return 0;
+}
 static int dt_grep_walk(const uint8_t *d, size_t n, size_t *pos, int depth, const char *parent, DtGrep *g) {
     if (depth > 32 || *pos + 8 > n) return -1;
     uint32_t np, nc; memcpy(&np, d + *pos, 4); memcpy(&nc, d + *pos + 4, 4); *pos += 8;
@@ -1234,6 +1249,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           uint64_t base = ((uint64_t)hi << 32) | lo; char lb[24]; snprintf(lb, sizeof lb, "%s-private", cn);
           if (a64m_add_unknown_mmio_named(m, base, 0x40000, lb) == 0) { size_t l = strlen(pa); snprintf(pa + l, sizeof pa - l, " %s=0x%llx", cn, (unsigned long long)base); nc++; } else bad++; }
       LOG("[boot] MODELLED (ASSUMPTION 0.4.116): %d per-core debug blocks from the DT 'cpuN/reg-private' (%s) as unknown 0x40000-byte blocks (size NOT in the DT; 0.4.116 used 0x10000, the kernel then wrote base+0x20fb0; reads 0, writes ignored). Reason: the kernel wrote the CoreSight lock key 0xC5ACCE55 to 0x210010fb0 (headless log 0.4.115)%s\n", nc, pa, bad ? " (WARNING: some could not be added)" : ""); }
+    { static char pb[1500]; static const uint32_t pw[] = { 0x14, 0x16 };   /* 0.4.445 */
+      for (int k = 0; k < 2; k++) { size_t pp = 0, pl = 0; pb[0] = 0; dt_find_phandle(dt, dtlen, &pp, 0, "-", pw[k], pb, sizeof pb, &pl); LOG("[boot] diagnostic (changes nothing): DT nodes with AAPL,phandle=0x%x: %s\n", pw[k], pl ? pb : "(none found)"); } }
     { static char db[5000]; static const char *const tg[] = { "aic", "sio" };   /* 0.4.117: where is 0x210030000 described? */
       for (int ti = 0; ti < 2; ti++) { size_t dp = 0, dl = 0; db[0] = 0; dt_dump_node(dt, dtlen, &dp, 0, tg[ti], db, sizeof db, &dl); LOG("[boot] diagnostic (changes nothing): DeviceTree node '%s' properties (name(len)=first words): %s\n", tg[ti], db); } }
     { /* 0.4.135 (MODELLED, ASSUMPTION): headless [cpu] state 0.4.133 + decoded code 0.4.134: the kernel (_mccEnableCacheMode) spins forever on the memory controller (block 0x200000000): it writes the cache mode to +0x1c00 and polls +0x1c04 + 0x40000*k (k = 0..3) until bits 14:10 and 9:5 equal the mode. */
