@@ -81,6 +81,7 @@ const char *a64m_ans_trace(void);   /* 0.4.417 */
 int a64m_unknown_rw(A64Machine *m, uint64_t pa, int w, uint64_t off, uint64_t v, uint64_t *rv);   /* 0.4.218, for tests */   /* 0.4.217 diagnostic */   /* 0.4.147 diagnostic: first accesses to the temperature sensor windows */
 int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val);   /* MODELLED fixed read value at an offset of an unknown block */
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */
+const char *a64m_aic_info(A64Machine *m);   /* 0.4.435 */
 const char *a64m_aic_writes(A64Machine *m);   /* 0.4.235 diagnostic: distinct written AIC offsets: +off:count|OR-of-values */
 int a64m_aic_raise(A64Machine *m, unsigned irq);   /* 0.4.234 MODELLED minimal AIC: a device raises interrupt irq (pending until unmasked) */
 int a64m_unknown_summary(A64Machine *m, char *out, size_t cap);   /* touched blocks: name reads/writes last-offset */

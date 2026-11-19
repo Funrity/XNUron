@@ -438,6 +438,7 @@ int main(int argc, char **argv) {
               fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
+      fprintf(stderr, "[aic-info] %s\n", a64m_aic_info(m));
       fprintf(stderr, "[aicw] distinct AIC register writes (+offset:count|OR of values):%s\n", a64m_aic_writes(m));
       { /* 0.4.251 diagnostic: where does the kernel build "voltage-states%d" (the PMGR perf-domain frequency tables)? find the string, then every ADRP+ADD reference in the code range */
         A64 *c4 = a64m_cpu(m); uint64_t sva = 0, pa4; uint8_t *q8; static const char nd[] = "AppleARMCPU-AllCPU-Initialized";   /* 0.4.317: where is init_program_name used (bsd_utaskbootstrap/load_init_program)? are those executed (E)? */

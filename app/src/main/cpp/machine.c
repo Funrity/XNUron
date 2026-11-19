@@ -170,6 +170,7 @@ static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
 }
 static struct Unk *aic_of(A64Machine *m) { for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].is_aic) return &g_unk[k]; return NULL; }
 const char *a64m_aic_writes(A64Machine *m) { static char b[6000]; size_t l = 0; b[0] = 0; struct Unk *a = aic_of(m); if (!a) return b; for (int k = 0; k < a->aw_cnt && l < sizeof b - 40; k++) l += (size_t)snprintf(b + l, sizeof b - l, " +%x:%ux|%x", a->aw_off[k], a->aw_n[k], a->aw_or[k]); return b; }
+const char *a64m_aic_info(A64Machine *m) { static char b[400]; struct Unk *a = aic_of(m); if (!a) { snprintf(b, sizeof b, "no aic block"); return b; } snprintf(b, sizeof b, "reads=%u writes=%u last_off=0x%llx first accesses:%s", a->reads, a->writes, (unsigned long long)a->last_off, a->ac); return b; }   /* 0.4.435 diagnostic */
 int a64m_aic_raise(A64Machine *m, unsigned irq) { struct Unk *a = aic_of(m); if (!a || irq >= 512) return -1; a->aic_pend[irq >> 5] |= 1u << (irq & 31); aic_update(a); return 0; }   /* 0.4.234: a device raises interrupt `irq` */
 /* 0.4.53: blocks with a label (the DeviceTree node name) so the log says which one was touched; 0.4.58: up to 360, each with a log budget (`cap` accesses) */
 static int add_unknown(A64Machine *m, uint64_t pa, uint64_t size, const char *label, unsigned cap) {
