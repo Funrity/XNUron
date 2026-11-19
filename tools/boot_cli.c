@@ -252,6 +252,7 @@ int main(int argc, char **argv) {
         { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
           fprintf(stderr, "[ionvram-standin] ch_pc=%llx fired=%u (MODELLED one-shot publishResource IONVRAM)\n", (unsigned long long)c7->ch_pc, c7->ch_n);
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
+          for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
           for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15;
