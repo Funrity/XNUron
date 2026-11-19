@@ -249,6 +249,27 @@ int main(int argc, char **argv) {
           uint64_t ow = lw[0]; static uint64_t ot[0x300 / 8]; int ook = ow >= 0xffffffe000000000ull;
           for (uint64_t o = 0; o < 0x300 && ook; o += 8) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c7, ow + o, &pa) || !(q = a64m_ram_at(m, pa, 8))) { ook = 0; break; } memcpy(&ot[o / 8], q, 8); }
           fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
+        { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
+          fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
+          for (unsigned k = 0; k < c7->wp_n && k < 16; k++) {
+            fprintf(stderr, "[wait%u] x0=%llx x1=%llx lr=%llx:", k, (unsigned long long)c7->wp_x0[k], (unsigned long long)c7->wp_x1[k], (unsigned long long)c7->wp_lr[k] & 0xfffffffffull);
+            uint64_t root = c7->wp_x1[k]; uint64_t l1[8], l2[8], l3[8];
+            for (int i = 0; i < 8; i++) { l1[i] = 0; } { uint64_t pa; uint8_t *q; for (int i = 0; i < 8; i++) if (!a64_virt_to_phys(c7, root + 8 * (uint64_t)i, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&l1[i], q, 8); }
+            for (int i = 1; i < 8; i++) { uint64_t p1 = l1[i]; if (p1 < 0xffffffe000000000ull) continue;
+              uint64_t pa; uint8_t *q; char sb2[48]; int ok = 0; memset(sb2, 0, sizeof sb2);
+              if (!a64_virt_to_phys(c7, p1, &pa) && (q = a64m_ram_at(m, pa, 40))) { memcpy(sb2, q, 40); ok = 1; for (int t = 0; t < 4; t++) if ((unsigned char)sb2[t] < 32 || (unsigned char)sb2[t] > 126) ok = 0; }
+              if (ok) { fprintf(stderr, " [%d]=\"%.40s\"", i, sb2); continue; }
+              for (int j = 0; j < 8; j++) l2[j] = 0; for (int j = 0; j < 8; j++) if (!a64_virt_to_phys(c7, p1 + 8 * (uint64_t)j, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&l2[j], q, 8);
+              fprintf(stderr, " [%d]->{", i);
+              for (int j = 0; j < 8; j++) { uint64_t p2 = l2[j]; if (p2 < 0xffffffe000000000ull) continue;
+                char s3[48]; memset(s3, 0, sizeof s3); int ok3 = 0; if (!a64_virt_to_phys(c7, p2, &pa) && (q = a64m_ram_at(m, pa, 40))) { memcpy(s3, q, 40); ok3 = 1; for (int t = 0; t < 4; t++) if ((unsigned char)s3[t] < 32 || (unsigned char)s3[t] > 126) ok3 = 0; }
+                if (ok3) { fprintf(stderr, "%d:\"%.40s\" ", j, s3); continue; }
+                for (int w = 0; w < 8; w++) l3[w] = 0; for (int w = 0; w < 8; w++) if (!a64_virt_to_phys(c7, p2 + 8 * (uint64_t)w, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&l3[w], q, 8);
+                fprintf(stderr, "%d:(", j);
+                for (int w = 1; w < 8; w++) { uint64_t p3 = l3[w]; if (p3 < 0xffffffe000000000ull) continue; char s4[48]; memset(s4, 0, sizeof s4); if (!a64_virt_to_phys(c7, p3, &pa) && (q = a64m_ram_at(m, pa, 40))) { memcpy(s4, q, 40); int ok4 = 1; for (int t = 0; t < 3; t++) if ((unsigned char)s4[t] < 32 || (unsigned char)s4[t] > 126) ok4 = 0; if (ok4) fprintf(stderr, "%d:\"%.40s\" ", w, s4); } }
+                fprintf(stderr, ") "); }
+              fprintf(stderr, "}"); }
+            fprintf(stderr, "\n"); } }
         for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe040000000ull && shown < 90; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
