@@ -240,6 +240,15 @@ int main(int argc, char **argv) {
         A64 *c7 = a64m_cpu(m); int shown = 0; static uint64_t ul[600]; int nul = 0;
         static uint64_t th[0x300 / 8 * 2]; int thok = 0; { uint64_t tv = c7->el0r.tp1; thok = tv != 0; for (uint64_t o = 0; o < 0x600 && thok; o += 8) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c7, tv + o, &pa) || !(q = a64m_ram_at(m, pa, 8))) { thok = 0; break; } memcpy(&th[o / 8], q, 8); } }   /* 0.4.400: the thread of the last EL0 abort: which kernel stack does its struct point to? */
         fprintf(stderr, "[thx] thread struct at 0x%llx readable=%d:", (unsigned long long)c7->el0r.tp1, thok); for (int u = 0; u < 0x600 / 8 && thok; u++) { if (th[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)th[u]); } fprintf(stderr, "\n");
+        { /* 0.4.427: the global lock AppleA7IOP::start sleeps on (code 0x80bc428: x19=[0xfffffff0091ba7c8], event/arg [..7d0]). Owner = lock word. */
+          uint64_t gv[2] = { 0xfffffff0091ba7c8ull, 0xfffffff0091ba7d0ull }; uint64_t gl[2] = { 0, 0 };
+          for (int u = 0; u < 2; u++) { uint64_t pa; uint8_t *q; if (!a64_virt_to_phys(c7, gv[u], &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&gl[u], q, 8); }
+          fprintf(stderr, "[lock] [%llx]=%llx [%llx]=%llx", (unsigned long long)gv[0], (unsigned long long)gl[0], (unsigned long long)gv[1], (unsigned long long)gl[1]);
+          uint64_t lw[4] = { 0, 0, 0, 0 }; for (int u = 0; u < 4 && gl[0]; u++) { uint64_t pa; uint8_t *q; if (!a64_virt_to_phys(c7, gl[0] + 8 * (uint64_t)u, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&lw[u], q, 8); }
+          fprintf(stderr, " lock words: %llx %llx %llx %llx\n", (unsigned long long)lw[0], (unsigned long long)lw[1], (unsigned long long)lw[2], (unsigned long long)lw[3]);
+          uint64_t ow = lw[0]; static uint64_t ot[0x300 / 8]; int ook = ow >= 0xffffffe000000000ull;
+          for (uint64_t o = 0; o < 0x300 && ook; o += 8) { uint64_t pa; uint8_t *q; if (a64_virt_to_phys(c7, ow + o, &pa) || !(q = a64m_ram_at(m, pa, 8))) { ook = 0; break; } memcpy(&ot[o / 8], q, 8); }
+          fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
         for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe040000000ull && shown < 90; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
