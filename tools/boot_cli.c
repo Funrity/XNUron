@@ -251,9 +251,9 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
         { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
-          for (unsigned k = 0; k < c7->wp_n && k < 16; k++) {
+          for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15;
             fprintf(stderr, "[wait%u] x0=%llx x1=%llx lr=%llx:", k, (unsigned long long)c7->wp_x0[k], (unsigned long long)c7->wp_x1[k], (unsigned long long)c7->wp_lr[k] & 0xfffffffffull);
-            uint64_t root = c7->wp_x1[k]; uint64_t l1[8], l2[8], l3[8];
+            uint64_t root = c7->wp_x0[k]; uint64_t l1[8], l2[8], l3[8];
             for (int i = 0; i < 8; i++) { l1[i] = 0; } { uint64_t pa; uint8_t *q; for (int i = 0; i < 8; i++) if (!a64_virt_to_phys(c7, root + 8 * (uint64_t)i, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&l1[i], q, 8); }
             for (int i = 1; i < 8; i++) { uint64_t p1 = l1[i]; if (p1 < 0xffffffe000000000ull) continue;
               uint64_t pa; uint8_t *q; char sb2[48]; int ok = 0; memset(sb2, 0, sizeof sb2);
