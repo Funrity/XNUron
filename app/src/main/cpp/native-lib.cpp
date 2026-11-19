@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <string>
+#include <memory>
 #include <vector>
 #include <chrono>
 #include <cstdio>
@@ -22,7 +23,8 @@ static void sink(void *ud, const char *b, size_t n) { static_cast<std::string *>
 /* Original v0.1 demo, kept: raw user-mode interpreter run. */
 JNI(jstring, runDemo)(JNIEnv *env, jclass) {
     std::vector<uint8_t> mem(0x10000, 0);
-    A64 cpu;
+    std::unique_ptr<A64> cpup(new A64());   /* 0.4.451: A64 is > 1 MB (diagnostic rings): on the stack it overflowed the JVM/Android thread stack */
+    A64 &cpu = *cpup;
     a64_init(&cpu, mem.data(), 0, mem.size());
     std::string out;
     cpu.out = sink; cpu.ud = &out;

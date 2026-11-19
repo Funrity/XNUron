@@ -1885,3 +1885,8 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.450
 - Результат 0.4.449 (имена ожидаемых служб, 3G-прогон): RTBuddy (поток 82e94ec) ждёт службу «RTBuddyFirmwareService» (IOPropertyExistsMatch); ещё ждут: AppleEmbeddedNVMeController (NVMeSEPNotifier), IODTNVRAM (класс платформенного устройства), IOCoreSurfaceRoot/AGXFirmware…RTBuddy (GPU). Т.е. RTBuddy ждёт службу, поставляющую прошивку/данные IOP.
 - Диагностика: строки ядра, начинающиеся с «RTBuddyF…», «RTBuddyIO…», «firmware…», «AppleANS2…» — найти, какой класс/личность должна публиковать RTBuddyFirmwareService.
+
+## 0.4.451
+- Результат 0.4.450: в ядре RTBuddy грузит прошивку IOP через пользовательский клиент (RTBuddyFirmwareService, право «com.apple.RTBuddy.load-firmware», AppleA7IOP::startCPU(IOSlaveFirmware*), _handlePreloadFirmware). RTBuddy ждёт, пока userspace-демон (в iOS — rtbuddyd) откроет эту службу. Значит, вопрос не в «железе ANS», а в том, запущен ли такой демон в нашем PID 1 (restore ramdisk) и до чего он дошёл.
+- Диагностика: `[paths]` теперь 95 байт на путь (было 39), без *.dylib, плюс пути posix_spawn/execve — видно, какие демоны запускает launchd.
+- Исправлено (найдено тестом JNI): `runDemo` держал структуру CPU (теперь > 1 МБ из-за диагностических колец) на стеке потока — переполнение стека JVM (на Android тоже опасно). Теперь выделяется в куче.
