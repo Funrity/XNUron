@@ -1006,9 +1006,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         seenh[cnt] = h; cnt++; nn += (size_t)snprintf(nl + nn, sizeof nl - nn, " %zx:%.*s |", b, (int)(e - b), (const char *)kern + b); o = e; }
       LOG("%s (%d)\n", nl, cnt); }
     { /* 0.4.411 diagnostic (changes nothing): where does the kernel call IOService::publishResource? Find the string "_publishIOResource: " (AppleCredentialManager), its ADRP+ADD xrefs, and dump the code around the first two (0x1c0 bytes before .. 0x200 after) so the bl to publishResource can be identified offline. */
-      static const char key[] = "): start(%p) - ("; uint64_t saddr = 0;
+      static const char key[] = "IOInterruptController%08X"; uint64_t saddr = 0;
       for (size_t o = 0; o + sizeof key < klen && !saddr; o++) if (!memcmp(kern + o, key, sizeof key - 1)) for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (mo.slice_off + g->fileoff <= o && o < mo.slice_off + g->fileoff + g->filesize) { saddr = g->vmaddr + (o - mo.slice_off - g->fileoff); break; } }
-      LOG("[boot] diagnostic (changes nothing): string 'Found (ANS2) provider, returning score' at virtual 0x%llx (0.4.411)\n", (unsigned long long)saddr);
+      LOG("[boot] diagnostic (changes nothing): string IOInterruptController%%08X (key) at virtual 0x%llx (0.4.411)\n", (unsigned long long)saddr);
       int nx = 0;
       for (int q = 0; q < mo.nseg && saddr && nx < 6; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 8 <= g->filesize && nx < 6; o += 4) { uint64_t pc = g->vmaddr + o; uint32_t w1, w2; memcpy(&w1, kern + mo.slice_off + g->fileoff + o, 4); memcpy(&w2, kern + mo.slice_off + g->fileoff + o + 4, 4);
