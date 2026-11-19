@@ -111,6 +111,7 @@ typedef struct {
     uint64_t cap_pc, cap_x[4], cap_hist[A64_PC_HIST]; unsigned cap_n;
     uint64_t ret_pc[512], ret_x0[512], ret_snap_pc[512], ret_snap_x0[512]; unsigned ret_i;   /* 0.4.360 diagnostic: ring of (pc of RET, x0); snapshot at cap_pc */   /* 0.4.357 diagnostic: x0..x3 at the first execution of pc==cap_pc */
     uint64_t e6_pc, e6_lr, e6_x0, e6_hist[64], e6_reg[31]; unsigned e6_n, e6_arm;   /* 0.4.369: first execution of pc==e6_pc with x1==6 */
+    char wp_snap[6000]; unsigned wp_snap_n; int wp_snap_done;   /* 0.4.444: string tree of x0 at the moment of the PMGR call */
     uint64_t wp_pc; unsigned wp_n; uint64_t wp_x0[16], wp_x1[16], wp_lr[16];   /* 0.4.429 watch: first 16 entries at wp_pc */
     uint64_t ch_pc, ch_target, ch_x1, ch_x2; unsigned ch_n;   /* 0.4.414 MODELLED one-shot call */
     uint64_t jmp_pc, jmp_to; unsigned jmp_n;   /* 0.4.378 MODELLED redirect: when pc==jmp_pc the instruction is NOT executed and execution continues at jmp_to */

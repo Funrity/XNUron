@@ -701,6 +701,30 @@ static int exec_excl(A64 *c, uint32_t i) {
 
 #include "simd.inc"
 
+static int wp_rd(A64 *c, uint64_t a, uint64_t *out) {   /* 0.4.444 diagnostic read: no abort side effects */
+    if (a < 0xffffffe000000000ull) return -1;
+    uint64_t pa; if (MMU_ON(c)) { int f = xlate(c, a, &pa); if (f >= 0) return -1; } else pa = a;
+    uint8_t *p = ptr(c, pa, 8); if (!p) return -1; memcpy(out, p, 8); return 0;
+}
+static int wp_str(A64 *c, uint64_t a, char *o, int n) { /* printable C string of >=3 chars at a */
+    for (int k = 0; k < n - 1; k++) { uint64_t v; if (wp_rd(c, (a + (uint64_t)k) & ~7ull, &v)) return 0; unsigned char ch = (unsigned char)(v >> (8 * ((a + (uint64_t)k) & 7))); if (ch == 0) { o[k] = 0; return k >= 3; } if (ch < 32 || ch > 126) return 0; o[k] = (char)ch; }
+    o[n - 1] = 0; return 1;
+}
+static void wp_snapshot(A64 *c, uint64_t root) {
+    char *b = c->wp_snap; size_t cap = sizeof c->wp_snap; size_t n = 0; char s[56];
+    for (int i = 0; i < 8; i++) { uint64_t p1; if (wp_rd(c, root + 8u * (unsigned)i, &p1) || p1 < 0xffffffe000000000ull) continue;
+        if (wp_str(c, p1, s, sizeof s)) { n += (size_t)snprintf(b + n, cap - n, " [%d]=\"%s\"", i, s); continue; }
+        n += (size_t)snprintf(b + n, cap - n, " [%d]{", i);
+        for (int j = 0; j < 8 && n < cap - 300; j++) { uint64_t p2; if (wp_rd(c, p1 + 8u * (unsigned)j, &p2) || p2 < 0xffffffe000000000ull) continue;
+            if (wp_str(c, p2, s, sizeof s)) { n += (size_t)snprintf(b + n, cap - n, "%d=\"%s\" ", j, s); continue; }
+            n += (size_t)snprintf(b + n, cap - n, "%d(", j);
+            for (int w = 0; w < 8 && n < cap - 200; w++) { uint64_t p3; if (wp_rd(c, p2 + 8u * (unsigned)w, &p3) || p3 < 0xffffffe000000000ull) continue;
+                if (wp_str(c, p3, s, sizeof s)) { n += (size_t)snprintf(b + n, cap - n, "%d=\"%s\" ", w, s); continue; }
+                for (int y = 0; y < 8 && n < cap - 150; y++) { uint64_t p4; if (wp_rd(c, p3 + 8u * (unsigned)y, &p4) || p4 < 0xffffffe000000000ull) continue; if (wp_str(c, p4, s, sizeof s)) n += (size_t)snprintf(b + n, cap - n, "%d.%d=\"%s\" ", w, y, s); } }
+            n += (size_t)snprintf(b + n, cap - n, ") "); }
+        n += (size_t)snprintf(b + n, cap - n, "}"); }
+    c->wp_snap_n = (unsigned)n;
+}
 static int exec_ldst(A64 *c, uint32_t i, uint64_t *next) {
     (void)next;
     if ((i >> 26) & 1) return simd_ldst(c, i, next);          /* all SIMD&FP loads/stores have V=1 */
@@ -1215,6 +1239,7 @@ static int step(A64 *c) {
     if (__builtin_expect(c->e6_pc != 0, 0) && c->e6_arm && !c->e6_n && (i & 0xffc00000u) == 0xb9000000u && ((i >> 10) & 0xfff) == 21 && (i & 31) != 31 && ((i >> 5) & 31) != 31 && ((i >> 5) & 31) != 29 && (uint32_t)c->x[i & 31] == 6 && pc >= 0xfffffff007000000ull && pc < 0xfffffff00a800000ull) { c->e6_n = 1; c->e6_lr = c->x[30]; c->e6_x0 = pc; memcpy(c->e6_reg, c->x, sizeof c->e6_reg); for (unsigned hi = 0; hi < 64; hi++) c->e6_hist[hi] = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 64 + hi) % A64_PC_HIST]; }  /* 0.4.370: first kernel-text 32-bit store of 6 to [xN,#84] (b_error = ENXIO); e6_x0 holds the store pc */
     if (__builtin_expect(c->cap_pc != 0, 0) && pc == c->cap_pc && !c->cap_n) { c->cap_n = 1; for (int ci = 0; ci < 4; ci++) c->cap_x[ci] = c->x[ci]; for (unsigned hi = 0; hi < 512; hi++) { c->ret_snap_pc[hi] = c->ret_pc[(c->ret_i + hi) & 511]; c->ret_snap_x0[hi] = c->ret_x0[(c->ret_i + hi) & 511]; } for (unsigned hi = 0; hi < A64_PC_HIST; hi++) c->cap_hist[hi] = c->pc_hist[(c->pc_hist_i + hi) % A64_PC_HIST]; }
     if (__builtin_expect(c->hk_pc != 0, 0) && pc == c->hk_pc && c->x[19] >= 0x1000) { c->hk_n++; (void)st(c, c->x[19] + 0x10b, 1, 1); (void)st(c, c->x[19] + 0x10c, 1, 0); }   /* 0.4.354 MODELLED hook */
+    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_snap_done && (c->x[30] & 0xfffffffffull) == 0x814a9f0ull) { c->wp_snap_done = 1; wp_snapshot(c, c->x[0]); }   /* 0.4.444: PMGR wait */
     if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; c->wp_lr[k] = c->x[30]; }   /* 0.4.429 diagnostic only */
     /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
     if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
