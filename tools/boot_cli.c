@@ -251,6 +251,7 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[lock-owner] thread %llx readable=%d:", (unsigned long long)ow, ook); for (int u = 0; u < 0x300 / 8 && ook; u++) if (ot[u]) fprintf(stderr, " +%x=%llx", u * 8, (unsigned long long)ot[u]); fprintf(stderr, "\n"); }
         { /* 0.4.429: arguments of every (first 16) call of the waitForService-like function 0x80bc408: print x1 (matching object) as a heuristic 3-level pointer tree with printable strings */
           fprintf(stderr, "[ionvram-standin] ch_pc=%llx fired=%u (MODELLED one-shot publishResource IONVRAM)\n", (unsigned long long)c7->ch_pc, c7->ch_n);
+          for (unsigned q = 0; q < c7->wp2_n; q++) fprintf(stderr, "[setter-ret%u] x0=%llx (0=ok, 0xe00002bc=bad argument) this=%llx nub=%llx\n", q, (unsigned long long)c7->wp2_x0[q], (unsigned long long)c7->wp2_x19[q], (unsigned long long)c7->wp2_x22[q]);
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
           for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
