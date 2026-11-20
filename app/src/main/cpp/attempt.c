@@ -604,7 +604,7 @@ static int dt_names_walk(const uint8_t *d, size_t n, size_t *pos, int depth, voi
 }
 /* 0.4.89 diagnostic (changes nothing): list DeviceTree nodes/properties whose name contains one of the key words (log 0.4.88: ApplePMGRMTRSensor.cpp:131 'propery mtr_0 missing in devicetree') */
 typedef struct { char *out; size_t cap, len; int hits; } DtGrep;
-static int dt_has_kw(const char *s) { static const char *const kw[] = { "function-vbus_voltage", "function-reset", "function-bb_on", "function-external_standby", "function-vci", "function-pcie_port_control", "function-micbias-enable", "function-bb_rst" }; for (size_t i = 0; i < sizeof kw / sizeof kw[0]; i++) if (strstr(s, kw[i])) return 1; return 0; }
+static int dt_has_kw(const char *s) { static const char *const kw[] = { "function-vbus_voltage", "function-reset", "function-bb_on", "function-external_standby", "function-vci", "function-pcie_port_control", "function-micbias-enable", "function-bb_rst", "function-pmp_control" };   /* 0.4.466 EXPERIMENT: PMGR::start waits for the provider of this function (node pmp, removed in 0.4.276) */ for (size_t i = 0; i < sizeof kw / sizeof kw[0]; i++) if (strstr(s, kw[i])) return 1; return 0; }
 /* 0.4.117 diagnostic: every property (name, length, first 8 words) of the nodes called `target`, comma separated */
 static int dt_dump_node(const uint8_t *d, size_t n, size_t *pos, int depth, const char *target, char *out, size_t cap, size_t *len) {
     if (depth > 32 || *pos + 8 > n) return -1;

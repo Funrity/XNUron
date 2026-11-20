@@ -1944,3 +1944,7 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.465
 - ОТМЕНА поправки 0.4.464: она была неверной. В логе 1500M адрес возврата 0x816be24 лежит внутри ApplePMGR::start (рядом строки "ApplePMGR::start" и "_regMaps[kRegMapPMGR].memMap"), сеттер 0x816bdcc — там же. Значит застрял именно ApplePMGR::start в waitForMatchingService("IOFunctionParent00000016"); выводы 0.4.459–0.4.462 верны. Причина ожидания пока не найдена (самоблокировка на kIOServiceMatchedState или потерянное пробуждение).
+
+## 0.4.466
+- Найдена вероятная причина зависания ApplePMGR::start: цепочка стека waitForMatchingService ← ожидание функции-родителя ← метод около «pmgr-dock-fifo-client» ← ApplePMGR::start. Узел 'pmp' удалён нашим же DT-фиксом (0.4.276, RTBuddy PMP паниковал «No response received»), поэтому провайдер function-pmp_control никогда не появляется. Это следствие нашего обхода, а не ошибка эмуляции (гипотеза, ещё не проверена прогоном).
+- ЭКСПЕРИМЕНТ (MODELLED, ASSUMPTION): свойство 'function-pmp_control' переименовано в 'x-off-pmp_control' (как другие function-* в 0.4.331), чтобы PMGR не ждал отсутствующий PMP. Реальная PMP-прошивка/почтовый ящик не моделируются.
