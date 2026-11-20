@@ -254,6 +254,9 @@ int main(int argc, char **argv) {
           for (unsigned q = 0; q < c7->wp2_n; q++) fprintf(stderr, "[setter-ret%u] x0=%llx (0=ok, 0xe00002bc=bad argument) this=%llx nub=%llx\n", q, (unsigned long long)c7->wp2_x0[q], (unsigned long long)c7->wp2_x19[q], (unsigned long long)c7->wp2_x22[q]);
           if (c7->wp2_n) { uint64_t th = c7->wp2_x19[0]; fprintf(stderr, "[pmgr-obj] this=%llx words +0x00..+0x58 (final state; IOService __state[0] expected near +0x40, kIOServiceRegisteredState=0x2):", (unsigned long long)th);
             for (int u = 0; u < 12; u++) { uint64_t pa, v = 0; uint8_t *q; if (!a64_virt_to_phys(c7, th + 8u * (unsigned)u, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&v, q, 8); fprintf(stderr, " %llx", (unsigned long long)v); } fprintf(stderr, "\n"); }
+          for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15; if (c7->wp_pc != 0xfffffff00806c958ull) break; if ((c7->wp_lr[k] & 0xfffffffffull) != 0x814a9f0ull) continue;
+            fprintf(stderr, "[pmgr-waitobj] x0=%llx words(+0x00..+0x58):", (unsigned long long)c7->wp_x0[k]);
+            for (int u = 0; u < 12; u++) { uint64_t pa, v = 0; uint8_t *q; if (!a64_virt_to_phys(c7, c7->wp_x0[k] + 8u * (unsigned)u, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&v, q, 8); fprintf(stderr, " %llx", (unsigned long long)v); } fprintf(stderr, "\n"); }
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
           for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
