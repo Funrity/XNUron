@@ -1890,3 +1890,7 @@ CI падал не на коде эмулятора, а на тестовых с
 - Результат 0.4.450: в ядре RTBuddy грузит прошивку IOP через пользовательский клиент (RTBuddyFirmwareService, право «com.apple.RTBuddy.load-firmware», AppleA7IOP::startCPU(IOSlaveFirmware*), _handlePreloadFirmware). RTBuddy ждёт, пока userspace-демон (в iOS — rtbuddyd) откроет эту службу. Значит, вопрос не в «железе ANS», а в том, запущен ли такой демон в нашем PID 1 (restore ramdisk) и до чего он дошёл.
 - Диагностика: `[paths]` теперь 95 байт на путь (было 39), без *.dylib, плюс пути posix_spawn/execve — видно, какие демоны запускает launchd.
 - Исправлено (найдено тестом JNI): `runDemo` держал структуру CPU (теперь > 1 МБ из-за диагностических колец) на стеке потока — переполнение стека JVM (на Android тоже опасно). Теперь выделяется в куче.
+
+## 0.4.452
+- Результат 0.4.451 (3G): launchd ramdisk запускает только xpcproxy → restored_external (плюс HorizonSetup, syslogd, ReportCrash, PurpleReverseProxy); rtbuddyd в списке НЕТ. Среди ядерных строк — RTBuddyFirmwareBundle, firmware_service, _handlePreloadFirmware, «Selected firmware does not match the target IOP», AppleFirmwareDecodeImage4 (прошивка IOP может поставляться kext-ом/пакетом внутри ядра, как у AGXFirmwareKextG11PRTBuddy). Что именно ждёт «RTBuddyFirmwareService» и относится ли оно к ANS — не доказано.
+- Диагностика: контексты «FirmwareService» в образе ядра (prelink-plist/строки, ±170 байт) — найти, какие kext/личности публикуют эту службу.

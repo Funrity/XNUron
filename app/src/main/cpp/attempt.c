@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "attempt.h"
 #include "macho.h"
 #include "lzfse/lzfse.h"
@@ -1070,6 +1071,10 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         free(tmp); }
       LOG("[boot] diagnostic (changes nothing): kernelcache symbol table: LC_SYMTAB %s, %u entries, %llu usable named section symbols\n", symoff ? "present" : "absent", nsyms, (unsigned long long)g_sym_cnt); }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
+    { /* 0.4.452 diagnostic (changes nothing): every context of 'FirmwareService' in the kernelcache (prelink plist / strings), +-170 bytes */
+      size_t from = 0; int nf = 0; while (nf < 10 && from + 16 < klen) { const uint8_t *q = (const uint8_t *)memmem(kern + from, klen - from - 16, "FirmwareService", 15); if (!q) break; size_t qo = (size_t)(q - kern); char cb[360]; size_t a0 = qo > 170 ? qo - 170 : 0, a1 = qo + 190 < klen ? qo + 190 : klen, nn = 0;
+        for (size_t z = a0; z < a1 && nn < sizeof cb - 1; z++) cb[nn++] = (kern[z] >= 32 && kern[z] < 127) ? (char)kern[z] : '|'; cb[nn] = 0;
+        LOG("[boot] diagnostic (changes nothing): 'FirmwareService' context #%d at file offset 0x%zx: %s\n", nf, qo, cb); nf++; from = qo + 40; } }
     { /* 0.4.447 MODELLED (user decision, re-installed; 0.4.414 search had an off-by-one): the IOService resource 'IONVRAM' is normally published once the ANS2 NVMe controller (which needs the ANS coprocessor: not emulated) brings up the NVRAM. The restore daemon in the ramdisk waits for it forever. Stand-in: right after AppleCredentialManager publishes its own resource (kernel code at 0xfffffff008ae88ec, wrapper 0xfffffff008ae8afc(key, uint32) -> OSNumber -> IOService::publishResource(const char *, OSObject *) at 0xfffffff008075860; addresses from the 0.4.412/413 disassembly of build 16A366, ASSUMPTION they apply to this kernelcache only) the emulator calls the SAME wrapper once more with key 'IONVRAM', value 1. Nothing behind the resource (no IODTNVRAM controller, no storage) exists. */
       static const char nk[] = "\0IONVRAM"; uint64_t nva = 0;
       for (size_t o = 0; o + sizeof nk < klen && !nva; o++) if (!memcmp(kern + o, nk, sizeof nk)) for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (mo.slice_off + g->fileoff <= o + 1 && o + 1 < mo.slice_off + g->fileoff + g->filesize) { nva = g->vmaddr + (o + 1 - mo.slice_off - g->fileoff); break; } }
