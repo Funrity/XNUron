@@ -117,7 +117,7 @@ int a64m_add_s5l_uart(A64Machine *m, uint64_t pa, uint64_t size) {
 }
 /* MODELLED placeholder for an SoC register block whose real behaviour is unknown: reads return 0, writes are ignored, and every access (first 40) is logged so the
  * stop report shows exactly what the kernel touches. This is an assumption, not hardware knowledge. */
-static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi, is_aic; uint32_t sp_fifo[16]; unsigned sp_n, sp_irq; uint32_t sp_en[8]; uint32_t aic_pend[16], aic_mask[16]; uint16_t aw_off[128]; uint32_t aw_or[128], aw_n[128]; int aw_cnt; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; } g_unk[360]; static int g_unk_n;
+static struct Unk { A64Machine *m; int is_i2c, is_dart, is_spmi, is_aic; uint32_t sp_fifo[16]; unsigned sp_n, sp_irq; uint32_t sp_en[8]; uint32_t aic_pend[16], aic_mask[16]; uint16_t aw_off[128]; uint32_t aw_or[128], aw_n[128]; int aw_cnt; uint32_t i2c_st; uint64_t ts_base[16]; int ts_n; uint64_t ts_off[160], ts_val[160]; int ts_rn; unsigned n, cap; char label[44]; uint64_t pa; uint64_t rv_off[16], rv_val[16]; int rv_n; unsigned reads, writes; uint64_t last_off; int rb; uint32_t rbv[1024]; int ps_n; uint64_t ps_off[512]; uint32_t ps_val[512]; int ps; int lk_n; uint64_t lk_w[8], lk_r[8]; uint32_t lk_v[8]; int lk_set[8]; char ac[170]; int asc, asc_mb; } g_unk[360]; static int g_unk_n;
 /* 0.4.234 MODELLED (ASSUMPTION, PLACEHOLDER): minimal interrupt controller for the DeviceTree node "aic" (aic,t8020, reg 0x23b100000). Register layout taken from the PUBLIC Linux (Asahi) driver of the first-generation Apple AIC, NOT verified on this chip: EVENT +0x2004 (read: lowest pending unmasked interrupt as (1<<16)|number, acknowledged; 0 = none), MASK_SET +0x4100.., MASK_CLR +0x4180.. (one bit per interrupt, 32 per word), everything starts masked. No priorities, no target CPU, no IPIs, no software interrupts. The CPU's IRQ input is the OR of pending&~mask. */
 static uint32_t g_aic_clr[16];   /* 0.4.477 diagnostic: every interrupt number the kernel ever unmasked */
 static void aic_update(struct Unk *d) { int any = 0; for (int i = 0; i < 16; i++) if (d->aic_pend[i] & ~d->aic_mask[i]) any = 1; d->m->cpu.irq_line = any ? true : false; }
@@ -135,8 +135,47 @@ const char *a64m_i2c_trace(void) { static char b[13000]; size_t l = 0; b[0] = 0;
 static struct { char w; uint64_t pa, off, v, pc; unsigned rep; } g_an[1200]; static unsigned g_ann; static uint64_t g_an_pa[24]; static unsigned g_an_c[24];   /* 0.4.472: at most 48 stored entries per block */
 static void an_trace(struct Unk *d, int w, uint64_t off, uint64_t v) { if (!strstr(d->label, "ans") && !strstr(d->label, "pmp")) return; if (g_ann && g_an[g_ann - 1].w == (char)w && g_an[g_ann - 1].pa == d->pa && g_an[g_ann - 1].off == off && g_an[g_ann - 1].v == v) { g_an[g_ann - 1].rep++; return; } if (g_ann >= 1200) return; { int q = 0; while (q < 24 && g_an_c[q] && g_an_pa[q] != d->pa) q++; if (q >= 24) return; if (!g_an_c[q]) { g_an_pa[q] = d->pa; } if (g_an_c[q] >= 48) return; g_an_c[q]++; } g_an[g_ann].w = (char)(w ? 'w' : 'r'); g_an[g_ann].pa = d->pa; g_an[g_ann].off = off; g_an[g_ann].v = v; g_an[g_ann].pc = d->m->cpu.pc; g_an[g_ann].rep = 0; g_ann++; }
 const char *a64m_ans_trace(void) { static char b[100000]; size_t l = 0; b[0] = 0; for (unsigned k = 0; k < g_ann && l < sizeof b - 90; k++) { l += (size_t)snprintf(b + l, sizeof b - l, " %c%llx+%llx=%llx@%llx", g_an[k].w, (unsigned long long)g_an[k].pa, (unsigned long long)g_an[k].off, (unsigned long long)g_an[k].v, (unsigned long long)g_an[k].pc & 0xfffffffffull); if (g_an[k].rep) l += (size_t)snprintf(b + l, sizeof b - l, "x%u", g_an[k].rep + 1); } return b; }
-static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
+
+/* 0.4.478 MODELLED (ASSUMPTION): the IOP side of an Apple "ASC" mailbox, used for coprocessors whose firmware (embedded in the kernelcache) we do NOT execute (PMP first). NOT real firmware: a scripted RTKit management endpoint (ep0) after the public Asahi Linux RTKit documentation. Register layout READ FROM THE KERNEL's own code (0.4.474): mailbox block = ASC base + 0x8000; +0x8108 A2I control, +0x810c I2A control (bit0 enable, bit16 full, bit17 empty, bits 20..23 entry count), +0x8800/+0x8808 A2I_SEND (16 bytes), +0x8830/+0x8838 I2A_RECV (16 bytes, pop on the 2nd word; its high half carries the count field, the kernel loops on it). CPU_CONTROL = ASC base + 0x44, bit 4 = run (Asahi docs + the kernel writes 0x10 there). The firmware's own endpoint list / protocol version are UNKNOWN here: the values used are PLACEHOLDERS and every message is logged. */
+static struct Asc { int used; A64Machine *m; uint64_t cpu_pa; unsigned irq; char tag[8]; int run, en_a, en_i; unsigned qn; uint64_t q[16][2]; uint64_t a0, a1; unsigned stage; struct { char dir; uint64_t m0, m1; } lg[96]; unsigned lgn; } g_asc[4];
+static void asc_log(struct Asc *a, char dir, uint64_t m0, uint64_t m1) { if (a->lgn < 96) { a->lg[a->lgn].dir = dir; a->lg[a->lgn].m0 = m0; a->lg[a->lgn].m1 = m1; a->lgn++; } }
+static void asc_push(struct Asc *a, uint64_t m0, uint64_t m1) { if (a->qn < 16) { a->q[a->qn][0] = m0; a->q[a->qn][1] = m1; a->qn++; asc_log(a, 'I', m0, m1); a64m_aic_raise(a->m, a->irq); } }
+static void asc_ap_msg(struct Asc *a, uint64_t m0, uint64_t m1) {
+    asc_log(a, 'A', m0, m1);
+    unsigned ep = (unsigned)(m1 & 0xff), ty = (unsigned)((m0 >> 52) & 0xff);
+    if (ep == 0 && ty == 2 && a->stage == 1) { a->stage = 2; asc_push(a, (8ull << 52) | (1ull << 51) | 0x1u, 0); }   /* HELLO_ACK -> EPMAP {ep0}, last (placeholder bitmap) */
+}
+static void asc_cpu_w(struct Asc *a, uint64_t v) { int run = (v >> 4) & 1; if (run && !a->run && a->stage == 0) { a->stage = 1; asc_push(a, (1ull << 52) | (1ull << 16) | 1u, 0); } a->run = run; }   /* RUN -> HELLO, versions min=max=1 (PLACEHOLDER: the DT 'iop-version' is 1; the real RTKit protocol version of this firmware is UNKNOWN) */
+int a64m_asc_add(A64Machine *m, uint64_t cpu_pa, unsigned irq, const char *tag) {
+    int ix = -1; for (int k = 0; k < 4; k++) if (g_asc[k].used && g_asc[k].cpu_pa == cpu_pa) { ix = k; break; }   /* the same coprocessor of a new machine replaces the old model (tests / reboot) */
+    for (int k = 0; ix < 0 && k < 4; k++) if (!g_asc[k].used) ix = k; if (ix < 0) return -1;
+    int n = 0; for (int k = 0; k < g_unk_n; k++) if (g_unk[k].m == m && g_unk[k].pa == cpu_pa) { g_unk[k].asc = ix + 1; g_unk[k].asc_mb = 0; n++; } else if (g_unk[k].m == m && g_unk[k].pa == cpu_pa + 0x8000) { g_unk[k].asc = ix + 1; g_unk[k].asc_mb = 1; n++; }
+    if (n < 2) return -2;
+    memset(&g_asc[ix], 0, sizeof g_asc[ix]); g_asc[ix].used = 1; g_asc[ix].m = m; g_asc[ix].cpu_pa = cpu_pa; g_asc[ix].irq = irq; snprintf(g_asc[ix].tag, sizeof g_asc[ix].tag, "%s", tag); return ix; }
+const char *a64m_asc_log(void) { static char b[9000]; size_t l = 0; b[0] = 0; for (int k = 0; k < 4; k++) if (g_asc[k].used) { l += (size_t)snprintf(b + l, sizeof b - l, "[asc-%s] stage=%u run=%d queued=%u messages (I = IOP->AP model, A = AP->IOP seen from the kernel; msg0 msg1):", g_asc[k].tag, g_asc[k].stage, g_asc[k].run, g_asc[k].qn); for (unsigned q = 0; q < g_asc[k].lgn && l < sizeof b - 120; q++) l += (size_t)snprintf(b + l, sizeof b - l, " %c:%llx,%llx", g_asc[k].lg[q].dir, (unsigned long long)g_asc[k].lg[q].m0, (unsigned long long)g_asc[k].lg[q].m1); l += (size_t)snprintf(b + l, sizeof b - l, "\n"); } return b; }
+static int asc_r(struct Unk *d, uint64_t off, unsigned sz, uint64_t *val) {
+    struct Asc *a = &g_asc[d->asc - 1];
+    if (!d->asc_mb) return 0;
+    if (off == 0x108) { *val = (uint64_t)a->en_a | 0x20000u; return 1; }   /* A2I: always "empty": the model consumes AP messages at once */
+    if (off == 0x10c) { *val = (uint64_t)a->en_i | (a->qn ? ((uint64_t)(a->qn > 15 ? 15 : a->qn) << 20) : 0x20000u); return 1; }
+    if (off == 0x830 || off == 0x834) { uint64_t m0 = a->qn ? a->q[0][0] : 0; *val = off == 0x834 ? (m0 >> 32) : (sz == 8 ? m0 : (m0 & 0xffffffffu)); return 1; }
+    if (off == 0x838 || off == 0x83c) { uint64_t m1 = a->qn ? a->q[0][1] & 0xffffffffu : 0; uint64_t hi = a->qn ? ((uint64_t)(a->qn > 15 ? 15 : a->qn) << 20) : 0; uint64_t full = m1 | (hi << 32); *val = off == 0x838 ? (sz == 8 ? full : (full & 0xffffffffu)) : (full >> 32);
+        if (a->qn && (sz == 8 || off == 0x83c)) { for (unsigned q = 1; q < a->qn; q++) { a->q[q - 1][0] = a->q[q][0]; a->q[q - 1][1] = a->q[q][1]; } a->qn--; }
+        return 1; }
+    return 0; }
+static void asc_w(struct Unk *d, uint64_t off, unsigned sz, uint64_t v) {
+    struct Asc *a = &g_asc[d->asc - 1];
+    if (!d->asc_mb) { if (off == 0x44) asc_cpu_w(a, v); return; }
+    if (off == 0x108) a->en_a = (int)(v & 1);
+    else if (off == 0x10c) a->en_i = (int)(v & 1);
+    else if (off == 0x800) a->a0 = sz == 8 ? v : ((a->a0 & ~0xffffffffull) | (v & 0xffffffffu));
+    else if (off == 0x804) a->a0 = (a->a0 & 0xffffffffull) | ((v & 0xffffffffu) << 32);
+    else if (off == 0x808 && sz == 8) asc_ap_msg(a, a->a0, v & 0xffffffffu);
+    else if (off == 0x808) a->a1 = v & 0xffffffffu;
+    else if (off == 0x80c) asc_ap_msg(a, a->a0, a->a1); }   /* 32-bit accesses: the message is complete with the last word */
+static uint64_t unk_r(void *u, uint64_t off, unsigned sz) {
     struct Unk *d = u; uint64_t val = 0; int fixed = 0; d->reads++; d->last_off = off;
+    if (d->asc && asc_r(d, off, sz, &val)) { fixed = 9; }   /* 0.4.478 */
     for (int k = 0; k < d->rv_n; k++) if (d->rv_off[k] == off) { val = d->rv_val[k]; fixed = 1; }
     for (int k = 0; !fixed && k < d->ts_rn; k++) if (d->ts_off[k] == off) { val = d->ts_val[k]; fixed = 5; }   /* 0.4.150 MODELLED temperature sensor registers, see a64m_unknown_ts_read */
     if (!fixed && d->is_dart && off == 0) { val = 0x0e000000u; fixed = 6; }   /* 0.4.224 MODELLED (ASSUMPTION, PLACEHOLDER): DART register +0x0, bits 27:24 = page-size shift. Source: AppleT8020DART.cpp:1918 compares this 4-bit field with the configured page shift and prints actual = 1<<field; config was 0x4000 (16 KiB) so the field must be 14. Other bits of the register are UNKNOWN and read 0 */
@@ -155,8 +194,8 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) { (void)sz;
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
-static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) { (void)sz;
-    struct Unk *d = u; d->writes++; d->last_off = off; if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v); an_trace(d, 1, off, v);
+static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) {
+    struct Unk *d = u; d->writes++; d->last_off = off; if (d->asc) asc_w(d, off, sz, v);   /* 0.4.478 */ if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v); an_trace(d, 1, off, v);
     if (d->is_aic && !(off >= 0x3000 && off < 0x4000 && !v)) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) { d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; g_aic_clr[(off - 0x4180) >> 2] |= (uint32_t)v; } aic_update(d); }
     if (d->is_spmi && off >= 0x720 && off < 0x740) d->sp_en[(off - 0x720) >> 2] = (uint32_t)v;
