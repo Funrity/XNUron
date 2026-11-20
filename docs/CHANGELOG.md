@@ -1902,3 +1902,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.454
 - Результат 0.4.453: личностей с IOMatchCategory RTBuddyFirmwareService всего четыре: AppleSPUFirmwareService для ролей AOP, SPU, SPU2 и AppleT8020PMPFirmware (роль PMP). Роли ANS среди них НЕТ — значит ожидание «RTBuddyFirmwareService» относится к AOP/SPU/PMP, а не к ANS (прошивку ANS, как у реального железа, ядро, по-видимому, не загружает).
 - Диагностика: личности в prelink-plist, упоминающие «iop,ascwrap», узел `ans`, AppleANS2NVMeController, RTBuddyService — какой класс/провайдер должен создать RTBuddy и «ANS2Endpoint1».
+
+## 0.4.455
+- Результат 0.4.454 (+3G-прогон): в prelink-plist AppleASCWrapV2 (iop,ascwrap-v2) → AppleA7IOPNub → RTBuddyV2 (iop-nub,rtbuddy-v2) → AppleANS2NVMeController (IOProviderClass=RTBuddyV2). Значит RTBuddyV2(ANS) существует, а запуск ASC позже идёт, вероятно, через питание. В 3G-прогоне ждёт один поток (816be24→8178864→814a91c): клиент «pmgr-dock-fifo-client self pmgr» ждёт свойство «IOFunctionParent00000016» (phandle 0x16 = сам pmgr). Кто выставляет это свойство — неизвестно.
+- Диагностика: ссылки на строку «IOFunctionParent%08X» (кто её создаёт/выставляет) + дамп кода рядом.

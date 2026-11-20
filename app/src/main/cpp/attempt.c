@@ -1022,7 +1022,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         seenh[cnt] = h; cnt++; nn += (size_t)snprintf(nl + nn, sizeof nl - nn, " %zx:%.*s |", b, (int)(e - b), (const char *)kern + b); o = e; }
       LOG("%s (%d)\n", nl, cnt); }
     { /* 0.4.411 diagnostic (changes nothing): where does the kernel call IOService::publishResource? Find the string "_publishIOResource: " (AppleCredentialManager), its ADRP+ADD xrefs, and dump the code around the first two (0x1c0 bytes before .. 0x200 after) so the bl to publishResource can be identified offline. */
-      static const char key[] = "AppleInterruptController::start: _aicVersion"; uint64_t saddr = 0;
+      static const char key[] = "IOFunctionParent%08X"; uint64_t saddr = 0;
       for (size_t o = 1; o + sizeof key < klen && !saddr; o++) if (kern[o - 1] == 0 && !memcmp(kern + o, key, sizeof key - 1)) for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (mo.slice_off + g->fileoff <= o && o < mo.slice_off + g->fileoff + g->filesize) { saddr = g->vmaddr + (o - mo.slice_off - g->fileoff); break; } }
       LOG("[boot] diagnostic (changes nothing): string IOInterruptController%%08X (key) at virtual 0x%llx (0.4.411)\n", (unsigned long long)saddr);
       int nx = 0;
