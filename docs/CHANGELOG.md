@@ -1898,3 +1898,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.453
 - Результат 0.4.452: «RTBuddyFirmwareService» — это IOMatchCategory kext-личностей (например, AppleSPUFirmwareService-AOP / -SPU: IOProviderClass RTBuddyService, IOPropertyMatch role=AOP/SPU) внутри ядра. То есть прошивку IOP поставляют драйверы внутри кернелкэша по роли; пользовательский демон не обязателен. Ждущая копия RTBuddy (res18) — вероятно, AOP/SPU, а не ANS (не доказано).
 - Диагностика: все личности с IOMatchCategory RTBuddyFirmwareService (имя/role/провайдер) — есть ли среди них роль ANS.
+
+## 0.4.454
+- Результат 0.4.453: личностей с IOMatchCategory RTBuddyFirmwareService всего четыре: AppleSPUFirmwareService для ролей AOP, SPU, SPU2 и AppleT8020PMPFirmware (роль PMP). Роли ANS среди них НЕТ — значит ожидание «RTBuddyFirmwareService» относится к AOP/SPU/PMP, а не к ANS (прошивку ANS, как у реального железа, ядро, по-видимому, не загружает).
+- Диагностика: личности в prelink-plist, упоминающие «iop,ascwrap», узел `ans`, AppleANS2NVMeController, RTBuddyService — какой класс/провайдер должен создать RTBuddy и «ANS2Endpoint1».
