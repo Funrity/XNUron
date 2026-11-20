@@ -1941,3 +1941,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.464
 - ПОПРАВКА к 0.4.459–0.4.462: застрявший поток — AppleARMCPU::start (рядом строки «Primary%ld», «AppleARMCPU-AllCPU-Initialized»), а не ApplePMGR::start; объект с __state 0x1e и nub с function-clock_gate — это CPU-драйвер. Функция 0x806c958 — waitForMatchingService(dict, timeout): она ищет службы с kIOServiceMatchedState. AppleARMCPU ждёт, пока драйвер ApplePMGR (phandle 0x16) получит IOFunctionParent00000016 и станет «matched»; сам PMGR, видимо, не стартует/не завершает start.
 - Диагностика: строки ядра «ApplePMGR::…»/«pmgr…» — найти код ApplePMGR::start.
+
+## 0.4.465
+- ОТМЕНА поправки 0.4.464: она была неверной. В логе 1500M адрес возврата 0x816be24 лежит внутри ApplePMGR::start (рядом строки "ApplePMGR::start" и "_regMaps[kRegMapPMGR].memMap"), сеттер 0x816bdcc — там же. Значит застрял именно ApplePMGR::start в waitForMatchingService("IOFunctionParent00000016"); выводы 0.4.459–0.4.462 верны. Причина ожидания пока не найдена (самоблокировка на kIOServiceMatchedState или потерянное пробуждение).
