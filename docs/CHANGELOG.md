@@ -1894,3 +1894,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.452
 - Результат 0.4.451 (3G): launchd ramdisk запускает только xpcproxy → restored_external (плюс HorizonSetup, syslogd, ReportCrash, PurpleReverseProxy); rtbuddyd в списке НЕТ. Среди ядерных строк — RTBuddyFirmwareBundle, firmware_service, _handlePreloadFirmware, «Selected firmware does not match the target IOP», AppleFirmwareDecodeImage4 (прошивка IOP может поставляться kext-ом/пакетом внутри ядра, как у AGXFirmwareKextG11PRTBuddy). Что именно ждёт «RTBuddyFirmwareService» и относится ли оно к ANS — не доказано.
 - Диагностика: контексты «FirmwareService» в образе ядра (prelink-plist/строки, ±170 байт) — найти, какие kext/личности публикуют эту службу.
+
+## 0.4.453
+- Результат 0.4.452: «RTBuddyFirmwareService» — это IOMatchCategory kext-личностей (например, AppleSPUFirmwareService-AOP / -SPU: IOProviderClass RTBuddyService, IOPropertyMatch role=AOP/SPU) внутри ядра. То есть прошивку IOP поставляют драйверы внутри кернелкэша по роли; пользовательский демон не обязателен. Ждущая копия RTBuddy (res18) — вероятно, AOP/SPU, а не ANS (не доказано).
+- Диагностика: все личности с IOMatchCategory RTBuddyFirmwareService (имя/role/провайдер) — есть ли среди них роль ANS.
