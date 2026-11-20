@@ -1034,6 +1034,13 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           nx++; LOG("[boot] diagnostic (changes nothing): xref #%d of the key string (0.4.431) at pc 0x%llx\n", nx, (unsigned long long)pc);
           for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x100; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
             if (a2 >= g->vmaddr && a2 + 0x80 <= g->vmaddr + g->filesize) { for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a2 - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } LOG("%s\n", dl); } } } } }
+    { /* 0.4.456 diagnostic (changes nothing): callers (BL) of the functions that build/use "IOFunctionParent%08X": 0x814a870 (name builder) and 0x814a944 (waiter) and of 0x814a8ec (wrapper) */
+      static const uint64_t tg[3] = { 0xfffffff00814a870ull, 0xfffffff00814a8ecull, 0xfffffff00814a944ull }; char cl[1500]; size_t cn = 0; int cnt[3] = { 0, 0, 0 };
+      cn += (size_t)snprintf(cl, sizeof cl, "[boot] diagnostic (changes nothing): BL callers of 0x814a870 / 0x814a8ec / 0x814a944 (0.4.456):");
+      for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
+        for (uint64_t o = 0; o + 4 <= g->filesize; o += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if ((w & 0xfc000000u) != 0x94000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000; uint64_t t = g->vmaddr + o + (uint64_t)(im * 4);
+          for (int k = 0; k < 3; k++) if (t == tg[k] && cnt[k] < 8 && cn < sizeof cl - 60) { cnt[k]++; cn += (size_t)snprintf(cl + cn, sizeof cl - cn, " [%d]0x%llx", k, (unsigned long long)(g->vmaddr + o)); } } }
+      LOG("%s\n", cl); }
     { /* 0.4.410 diagnostic (changes nothing): all printable strings (>=3 chars) in two kernelcache windows around the NVRAM controller class names (offsets from 0.4.408): which names does AppleARMCHRPNVRAM / IONVRAMController sit next to? */
       static const size_t win[2][2] = { { 0x4d2080, 0x4d2300 }, { 0x4cfe00, 0x4d0000 } }; char wl[3500]; size_t wn = 0;
       for (int wi = 0; wi < 2; wi++) { wn += (size_t)snprintf(wl + wn, sizeof wl - wn, "[boot] diagnostic (changes nothing): kernelcache strings in file window 0x%zx..0x%zx (0.4.410):", win[wi][0], win[wi][1]);
