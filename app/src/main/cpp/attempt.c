@@ -1013,9 +1013,9 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } } }
         if (okd) LOG("%s\n", dl); } }
     { /* 0.4.408 diagnostic (changes nothing): printable strings of the kernelcache that contain 'nvram' (any case), distinct, with file offsets: which classes / properties does this kernel have for NVRAM? */
-      char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings starting with RTBuddyF/RTBuddyIO/firmware/AppleANS2 (0.4.450, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
+      char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings starting with ApplePMGR::/pmgr (0.4.464, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
       for (size_t o = 0; o + 16 < klen && cnt < 120 && nn < sizeof nl - 200; o++) {
-        if (!(!memcmp(kern + o, "RTBuddyF", 8) || !memcmp(kern + o, "RTBuddyIO", 9) || !strncasecmp((const char *)kern + o, "firmware", 8) || !memcmp(kern + o, "AppleANS2", 9))) continue;   /* 0.4.450: RTBuddy firmware service strings */   /* 0.4.434: 'aic,' (DT compatible) or 'pleint' (AppleInterrupt...) */
+        if (memcmp(kern + o, "ApplePMGR::", 11) && memcmp(kern + o, "ApplePMGR ", 10) && memcmp(kern + o, "pmgr", 4)) continue;   /* 0.4.464: ApplePMGR strings */   /* 0.4.450: RTBuddy firmware service strings */   /* 0.4.434: 'aic,' (DT compatible) or 'pleint' (AppleInterrupt...) */
         size_t b = o; while (b > 0 && o - b < 60 && kern[b - 1] >= 32 && kern[b - 1] < 127) b--;
         size_t e = o; while (e < klen && e - o < 80 && kern[e] >= 32 && kern[e] < 127) e++;
         if (e - b < 6) continue; uint64_t h = 1469598103934665603ull; for (size_t q = b; q < e; q++) h = (h ^ kern[q]) * 1099511628211ull;
