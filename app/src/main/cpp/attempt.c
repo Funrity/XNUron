@@ -998,7 +998,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           cur[ncur++] = f; g_ch_fn[g_ch_n] = f; g_ch_site[g_ch_n] = xr; g_ch_d[g_ch_n++] = 0; }
         for (int dep = 1; dep <= 8 && ncur && g_ch_n < 44; dep++) { nnx = 0;
           for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
-            for (uint64_t o = 0; o + 4 <= g->filesize && nnx < 8; o += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if ((w & 0xfc000000u) != 0x94000000u) continue;
+            for (uint64_t o = 0; o + 4 <= g->filesize && nnx < 8; o += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if ((w & 0xfc000000u) != 0x94000000u && (w & 0xfc000000u) != 0x14000000u) continue;
               int64_t d = (int64_t)(w & 0x3ffffffu); if (d & 0x2000000) d -= 0x4000000; uint64_t pc = g->vmaddr + o, tg = pc + (uint64_t)(d * 4); int hit = 0; for (int k = 0; k < ncur; k++) if (cur[k] == tg) hit = 1; if (!hit) continue;
               uint64_t f = pc; for (uint64_t o2 = o; o2 >= 4 && o - o2 < 0x4000; o2 -= 4) { uint32_t w2; memcpy(&w2, kern + mo.slice_off + g->fileoff + o2, 4); if (w2 == 0xd503237fu) { f = g->vmaddr + o2; break; } }
               int dup = 0; for (int k = 0; k < nnx; k++) if (nxt[k] == f) dup = 1; if (dup) continue; nxt[nnx++] = f; if (g_ch_n < 48) { g_ch_fn[g_ch_n] = f; g_ch_site[g_ch_n] = pc; g_ch_d[g_ch_n++] = dep; } } }
@@ -1035,8 +1035,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
           for (uint64_t a2 = (pc - 0x1c0) & ~0x7full; a2 < pc + 0x100; a2 += 0x80) { char dl[1200]; size_t dn = (size_t)snprintf(dl, sizeof dl, "[stop] code 0x%llx (kernel image dump 0.4.127):", (unsigned long long)a2);
             if (a2 >= g->vmaddr && a2 + 0x80 <= g->vmaddr + g->filesize) { for (int w = 0; w < 32; w++) { uint32_t x; memcpy(&x, kern + mo.slice_off + g->fileoff + (a2 - g->vmaddr) + 4 * (uint64_t)w, 4); dn += (size_t)snprintf(dl + dn, sizeof dl - dn, " %08x", x); } LOG("%s\n", dl); } } } } }
     { /* 0.4.456 diagnostic (changes nothing): callers (BL) of the functions that build/use "IOFunctionParent%08X": 0x814a870 (name builder) and 0x814a944 (waiter) and of 0x814a8ec (wrapper) */
-      static const uint64_t tg[3] = { 0xfffffff00814a870ull, 0xfffffff00814a8ecull, 0xfffffff00814a944ull }; char cl[1500]; size_t cn = 0; int cnt[3] = { 0, 0, 0 };
-      cn += (size_t)snprintf(cl, sizeof cl, "[boot] diagnostic (changes nothing): BL callers of 0x814a870 / 0x814a8ec / 0x814a944 (0.4.456):");
+      static const uint64_t tg[3] = { 0xfffffff00814a7a0ull, 0xfffffff00814a870ull, 0xfffffff00814a944ull };   /* 0.4.457: 0x814a7a0 = the function that SETS IOFunctionParent%08X (getProperty phandle -> name -> this->setProperty) */ char cl[1500]; size_t cn = 0; int cnt[3] = { 0, 0, 0 };
+      cn += (size_t)snprintf(cl, sizeof cl, "[boot] diagnostic (changes nothing): BL/B callers of 0x814a7a0 [0] / 0x814a870 [1] / 0x814a944 [2] (0.4.457):");
       for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4) || mo.slice_off + g->fileoff + g->filesize > klen) continue;
         for (uint64_t o = 0; o + 4 <= g->filesize; o += 4) { uint32_t w; memcpy(&w, kern + mo.slice_off + g->fileoff + o, 4); if ((w & 0xfc000000u) != 0x94000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000; uint64_t t = g->vmaddr + o + (uint64_t)(im * 4);
           for (int k = 0; k < 3; k++) if (t == tg[k] && cnt[k] < 8 && cn < sizeof cl - 60) { cnt[k]++; cn += (size_t)snprintf(cl + cn, sizeof cl - cn, " [%d]0x%llx", k, (unsigned long long)(g->vmaddr + o)); } } }
