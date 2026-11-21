@@ -2034,3 +2034,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.488
 - Реальные ответы ядра (0.4.487): на «IOP power ON» (тип 7, 0x20) ядро прислало 0x00b0_0000_0000_0020 (тип 0xb = AP power state, 0x20). В стеках блокировок видны RTBuddy::_setPowerStateGuardEntryGated, _messageHandler ("invalid management message %llx received"), _incomingMsgAction — драйвер ждёт завершения смены питания, PMGR всё ещё ждёт PMP.
 - Диагностика: дамп 0x82f3d00..0x82f4580 — _messageHandler/_incomingMsgAction (какие типы сообщений ep0 он принимает и что делает с каждым).
+
+## 0.4.489
+- Прочитано из кода ядра (дамп 0x82f3d00..): диспетчер входящих сообщений ep0 (_messageHandler, 0x82f3e64): тип = биты 55:52 (ubfx x22,x19,#52,#4), таблица переходов на типы 1 (HELLO → 0x82f46c0), 4 (→ 0x82f4a20), 7 (ack питания IOP → 0x82f4b18), 8 (EPMAP → ~0x82f4850), 0xb (→ 0x82f3f20: сохраняет младшие 32 бита в объект+232 и будит ожидающий поток — это то, на чём стоит _setPowerStateGuardEntryGated). Остальные типы → «invalid management message».
+- Модель (MODELLED, ASSUMPTION): на AP_PWR_STATE (тип 0xb от ядра) модель отвечает тем же типом 0xb с тем же состоянием.
