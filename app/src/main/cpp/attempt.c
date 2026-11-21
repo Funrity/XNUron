@@ -1086,7 +1086,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       LOG("[boot] diagnostic (changes nothing): kernelcache symbol table: LC_SYMTAB %s, %u entries, %llu usable named section symbols\n", symoff ? "present" : "absent", nsyms, (unsigned long long)g_sym_cnt); }
     uint64_t entry_v = mo.thread_pc, entry_p = kphys + (entry_v - mo.lowest_vm);
     { /* 0.4.454 diagnostic (changes nothing): personalities that mention ascwrap / RTBuddyService / ANS2 in the prelink plist */
-      static const char *const pats[] = { "<string>pmp<", "<string>PMP<", "<string>pmp0<", "<string>AppleARMPMGR" };   /* 0.4.496 */
+      static const char *const pats[] = { "<string>iop-nub,rtbuddy-v2<", "<string>iop-pmp-nub<", "<string>iop-nub,rtbuddy<", "<string>RTBuddyV2" };   /* 0.4.505 */
       for (int pi = 0; pi < 4; pi++) { size_t from = 0; int nf = 0; size_t pl = strlen(pats[pi]); while (nf < 8 && from + 64 < klen) { const uint8_t *q = (const uint8_t *)memmem(kern + from, klen - from - 64, pats[pi], pl); if (!q) break; size_t qo = (size_t)(q - kern); char cb[460]; size_t a0 = qo > 200 ? qo - 200 : 0, a1 = qo + 220 < klen ? qo + 220 : klen, nn = 0;
         for (size_t z = a0; z < a1 && nn < sizeof cb - 1; z++) cb[nn++] = (kern[z] >= 32 && kern[z] < 127) ? (char)kern[z] : '|'; cb[nn] = 0;
         LOG("[boot] diagnostic (changes nothing): plist pattern %d #%d: %s\n", pi, nf, cb); nf++; from = qo + pl; } } }
