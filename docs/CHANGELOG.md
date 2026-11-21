@@ -2162,3 +2162,8 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.522
 - Результат 0.4.521: личности с провайдером RTBuddyV2 — только AppleANS2NVMeController и AppleANS2CGNVMeController; клиентов RTBuddy/RTBuddyService — AppleT8020PMPFirmware/AppleSPU*. Но в строках ядра есть класс ApplePMP (ApplePMP-98.200.34, «ApplePMPControlFunction», «ApplePMPUserClient») — вероятный издатель function PMPC / IOFunctionParent для iop-pmp-nub.
 - Диагностика: поиск личности ApplePMP в plist (ключ, IOProviderClass, IONameMatch).
+
+## 0.4.523 — ПЕРВОЕ ИЗМЕНЕНИЕ ПОВЕДЕНИЯ (EXPERIMENT / ASSUMPTION / PLACEHOLDER)
+- Результат 0.4.522: личность ApplePMP матчится на IOProviderClass=RTBuddyEndpointService, IONameMatch «PMPEndpoint1» (второй класс — «PMPEndpoint2»). Это узлы-эндпоинты, которые RTBuddyV2 должен создать из EPMAP от IOP; пока такого узла нет, ApplePMP не стартует и IOFunctionParent для iop-pmp-nub не публикуется (аналогично драйвер NVMe ждёт «ANS2Endpoint1»).
+- Эмулятор (MODELLED IOP-сторона, прошивка НЕ исполняется): EPMAP теперь двумя группами — группа 0 (ep0..4, без LAST) и после ответа ядра группа 1 (base 1, LAST, биты 0..1 = эндпоинты 0x20, 0x21). Номера эндпоинтов — ПРЕДПОЛОЖЕНИЕ (нумерация «Endpoint1/2» → 0x20/0x21 не подтверждена), реальный список PMP-прошивки неизвестен.
+- Тест: ответ AP на EPMAP даёт вторую группу (base1, LAST, 0x3).
