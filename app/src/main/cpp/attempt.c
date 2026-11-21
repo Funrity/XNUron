@@ -973,6 +973,14 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
         for (uint64_t off = 0; off + 4 <= g->filesize && nh2 < 12; off += 4) { size_t fi = mo.slice_off + g->fileoff + off; if (fi + 4 > klen) break; uint32_t w = (uint32_t)kern[fi] | (uint32_t)kern[fi + 1] << 8 | (uint32_t)kern[fi + 2] << 16 | (uint32_t)kern[fi + 3] << 24;
           if ((w & 0x7fe00000u) == 0x72a00000u && ((w >> 5) & 0xffff) == 0xbad) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
       LOG("%s (%d)\n", ln, nh2); }
+    { /* 0.4.508 diagnostic (changes nothing): BL/B call sites of the IOFunctionParent name builder 0x814a870 and the waiter 0x814a8f0 */
+      static const uint64_t tg[2] = { 0xfffffff00814a870ull, 0xfffffff00814a8f0ull };
+      for (int ti = 0; ti < 2; ti++) { char ln[900]; size_t lw = (size_t)snprintf(ln, sizeof ln, "[boot] diagnostic (changes nothing, 0.4.508): callers (BL) of 0x%llx:", (unsigned long long)tg[ti]); int nh2 = 0;
+        for (int q = 0; q < mo.nseg && nh2 < 40; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4)) continue;
+          for (uint64_t off = 0; off + 4 <= g->filesize && nh2 < 40; off += 4) { size_t fi = mo.slice_off + g->fileoff + off; if (fi + 4 > klen) break; uint32_t w = (uint32_t)kern[fi] | (uint32_t)kern[fi + 1] << 8 | (uint32_t)kern[fi + 2] << 16 | (uint32_t)kern[fi + 3] << 24;
+            if ((w & 0xfc000000u) != 0x94000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
+            if (g->vmaddr + off + (uint64_t)(im * 4) == tg[ti]) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
+        LOG("%s (%d)\n", ln, nh2); } }
     { /* 0.4.126 diagnostic (changes nothing): code that references the strings 'RAMDisk' and 'root-matching' (ADRP+ADD pairs); the first hit of each gets a code dump window */
       static const char *const xs[] = { "RAMDisk", "root-matching" };
       for (int xi = 0; xi < 2; xi++) { size_t kl = strlen(xs[xi]) + 1; uint64_t sva = 0;
