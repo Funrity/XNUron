@@ -2158,3 +2158,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.521
 - Результат 0.4.520: в RTBuddy::start (0x82e8a6c…) вызов _createReporters (0x82e94a0) стоит в самом конце (после него return true) — зависший SMC-поток блокируется именно в нём; LC_SYMTAB в ядре ОТСУТСТВУЕТ (моя прежняя запись о наличии символов была неверной).
 - Диагностика: поиск личностей, у которых провайдер RTBuddyV2 / RTBuddy / RTBuddyService, и строки «PMPC» в plist ядра — кто реализует function PMPC для iop-pmp-nub и должен опубликовать IOFunctionParent.
+
+## 0.4.522
+- Результат 0.4.521: личности с провайдером RTBuddyV2 — только AppleANS2NVMeController и AppleANS2CGNVMeController; клиентов RTBuddy/RTBuddyService — AppleT8020PMPFirmware/AppleSPU*. Но в строках ядра есть класс ApplePMP (ApplePMP-98.200.34, «ApplePMPControlFunction», «ApplePMPUserClient») — вероятный издатель function PMPC / IOFunctionParent для iop-pmp-nub.
+- Диагностика: поиск личности ApplePMP в plist (ключ, IOProviderClass, IONameMatch).
