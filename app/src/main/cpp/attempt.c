@@ -1021,7 +1021,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     { /* 0.4.408 diagnostic (changes nothing): printable strings of the kernelcache that contain 'nvram' (any case), distinct, with file offsets: which classes / properties does this kernel have for NVRAM? */
       char nl[7000]; size_t nn = (size_t)snprintf(nl, sizeof nl, "[boot] diagnostic (changes nothing): kernelcache strings starting with ApplePMP/AppleARMPMP/PMP/IOPMP (0.4.493, file offset:string):"); int cnt = 0; static uint64_t seenh[512];
       for (size_t o = 0; o + 16 < klen && cnt < 120 && nn < sizeof nl - 200; o++) {
-        if (memcmp(kern + o, "ApplePMP", 8) && memcmp(kern + o, "AppleARMPMP", 11) && memcmp(kern + o, "PMP", 3) && memcmp(kern + o, "AppleARMPlatform", 16) && memcmp(kern + o, "IOPMP", 5) && memcmp(kern + o, "ApplePMGR::", 11)) continue;   /* 0.4.464: ApplePMGR strings */   /* 0.4.450: RTBuddy firmware service strings */   /* 0.4.434: 'aic,' (DT compatible) or 'pleint' (AppleInterrupt...) */
+        if (memcmp(kern + o, "AppleT8020PMP", 13) && memcmp(kern + o, "virtual bool AppleT8020PMP", 26) && memcmp(kern + o, "AppleT8020", 10)) continue;   /* 0.4.497 */   /* 0.4.464: ApplePMGR strings */   /* 0.4.450: RTBuddy firmware service strings */   /* 0.4.434: 'aic,' (DT compatible) or 'pleint' (AppleInterrupt...) */
         size_t b = o; while (b > 0 && o - b < 60 && kern[b - 1] >= 32 && kern[b - 1] < 127) b--;
         size_t e = o; while (e < klen && e - o < 80 && kern[e] >= 32 && kern[e] < 127) e++;
         if (e - b < 6) continue; uint64_t h = 1469598103934665603ull; for (size_t q = b; q < e; q++) h = (h ^ kern[q]) * 1099511628211ull;

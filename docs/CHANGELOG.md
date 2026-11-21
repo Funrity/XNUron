@@ -2063,3 +2063,7 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.496
 - Лог 0.4.495: DT-узлы 'pmp' и 'ans' имеют compatible = «iop,ascwrap-…» (обрезано выводом; в начале «iop,ascwrap-»), device_type «pmp» / «ans» — один и тот же класс ASCWrap, различаются только именем/ролью; драйвер, публикующий function-pmp_control, не найден по строкам «ApplePMP».
 - Диагностика: контексты plist-персоналити со строками <string>pmp<, <string>PMP<, <string>pmp0<, <string>AppleARMPMGR (какие драйверы матчатся на узел pmp).
+
+## 0.4.497
+- НАЙДЕНО в plist ядра (лог 0.4.496): драйвер «AppleT8020PMPFirmware» (IOMatchCategory RTBuddyFirmwareService, IOPropertyMatch role=PMP, IOProviderClass=RTBuddy, com.apple.driver.AppleT8020PMPFirmware). Значит RTBuddy::start для PMP действительно ждёт этот драйвер (то самое ожидание RTBuddyFirmwareService из 0.4.492) — и PMP-ветка блокируется на том, что он не стартует/не публикуется. Исправляю свои выводы 0.4.493 («скорее AOP/SPU»): поток может быть и PMP.
+- Диагностика: строки ядра AppleT8020* (код драйвера прошивки PMP).
