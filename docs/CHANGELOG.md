@@ -2098,3 +2098,6 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.505 — результат
 - plist: «iop-nub,rtbuddy-v2» → класс RTBuddyV2 (провайдер AppleA7IOPNub); «iop-nub,rtbuddy» → RTBuddy. AppleANS2NVMeController имеет IOProviderClass=RTBuddyV2 — т.е. и NVMe ждёт старта RTBuddyV2 узла ANS. Значит PMGR ждёт IOFunctionParent, публикуемый RTBuddyV2-нодой 'iop-pmp-nub'; почему её start не завершается — ещё не выяснено.
+
+## 0.4.506
+- Диагностика (ничего не меняет): в RTBuddy::start перед ожиданием службы (pc 0x82e94dc) снимается поле this+192 (role) → в логе [wait-resN] x0=<this>: «…строки role…». Цель — узнать, какой IOP (SMC/GFX/ANS2/SIO/AOP/PMP) стоит на 0x82e94ec.
