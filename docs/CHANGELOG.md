@@ -2067,3 +2067,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.497
 - НАЙДЕНО в plist ядра (лог 0.4.496): драйвер «AppleT8020PMPFirmware» (IOMatchCategory RTBuddyFirmwareService, IOPropertyMatch role=PMP, IOProviderClass=RTBuddy, com.apple.driver.AppleT8020PMPFirmware). Значит RTBuddy::start для PMP действительно ждёт этот драйвер (то самое ожидание RTBuddyFirmwareService из 0.4.492) — и PMP-ветка блокируется на том, что он не стартует/не публикуется. Исправляю свои выводы 0.4.493 («скорее AOP/SPU»): поток может быть и PMP.
 - Диагностика: строки ядра AppleT8020* (код драйвера прошивки PMP).
+
+## 0.4.498
+- Лог 0.4.497: список строк AppleT8020* упёрся в лимит вывода (первые — AppleT8020PlatformErrorHandler), строки AppleT8020PMPFirmware не попали. Сузил фильтр до «AppleT8020PMP».
