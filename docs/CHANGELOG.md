@@ -2095,3 +2095,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.505
 - РЕЗУЛЬТАТ 0.4.504 (строки ядра @0x75118c8): RTBuddy::start ждёт службу класса «RTBuddyFirmwareService» с ключом «Role». Для PMP она найдена (AppleT8020PMPFirmware: Found firmware, RTBuddy(PMP): Loaded firmware) — значит гипотеза «PMP ждёт прошивку» была неверна; единственный поток, всё ещё стоящий на 0x82e94ec, принадлежит другому IOP (роль не определена: кандидаты SMC/GFX/ANS2/SIO/AOP).
 - PMGR всё ещё ждёт IOFunctionParent0000003b (iop-pmp-nub). Диагностика: поиск в plist ядра личностей, матчащихся на «iop-nub,rtbuddy-v2» / «iop-pmp-nub» / RTBuddyV2.
+
+## 0.4.505 — результат
+- plist: «iop-nub,rtbuddy-v2» → класс RTBuddyV2 (провайдер AppleA7IOPNub); «iop-nub,rtbuddy» → RTBuddy. AppleANS2NVMeController имеет IOProviderClass=RTBuddyV2 — т.е. и NVMe ждёт старта RTBuddyV2 узла ANS. Значит PMGR ждёт IOFunctionParent, публикуемый RTBuddyV2-нодой 'iop-pmp-nub'; почему её start не завершается — ещё не выяснено.
