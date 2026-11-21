@@ -971,7 +971,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
       char ln[800]; size_t lw = (size_t)snprintf(ln, sizeof ln, "[boot] diagnostic (changes nothing, 0.4.480): MOVK w,#0xbad,lsl#16 at virtual:"); int nh2 = 0;
       for (int q = 0; q < mo.nseg && nh2 < 12; q++) { const A64Seg *g = &mo.seg[q];
         for (uint64_t off = 0; off + 4 <= g->filesize && nh2 < 12; off += 4) { size_t fi = mo.slice_off + g->fileoff + off; if (fi + 4 > klen) break; uint32_t w = (uint32_t)kern[fi] | (uint32_t)kern[fi + 1] << 8 | (uint32_t)kern[fi + 2] << 16 | (uint32_t)kern[fi + 3] << 24;
-          if ((w & 0xffe00000u) == 0x72a00000u && ((w >> 5) & 0xffff) == 0xbad) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
+          if ((w & 0x7fe00000u) == 0x72a00000u && ((w >> 5) & 0xffff) == 0xbad) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
       LOG("%s (%d)\n", ln, nh2); }
     { /* 0.4.126 diagnostic (changes nothing): code that references the strings 'RAMDisk' and 'root-matching' (ADRP+ADD pairs); the first hit of each gets a code dump window */
       static const char *const xs[] = { "RAMDisk", "root-matching" };
