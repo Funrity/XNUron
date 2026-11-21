@@ -710,6 +710,19 @@ static int wp_str(A64 *c, uint64_t a, char *o, int n) { /* printable C string of
     for (int k = 0; k < n - 1; k++) { uint64_t v; if (wp_rd(c, (a + (uint64_t)k) & ~7ull, &v)) return 0; unsigned char ch = (unsigned char)(v >> (8 * ((a + (uint64_t)k) & 7))); if (ch == 0) { o[k] = 0; return k >= 3; } if (ch < 32 || ch > 126) return 0; o[k] = (char)ch; }
     o[n - 1] = 0; return 1;
 }
+
+static void wp_dict(A64 *c, uint64_t obj, char *b, size_t cap, size_t *n, int depth) {   /* 0.4.501 diagnostic: OSDictionary {key,value} pairs, strings at +0x10, count +0x10, entries +0x20; recursion for dictionary values */
+    uint64_t w0, arr; if (wp_rd(c, obj + 0x10, &w0) || wp_rd(c, obj + 0x20, &arr) || arr < 0xffffffe000000000ull) { *n += (size_t)snprintf(b + *n, cap - *n, "?"); return; }
+    unsigned cnt = (unsigned)(w0 & 0xffffffffu); if (cnt == 0 || cnt > 12) { *n += (size_t)snprintf(b + *n, cap - *n, "?"); return; }
+    *n += (size_t)snprintf(b + *n, cap - *n, "{");
+    for (unsigned i = 0; i < cnt && *n < cap - 120; i++) { uint64_t k, v, ks, vs; char s1[48], s2[48];
+        if (wp_rd(c, arr + 16u * i, &k) || wp_rd(c, arr + 16u * i + 8, &v)) break;
+        s1[0] = 0; if (!wp_rd(c, k + 0x10, &ks) && wp_str(c, ks, s1, sizeof s1)) {} else snprintf(s1, sizeof s1, "?");
+        *n += (size_t)snprintf(b + *n, cap - *n, "%s=", s1);
+        s2[0] = 0; if (!wp_rd(c, v + 0x10, &vs) && vs >= 0xffffffe000000000ull && wp_str(c, vs, s2, sizeof s2)) *n += (size_t)snprintf(b + *n, cap - *n, "\"%s\" ", s2);
+        else if (depth < 3) { wp_dict(c, v, b, cap, n, depth + 1); *n += (size_t)snprintf(b + *n, cap - *n, " "); }
+        else *n += (size_t)snprintf(b + *n, cap - *n, "? "); }
+    *n += (size_t)snprintf(b + *n, cap - *n, "}"); }
 static void wp_snapshot(A64 *c, uint64_t root, int which) {
     char *b = which == 2 ? c->wp_sn[c->wp_sn_n] : which ? c->wp_snap2 : c->wp_snap; size_t cap = which == 2 ? sizeof c->wp_sn[0] : sizeof c->wp_snap; size_t n = 0; char s[56];
     for (int i = 0; i < 8; i++) { uint64_t p1; if (wp_rd(c, root + 8u * (unsigned)i, &p1) || p1 < 0xffffffe000000000ull) continue;
@@ -1243,7 +1256,7 @@ static int step(A64 *c) {
     if (__builtin_expect(c->fp_pc != 0, 0) && pc == c->fp_pc && c->fp_n < 6 && (c->x[30] & 0xfffffffffull) == 0x8178864ull) { unsigned k = c->fp_n++; c->fp_x0[k] = c->x[0]; c->fp_x1[k] = c->x[1]; c->fp_lr[k] = c->x[30]; c->fp_s[k][0] = 0; if (!wp_str(c, c->x[1], c->fp_s[k], 48)) c->fp_s[k][0] = 0; }   /* 0.4.467 diagnostic only */
     if (__builtin_expect(c->wp2_pc != 0, 0) && pc == c->wp2_pc && c->wp2_n < 8) { unsigned k = c->wp2_n++; c->wp2_x0[k] = c->x[0]; c->wp2_x19[k] = c->x[19]; c->wp2_x22[k] = c->x[22]; }   /* 0.4.460 diagnostic only */
     if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_snap_done && (c->x[30] & 0xfffffffffull) == 0x816bdccull) { c->wp_snap_done = 1; wp_snapshot(c, c->x[0], 0); }   /* 0.4.444: PMGR wait */
-    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && ((pc == c->wp_pc && (c->x[30] & 0xfffffffffull) == 0x816bdccull) || (pc == 0xfffffff008075e48ull && (c->x[30] & 0xfffffffffull) == 0x82e94ecull))) {   /* 0.4.492: also the wait of RTBuddy (0x8075e48 called from 0x82e94e8) */ c->wp_snap2_done = 1; c->wp_sn[c->wp_sn_n][0] = 0; wp_snapshot(c, c->x[0], 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[0]; c->wp_sn_n++; }   /* 0.4.449: every resource wait (up to 24) */   /* 0.4.446: second waiter (thread via 81613c0) */
+    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && ((pc == c->wp_pc && (c->x[30] & 0xfffffffffull) == 0x816bdccull) || (pc == 0xfffffff008075e48ull && (c->x[30] & 0xfffffffffull) == 0x82e94ecull))) {   /* 0.4.492: also the wait of RTBuddy (0x8075e48 called from 0x82e94e8) */ c->wp_snap2_done = 1; c->wp_sn[c->wp_sn_n][0] = 0; if (pc == 0xfffffff008075e48ull) { size_t nn = 0; wp_dict(c, c->x[0], c->wp_sn[c->wp_sn_n], sizeof c->wp_sn[0], &nn, 0); } else wp_snapshot(c, c->x[0], 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[0]; c->wp_sn_n++; }   /* 0.4.449: every resource wait (up to 24) */   /* 0.4.446: second waiter (thread via 81613c0) */
     if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; c->wp_lr[k] = c->x[30]; }   /* 0.4.429 diagnostic only */
     /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
     if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
