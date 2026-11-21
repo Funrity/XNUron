@@ -146,7 +146,7 @@ static void asc_ap_msg(struct Asc *a, uint64_t m0, uint64_t m1) {
     if (ep == 0 && ty == 2 && a->stage == 1 && (m0 & 0xffffffffu) == 0x0badffffu) { a->stage = 3; }   /* the kernel's own answer to an unacceptable version range (0.4.478 log: 0x0badffff) */
     else if (ep == 0 && ty == 2 && a->stage == 1) { a->stage = 2; asc_push(a, (8ull << 52) | (1ull << 51) | 0x1u, 0); }   /* HELLO_ACK -> EPMAP {ep0}, last (placeholder bitmap) */
 }
-static void asc_cpu_w(struct Asc *a, uint64_t v) { int run = (v >> 4) & 1; if (run && !a->run && a->stage == 0) { a->stage = 1; asc_push(a, (1ull << 52) | (0xffffull << 16) | 1u, 0); } a->run = run; }   /* RUN -> HELLO, versions min=1 max=0xffff: a deliberately wide range so that the kernel's reply reveals the version IT chooses (0.4.478 log: min=max=1 was answered with the error pattern 0x0badffff). The real firmware's range is UNKNOWN */
+static void asc_cpu_w(struct Asc *a, uint64_t v) { int run = (v >> 4) & 1; if (run && !a->run && a->stage == 0) { a->stage = 1; asc_push(a, (1ull << 52) | (10ull << 16) | 10u, 0); } a->run = run; }   /* RUN -> HELLO, max version 10 = the ONLY value the kernel's HELLO handler accepts (code at 0x82f4754: ubfx(msg,16,16) compared with 10; any other value is answered with 0x0badffff, built at 0x82f4814); min=10 is a PLACEHOLDER (the kernel does not compare it there) */
 int a64m_asc_add(A64Machine *m, uint64_t cpu_pa, unsigned irq, const char *tag) {
     int ix = -1; for (int k = 0; k < 4; k++) if (g_asc[k].used && g_asc[k].cpu_pa == cpu_pa) { ix = k; break; }   /* the same coprocessor of a new machine replaces the old model (tests / reboot) */
     for (int k = 0; ix < 0 && k < 4; k++) if (!g_asc[k].used) ix = k; if (ix < 0) return -1;
