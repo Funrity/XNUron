@@ -115,7 +115,8 @@ typedef struct {
     uint64_t wp_pm_x0;   /* 0.4.463: x0 of the first wait call from the PMGR client (lr 0x814a9f0) */
     uint64_t wp2_pc; unsigned wp2_n; uint64_t wp2_x0[8], wp2_x19[8], wp2_x22[8];   /* 0.4.460 */
     uint64_t fp_pc; unsigned fp_n; uint64_t fp_x0[6], fp_x1[6], fp_lr[6]; char fp_s[6][48];
-    unsigned fq_n; uint64_t fq_x0[16], fq_x1[16], fq_x2[16], fq_lr[16]; char fq_s[16][120];   /* 0.4.507 diagnostic: calls of 0x814a7a0 (function-property setter) */   /* 0.4.467 diagnostic: calls of waitForFunctionParent 0x814a8f0 */
+    unsigned fq_n; uint64_t fq_x0[16], fq_x1[16], fq_x2[16], fq_lr[16]; char fq_s[16][120];
+    unsigned fn_n; char fn_s[40][32];   /* 0.4.512 diagnostic: names built by 0x814a870 */   /* 0.4.507 diagnostic: calls of 0x814a7a0 (function-property setter) */   /* 0.4.467 diagnostic: calls of waitForFunctionParent 0x814a8f0 */
     uint64_t wp_pc; unsigned wp_n; uint64_t wp_x0[16], wp_x1[16], wp_lr[16];   /* 0.4.429 watch: first 16 entries at wp_pc */
     uint64_t ch_pc, ch_target, ch_x1, ch_x2; unsigned ch_n;   /* 0.4.414 MODELLED one-shot call */
     uint64_t jmp_pc, jmp_to; unsigned jmp_n;   /* 0.4.378 MODELLED redirect: when pc==jmp_pc the instruction is NOT executed and execution continues at jmp_to */

@@ -256,6 +256,7 @@ int main(int argc, char **argv) {
             for (int u = 0; u < 12; u++) { uint64_t pa, v = 0; uint8_t *q; if (!a64_virt_to_phys(c7, th + 8u * (unsigned)u, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&v, q, 8); fprintf(stderr, " %llx", (unsigned long long)v); } fprintf(stderr, "\n"); }
           if (c7->wp_pm_x0) { fprintf(stderr, "[pmgr-waitobj] x0=%llx words(+0x00..+0x58):", (unsigned long long)c7->wp_pm_x0);
             for (int u = 0; u < 12; u++) { uint64_t pa, v = 0; uint8_t *q; if (!a64_virt_to_phys(c7, c7->wp_pm_x0 + 8u * (unsigned)u, &pa) && (q = a64m_ram_at(m, pa, 8))) memcpy(&v, q, 8); fprintf(stderr, " %llx", (unsigned long long)v); } fprintf(stderr, "\n"); }
+          for (unsigned q = 0; q < c7->fn_n; q++) fprintf(stderr, "[fname%u] %s\n", q, c7->fn_s[q]);
           for (unsigned q = 0; q < c7->fq_n; q++) fprintf(stderr, "[fset%u] x0=%llx x1=%llx x2=%llx lr=%llx s1=\"%s\"\n", q, (unsigned long long)c7->fq_x0[q], (unsigned long long)c7->fq_x1[q], (unsigned long long)c7->fq_x2[q], (unsigned long long)c7->fq_lr[q], c7->fq_s[q]);
           for (unsigned q = 0; q < c7->fp_n; q++) fprintf(stderr, "[fparent%u] provider=%llx x1=%llx lr=%llx name=\"%s\"\n", q, (unsigned long long)c7->fp_x0[q], (unsigned long long)c7->fp_x1[q], (unsigned long long)c7->fp_lr[q], c7->fp_s[q]);
           fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
