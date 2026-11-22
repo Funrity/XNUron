@@ -450,7 +450,9 @@ int main(int argc, char **argv) {
               fprintf(stderr, " @%llx\"%s\"", (unsigned long long)(a & 0xfffffffffull), buf); cnt++; }
             fprintf(stderr, "\n"); if (nf <= fp) break; fp = nf; } }
       }
-      fprintf(stderr, "[aic-info] %s\n", a64m_aic_info(m)); fputs(a64m_asc_log(), stderr);
+      fprintf(stderr, "[aic-info] %s\n", a64m_aic_info(m)); { size_t fn = 0; const uint8_t *fw = a64m_pmp_fw(&fn); fprintf(stderr, "[pmpfw] captured bytes written to 0x23b500000: highest end 0x%zx\n", fn);
+          for (size_t o = 0; o < fn; o += 32) { int nz = 0; for (size_t i = 0; i < 32 && o + i < fn; i++) if (fw[o + i]) nz = 1; if (!nz) continue; fprintf(stderr, "[pmpfw] %05zx ", o); for (size_t i = 0; i < 32 && o + i < fn; i++) fprintf(stderr, "%02x", fw[o + i]); fputc('\n', stderr); } }
+          fputs(a64m_asc_log(), stderr);
       fprintf(stderr, "[aicw] distinct AIC register writes (+offset:count|OR of values):%s\n", a64m_aic_writes(m));
       { /* 0.4.251 diagnostic: where does the kernel build "voltage-states%d" (the PMGR perf-domain frequency tables)? find the string, then every ADRP+ADD reference in the code range */
         A64 *c4 = a64m_cpu(m); uint64_t sva = 0, pa4; uint8_t *q8; static const char nd[] = "AppleARMCPU-AllCPU-Initialized";   /* 0.4.317: where is init_program_name used (bsd_utaskbootstrap/load_init_program)? are those executed (E)? */

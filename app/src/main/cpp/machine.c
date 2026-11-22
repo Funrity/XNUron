@@ -199,8 +199,11 @@ static uint64_t unk_r(void *u, uint64_t off, unsigned sz) {
     if (d->pa != 0x200000000ull) { unsigned i = g_rr_n++ % 24; g_rr[i].m = d->m; snprintf(g_rr[i].label, sizeof g_rr[i].label, "%s@%llx", d->label[0] ? d->label : "'?'", (unsigned long long)d->pa); g_rr[i].off = off; g_rr[i].val = val; }
     return val;
 }
+static uint8_t g_pmpfw[0x40000]; static size_t g_pmpfw_hi;   /* 0.4.536 capture only: bytes the kernel writes into the PMP SRAM window (the PMP firmware image it copies there); reads are NOT affected */
+const uint8_t *a64m_pmp_fw(size_t *n) { if (n) *n = g_pmpfw_hi; return g_pmpfw; }
 static void unk_w(void *u, uint64_t off, unsigned sz, uint64_t v) {
-    struct Unk *d = u; d->writes++; d->last_off = off; if (d->asc) asc_w(d, off, sz, v);   /* 0.4.478 */ if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v); an_trace(d, 1, off, v);
+    struct Unk *d = u; if (d->pa == 0x23b500000ull && off + sz <= sizeof g_pmpfw && sz <= 8) { memcpy(g_pmpfw + off, &v, sz); if (off + sz > g_pmpfw_hi) g_pmpfw_hi = off + sz; }
+    d->writes++; d->last_off = off; if (d->asc) asc_w(d, off, sz, v);   /* 0.4.478 */ if (d->ts_n) ts_trace(d, 1, off, v); i2_trace(d, 1, off, v); an_trace(d, 1, off, v);
     if (d->is_aic && !(off >= 0x3000 && off < 0x4000 && !v)) { int k = 0; while (k < d->aw_cnt && d->aw_off[k] != (uint16_t)off) k++; if (k == d->aw_cnt && k < 128) { d->aw_off[k] = (uint16_t)off; d->aw_cnt++; } if (k < 128) { d->aw_or[k] |= (uint32_t)v; d->aw_n[k]++; } }   /* 0.4.235 diagnostic: distinct written offsets with the OR of the values */
     if (d->is_aic) { if (off >= 0x4100 && off < 0x4140) d->aic_mask[(off - 0x4100) >> 2] |= (uint32_t)v; else if (off >= 0x4180 && off < 0x41c0) { d->aic_mask[(off - 0x4180) >> 2] &= ~(uint32_t)v; g_aic_clr[(off - 0x4180) >> 2] |= (uint32_t)v; } aic_update(d); }
     if (d->is_spmi && off >= 0x720 && off < 0x740) d->sp_en[(off - 0x720) >> 2] = (uint32_t)v;
