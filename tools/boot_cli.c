@@ -294,6 +294,16 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.541 diagnostic (changes nothing): references to PMGR callback 0x89a7690 / waiter 0x89a7740 in the RUN-TIME kernel image (the kernel has applied its own chained fixups by now): BL/B callers and 8-byte data words whose low 36 bits equal the address, with neighbouring words */
+          static const uint64_t tg[2] = { 0x0089a7690ull, 0x0089a7740ull };
+          for (int ti = 0; ti < 2; ti++) { int nb = 0, nd = 0;
+            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && (nb < 12 || nd < 6); pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000 && nb < 12; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0x7c000000u) != 0x14000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
+                if (((pg + o + (uint64_t)(im * 4)) & 0xfffffffffull) == tg[ti]) { fprintf(stderr, "[pmgrref] %llx: %s from %llx\n", (unsigned long long)tg[ti], (w & 0x80000000u) ? "BL" : "B", (unsigned long long)((pg + o) & 0xfffffffffull)); nb++; } }
+              for (uint32_t o = 0; o + 8 <= 0x1000 && nd < 6; o += 8) { uint64_t v; memcpy(&v, q8 + o, 8); if ((v & 0xfffffffffull) != tg[ti] || (v >> 36) == 0) continue;
+                fprintf(stderr, "[pmgrref] %llx: data word at %llx (raw %llx); words -6..+6:", (unsigned long long)tg[ti], (unsigned long long)((pg + o) & 0xfffffffffull), (unsigned long long)v);
+                for (int d = -6; d <= 6; d++) { uint64_t pa9; uint8_t *q9; uint64_t va9 = pg + o + (uint64_t)(int64_t)(d * 8); if (a64_virt_to_phys(c7, va9, &pa9) || !(q9 = a64m_ram_at(m, pa9, 8))) continue; uint64_t v9; memcpy(&v9, q9, 8); fprintf(stderr, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)(v9 & 0xfffffffffull)); }
+                fprintf(stderr, "\n"); nd++; } } } }
         { /* 0.4.368 diagnostic: [e6] scan found no direct stores of 6 into [bp+84]. Find (1) 'str w1,[x0,#84]' (buf_seterror-like setter) and (2) 'mov w1,#6' followed within 3 instructions by a BL whose target contains such a str within 0x30 bytes of its start */
           int nh = 0; uint64_t setter[8]; int ns = 0;
           for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
