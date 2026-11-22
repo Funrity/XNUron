@@ -982,7 +982,7 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             if (g->vmaddr + off + (uint64_t)(im * 4) == tg[ti]) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
         LOG("%s (%d)\n", ln, nh2); } }
     { /* 0.4.126 diagnostic (changes nothing): code that references the strings 'RAMDisk' and 'root-matching' (ADRP+ADD pairs); the first hit of each gets a code dump window */
-      static const char *const xs[] = { "RAMDisk", "root-matching" };
+      static const char *const xs[] = { "EndpointNN", "RTBuddyEndpointService" };   /* 0.4.529 */
       for (int xi = 0; xi < 2; xi++) { size_t kl = strlen(xs[xi]) + 1; uint64_t sva = 0;
         for (size_t i = 0; i + kl <= klen && !sva; i++) if (!memcmp(kern + i, xs[xi], kl) && (i == 0 || kern[i - 1] == 0)) {
             for (int q = 0; q < mo.nseg; q++) { const A64Seg *g = &mo.seg[q]; uint64_t off = i - mo.slice_off; if (i >= mo.slice_off && off >= g->fileoff && off < g->fileoff + g->filesize) { sva = g->vmaddr + (off - g->fileoff); break; } } }
