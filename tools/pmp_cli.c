@@ -8,8 +8,16 @@
 #include <stdint.h>
 typedef struct { char name[24]; unsigned n; } Dv;
 static Dv dv[64]; static int ndv;
-static uint64_t dr(void *u, uint64_t off, unsigned sz) { Dv *d = u; if (d->n++ < (d->name[0]=='i' ? 600u : 40u)) fprintf(stderr, "[io] R %s+%llx sz%u -> 0\n", d->name, (unsigned long long)off, sz); return 0; }
-static void dw(void *u, uint64_t off, unsigned sz, uint64_t v) { Dv *d = u; if (d->n++ < (d->name[0]=='i' ? 600u : 40u)) fprintf(stderr, "[io] W %s+%llx sz%u = %llx\n", d->name, (unsigned long long)off, sz, (unsigned long long)v); }
+static uint64_t q_lo[64], q_hi[64]; static int q_h, q_t; static uint64_t o_lo;
+static void q_push(uint64_t lo, uint64_t hi) { q_lo[q_t % 64] = lo; q_hi[q_t % 64] = hi; q_t++; fprintf(stderr, "[ap->iop] %016llx %llx (MODELLED AP reply)\n", (unsigned long long)lo, (unsigned long long)hi); }
+static void on_iop_msg(uint64_t lo, uint64_t hi) { unsigned t = (lo >> 52) & 0xff; fprintf(stderr, "[iop->ap] type %u lo=%016llx hi=%llx\n", t, (unsigned long long)lo, (unsigned long long)hi);
+    if (!getenv("PMP_SCRIPT")) return;
+    if (t == 1) q_push((2ull << 52) | (10ull << 16) | 10ull, 0);                       /* ASSUMPTION: HELLO_ACK carries ver 10/10 */
+    else if (t == 8) q_push((8ull << 52) | (1ull << 51) | 0, 0);                        /* ASSUMPTION placeholder EPMAP reply: filled below */
+}
+static uint64_t dr(void *u, uint64_t off, unsigned sz) { Dv *d = u;
+    if (getenv("PMP_SCRIPT")) { uint64_t o = off + 0x4000000ull; if (o == 0x23bc0080cull && getenv("PMP_W3")) return q_h == q_t ? 0 : (1u << atoi(getenv("PMP_W3"))); if (o == 0x23bc0081cull && getenv("PMP_IRQBIT")) return q_h == q_t ? 0 : (0x10000u | atoi(getenv("PMP_IRQBIT"))); if (o == 0x23bc04108ull) return q_h == q_t ? 0x20000 : (1u << 20); if (o == 0x23bc04810ull) return q_h == q_t ? 0 : q_lo[q_h % 64]; if (o == 0x23bc04818ull) { uint64_t v = q_h == q_t ? 0 : q_hi[q_h % 64]; if (q_h != q_t) q_h++; return v; } } if (getenv("PMP_EMPTY") && off == 0x23bc04108ull - 0x4000000ull) { if (d->n++ < 600) fprintf(stderr, "[io] R ctl+4108 -> 0x20000 (MODELLED empty)\n"); return 0x20000; } if (d->n++ < (d->name[0]=='i' ? 600u : 40u)) fprintf(stderr, "[io] R %s+%llx sz%u -> 0\n", d->name, (unsigned long long)off, sz); return 0; }
+static void dw(void *u, uint64_t off, unsigned sz, uint64_t v) { Dv *d = u; { uint64_t o = off + 0x4000000ull; if (o == 0x23bc04820ull) o_lo = v; if (o == 0x23bc04828ull) on_iop_msg(o_lo, v); } if (d->n++ < (d->name[0]=='i' ? 600u : 40u)) fprintf(stderr, "[io] W %s+%llx sz%u = %llx\n", d->name, (unsigned long long)off, sz, (unsigned long long)v); }
 static void out(void *u, const char *b, size_t n) { (void)u; fwrite(b, 1, n, stderr); }
 int main(int argc, char **argv) {
     if (argc < 2) return 2;
@@ -30,7 +38,7 @@ int main(int argc, char **argv) {
         for (uint64_t i = 0; i < steps; i++) { uint64_t pc0 = c->pc; if (a64_run(c, 1) != A64_RUN_LIMIT) break; uint64_t nv; memcpy(&nv, mem + va, 8); if (nv != old) { fprintf(stderr, "[watchva] step %llu pc=%llx %llx -> %llx x8=%llx\n", (unsigned long long)i, (unsigned long long)pc0, (unsigned long long)old, (unsigned long long)nv, (unsigned long long)c->x[8]); old = nv; } } return 0; }
     uint64_t done = 0; int r = 1;
     unsigned idles = 0;
-    while (done < steps) { r = a64_run(c, steps < 1000000 ? steps : 1000000); if (r == A64_RUN_LIMIT) { done += (steps < 1000000 ? steps : 1000000); continue; } if (r == A64_RUN_IDLE && idles < 2000) { if (idles < 5 || idles % 500 == 0) fprintf(stderr, "[pmp] idle #%u at pc=%llx steps=%llu counter=%llu\n", idles, (unsigned long long)c->pc, (unsigned long long)c->steps, (unsigned long long)a64_counter(c)); idles++; a64_advance_time(c, A64_TIMER_HZ / 1000); continue; } break; }
+    while (done < steps) { r = a64_run(c, steps < 1000000 ? steps : 1000000); if (r == A64_RUN_LIMIT) { done += (steps < 1000000 ? steps : 1000000); continue; } if (r == A64_RUN_IDLE && idles < 2000) { c->irq_line = (q_h != q_t); if (idles < 5 || idles % 500 == 0) fprintf(stderr, "[pmp] idle #%u at pc=%llx steps=%llu counter=%llu\n", idles, (unsigned long long)c->pc, (unsigned long long)c->steps, (unsigned long long)a64_counter(c)); idles++; a64_advance_time(c, A64_TIMER_HZ / 1000); continue; } break; }
     fprintf(stderr, "[pmp] rc=%d steps=%llu pc=%llx %s\n", r, (unsigned long long)c->steps, (unsigned long long)c->pc, c->err);
     for (unsigned k = 0; k < c->watch_n && k < 24; k++) fprintf(stderr, "[pmp] watch %u: pc=%llx addr=%llx val=%llx %s sz%u\n", k, (unsigned long long)c->watch[k].pc, (unsigned long long)c->watch[k].addr, (unsigned long long)c->watch[k].val, c->watch[k].wr ? "W" : "R", c->watch[k].sz);
     fprintf(stderr, "[pmp] ex_sn=%llu ex_far=%llx\n", (unsigned long long)c->ex_sn, (unsigned long long)c->ex_far); for (unsigned k = 0; k < 8 && k < c->ex_sn; k++) fprintf(stderr, "[pmp] ex %u: rs=%llx rt=%llx sr=%llx\n", k, (unsigned long long)c->ex_rs[k], (unsigned long long)c->ex_rt[k], (unsigned long long)c->ex_sr[k]);
