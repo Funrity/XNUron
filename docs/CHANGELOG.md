@@ -2203,3 +2203,6 @@ CI падал не на коде эмулятора, а на тестовых с
 ## 0.4.531 — РЕЗУЛЬТАТ (лог 1500M)
 - «ApplePMP: started», «ApplePMPThermal: started» — узлы PMPEndpoint1/2 созданы, драйвер ApplePMP стартовал; поток ApplePMGR::start (0x8178864/waitForFunctionParent) в стеках ИСЧЕЗ — PMGR больше не блокирует платформу. Ядро отправило StartEP для ep6 и ep7. Это первое реальное продвижение за серию; прошивка PMP по-прежнему НЕ исполняется, IOP-сторона — моделируемая (список эндпоинтов — ASSUMPTION, выведено из кода ядра).
 - Дальше: то же для ANS (NVMe ждёт ANS2Endpoint1 = эндпоинт 6).
+
+## 0.4.532 — ANS: та же моделируемая сторона IOP (ASSUMPTION / PLACEHOLDER)
+- ASC ANS: первое reg узла 'ans' = 0x277400000+0xc000 (как у aop/sio/smc/pmp), почтовый ящик +0x8000, IRQ 0x16f (третий в списке interrupts, как для pmp). EPMAP: ep0..4 и ep6 (0x5f) — NVMe ждёт узел «ANS2Endpoint1» (k=6). Прошивка ANS НЕ исполняется, NVMe/SART не моделируются. Лог: [asc-ANS2]. Новая функция a64m_asc_set_epmap (карта эндпоинтов на каждый ASC).
