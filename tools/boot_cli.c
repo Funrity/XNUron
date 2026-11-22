@@ -304,6 +304,17 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "[pmgrref] %llx: data word at %llx (raw %llx); words -6..+6:", (unsigned long long)tg[ti], (unsigned long long)((pg + o) & 0xfffffffffull), (unsigned long long)v);
                 for (int d = -6; d <= 6; d++) { uint64_t pa9; uint8_t *q9; uint64_t va9 = pg + o + (uint64_t)(int64_t)(d * 8); if (a64_virt_to_phys(c7, va9, &pa9) || !(q9 = a64m_ram_at(m, pa9, 8))) continue; uint64_t v9; memcpy(&v9, q9, 8); fprintf(stderr, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)(v9 & 0xfffffffffull)); }
                 fprintf(stderr, "\n"); nd++; } } } }
+        { /* 0.4.542 diagnostic (changes nothing): the callback 0x89a7690 sits in a vtable slot at 0x90c25a8: find the vtable start (two zero words before it), compute the slot offset OFF and list every kernel instruction that loads a function pointer at [reg,#OFF] (LDRAA/LDRAB pre-index or plain LDR), marking sites where w2 is set to 1 within the 16 preceding instructions */
+          uint64_t sl = 0xfffffff0090c25a8ull, base = 0; uint64_t pw = 1;
+          for (int d = 1; d < 600; d++) { uint64_t pa9; uint8_t *q9; uint64_t va9 = sl - (uint64_t)d * 8; if (a64_virt_to_phys(c7, va9, &pa9) || !(q9 = a64m_ram_at(m, pa9, 8))) break; uint64_t v9; memcpy(&v9, q9, 8); if (v9 == 0 && pw == 0) { base = va9 + 16; break; } pw = v9; }
+          fprintf(stderr, "[vtoff] slot %llx vtable base %llx OFF %llx\n", (unsigned long long)(sl & 0xfffffffffull), (unsigned long long)(base & 0xfffffffffull), (unsigned long long)(base ? sl - base : 0));
+          if (base) { uint64_t off = sl - base; int nh = 0;
+            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 40; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000 && nh < 40; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); int hit = 0;
+                if ((w & 0xffa00400u) == 0xf8200400u) { int32_t imm9 = (int32_t)((w >> 12) & 0x1ff); int sg = (w >> 22) & 1; int32_t im = (sg ? imm9 - 512 : imm9) * 8; if ((uint64_t)(int64_t)im == off) hit = 1; }
+                if ((w & 0xffc00000u) == 0xf9400000u && (((w >> 10) & 0xfff) * 8ull) == off) hit = 1;
+                if (!hit) continue; int w2 = 0; for (int b = 1; b <= 16 && (int)o - b * 4 >= 0; b++) { uint32_t x; memcpy(&x, q8 + o - b * 4, 4); if (x == 0x321f03e2u || x == 0x52800022u) w2 = 1; }
+                fprintf(stderr, "[vtoff] load at %llx%s\n", (unsigned long long)((pg + o) & 0xfffffffffull), w2 ? " (w2=1 nearby)" : ""); nh++; } } } }
         { /* 0.4.368 diagnostic: [e6] scan found no direct stores of 6 into [bp+84]. Find (1) 'str w1,[x0,#84]' (buf_seterror-like setter) and (2) 'mov w1,#6' followed within 3 instructions by a BL whose target contains such a str within 0x30 bytes of its start */
           int nh = 0; uint64_t setter[8]; int ns = 0;
           for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
