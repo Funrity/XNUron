@@ -2206,3 +2206,7 @@ CI падал не на коде эмулятора, а на тестовых с
 
 ## 0.4.532 — ANS: та же моделируемая сторона IOP (ASSUMPTION / PLACEHOLDER)
 - ASC ANS: первое reg узла 'ans' = 0x277400000+0xc000 (как у aop/sio/smc/pmp), почтовый ящик +0x8000, IRQ 0x16f (третий в списке interrupts, как для pmp). EPMAP: ep0..4 и ep6 (0x5f) — NVMe ждёт узел «ANS2Endpoint1» (k=6). Прошивка ANS НЕ исполняется, NVMe/SART не моделируются. Лог: [asc-ANS2]. Новая функция a64m_asc_set_epmap (карта эндпоинтов на каждый ASC).
+
+## 0.4.533
+- Результат 0.4.532 (лог 1500M): модель ASC ANS зарегистрирована (блоки 0x277400000 / +0x8000 добавлены), но ядро НИ РАЗУ не обратилось к блокам ANS (run=0, [asc-ANS2] пуст): RTBuddy(ANS2)::start напечатан, а загрузка/запуск ANS-IOP не происходит; AppleANS2NVMeController::start доходит до ожидания ANS2Endpoint1 (0x8cbfc8c) без обращений к ASC. База ASC 0x277400000 при этом НЕ подтверждена (обращений нет). Кто запускает ANS-RTBuddy (firmware service отсутствует в plist для ANS), неизвестно.
+- Диагностика: свойства DT узлов 'iop-ans-nub' и 'iop-pmp-nub' (pre-loaded, no-firmware-service, region-base и т.п.).
