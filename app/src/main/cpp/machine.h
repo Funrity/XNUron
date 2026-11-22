@@ -83,7 +83,8 @@ int a64m_unknown_set_read(A64Machine *m, uint64_t pa, uint64_t off, uint64_t val
 int a64m_add_unknown_mmio_auto(A64Machine *m, uint64_t pa, uint64_t size, const char *label);   /* same, few accesses logged per block */
 const char *a64m_aic_info(A64Machine *m);   /* 0.4.435 */
 const char *a64m_aic_writes(A64Machine *m);   /* 0.4.235 diagnostic: distinct written AIC offsets: +off:count|OR-of-values */
-const uint8_t *a64m_pmp_fw(size_t *n);   /* 0.4.536 capture of the firmware image the kernel copies into the PMP SRAM */
+const uint8_t *a64m_pmp_fw(size_t *n);
+const char *a64m_pmp_print_trace(void);   /* 0.4.544 diagnostic */   /* 0.4.536 capture of the firmware image the kernel copies into the PMP SRAM */
 int a64m_asc_set_epmap(uint64_t cpu_pa, uint64_t map);
 int a64m_asc_add(A64Machine *m, uint64_t cpu_pa, unsigned irq, const char *tag);   /* 0.4.478 MODELLED ASC mailbox (IOP side) on the blocks cpu_pa and cpu_pa+0x8000 */
 const char *a64m_asc_log(void);

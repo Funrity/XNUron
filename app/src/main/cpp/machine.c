@@ -49,11 +49,24 @@ static void guest_note(A64Machine *m) {   /* lock held */
     char t[80]; int k = snprintf(t, sizeof t, "[last line repeated %u more time%s]\n", m->gl_rep, m->gl_rep == 1 ? "" : "s");
     guest_emit(m, t, (size_t)k); m->gl_rep = 0;
 }
+static void pmp_trace_line(A64Machine *m);
 static void guest_line_done(A64Machine *m, bool nl) {   /* lock held; gl_cur holds one complete line (nl) or a part of a very long one */
+    if (nl && m->gl_n < 600) { m->gl_cur[m->gl_n] = 0; if (strstr(m->gl_cur, "PMP") || strstr(m->gl_cur, "Endpoint")) pmp_trace_line(m); }
     if (nl && m->gl_pv && m->gl_n == m->gl_pn && !memcmp(m->gl_cur, m->gl_prev, m->gl_n)) { if (++m->gl_rep >= 256) guest_note(m); m->gl_n = 0; return; }
     guest_note(m); guest_emit(m, m->gl_cur, m->gl_n);
     if (nl) { memcpy(m->gl_prev, m->gl_cur, m->gl_n); m->gl_pn = m->gl_n; m->gl_pv = true; } else m->gl_pv = false;
     m->gl_n = 0;
+}
+static char g_pmp_tr[6000]; static size_t g_pmp_trn; static int g_pmp_trc;
+const char *a64m_pmp_print_trace(void) { return g_pmp_tr; }
+static void pmp_trace_line(A64Machine *m) {
+    if (g_pmp_trc >= 14 || g_pmp_trn > sizeof g_pmp_tr - 400) return; g_pmp_trc++;
+    g_pmp_trn += (size_t)snprintf(g_pmp_tr + g_pmp_trn, sizeof g_pmp_tr - g_pmp_trn, "[pmpprint] \"%.60s\" pc=%llx lr=%llx chain:", m->gl_cur, (unsigned long long)(m->cpu.pc & 0xfffffffffull), (unsigned long long)(m->cpu.x[30] & 0xfffffffffull));
+    uint64_t fp = m->cpu.x[29];
+    for (int d = 0; d < 14 && fp > 0xffffffe000000000ull; d++) { uint64_t pa, nf, lr; uint8_t *q;
+        if (a64_virt_to_phys(&m->cpu, fp, &pa) || !(q = a64m_ram_at(m, pa, 16))) break; memcpy(&nf, q, 8); memcpy(&lr, q + 8, 8);
+        g_pmp_trn += (size_t)snprintf(g_pmp_tr + g_pmp_trn, sizeof g_pmp_tr - g_pmp_trn, " %llx", (unsigned long long)(lr & 0xfffffffffull)); fp = nf; }
+    g_pmp_trn += (size_t)snprintf(g_pmp_tr + g_pmp_trn, sizeof g_pmp_tr - g_pmp_trn, "\n");
 }
 static void guest_flush(A64Machine *m) { if (m->gl_n) guest_line_done(m, false); guest_note(m); }   /* lock held */
 static void log_raw_k(A64Machine *m, const char *s, size_t n, int kind) {   /* kind: 1 guest, 2 emulator */
