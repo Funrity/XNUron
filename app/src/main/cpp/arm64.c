@@ -589,6 +589,8 @@ static int sysreg_read(A64 *c, unsigned k, uint64_t *out) {
     }
     /* reserved ID register space reads as zero */
     if (((k >> 14) == 3) && ((k >> 11) & 7) == 0 && ((k >> 7) & 15) == 0 && ((k >> 3) & 15) >= 4) { *out = 0; return 0; }
+    /* op1=1, CRn=0 (CCSIDR/CLIDR/AIDR_EL1): implementation-defined ID, not modelled -> reads as zero (ASSUMPTION). */
+    if (((k >> 14) == 3) && ((k >> 11) & 7) == 1 && ((k >> 7) & 15) == 0) { *out = 0; return 0; }
     if (pac_key_idx(k) >= 0) { *out = c->pac_key[pac_key_idx(k)]; return 0; }
     /* Debug register space (op0=2, op1=0: OSLAR_EL1, OSLSR_EL1, MDSCR_EL1, DBG*R...): no debug unit is
      * emulated, so it reads as zero and ignores writes.  Kernels clear the OS lock very early. */
