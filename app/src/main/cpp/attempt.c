@@ -981,6 +981,21 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
             if ((w & 0xfc000000u) != 0x94000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
             if (g->vmaddr + off + (uint64_t)(im * 4) == tg[ti]) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
         LOG("%s (%d)\n", ln, nh2); } }
+    { /* 0.4.540 diagnostic (changes nothing): who uses the PMGR callback 0x89a7690 and waiter 0x89a7740? BL/B callers plus 8-byte data words whose low 32 bits equal the address (vtable slots / registered callbacks; PAC bits ignored) with neighbouring words */
+      static const uint64_t tg[3] = { 0xfffffff0089a7690ull, 0xfffffff0089a7740ull, 0xfffffff0089a7744ull };
+      for (int ti = 0; ti < 3; ti++) { char ln[1600]; size_t lw = (size_t)snprintf(ln, sizeof ln, "[boot] diagnostic (changes nothing, 0.4.540): refs to 0x%llx: BL from", (unsigned long long)tg[ti]); int nh2 = 0, nd = 0;
+        for (int q = 0; q < mo.nseg && nh2 < 12; q++) { const A64Seg *g = &mo.seg[q]; if (!(g->initprot & 4)) continue;
+          for (uint64_t off = 0; off + 4 <= g->filesize && nh2 < 12; off += 4) { size_t fi = mo.slice_off + g->fileoff + off; if (fi + 4 > klen) break; uint32_t w; memcpy(&w, kern + fi, 4);
+            if ((w & 0x7c000000u) != 0x14000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
+            if (g->vmaddr + off + (uint64_t)(im * 4) == tg[ti]) { lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " 0x%llx", (unsigned long long)(g->vmaddr + off)); nh2++; } } }
+        lw += (size_t)snprintf(ln + lw, sizeof ln - lw, "; data words:");
+        for (int q = 0; q < mo.nseg && nd < 4; q++) { const A64Seg *g = &mo.seg[q]; if (g->initprot & 4) continue;
+          for (uint64_t off = 0; off + 8 <= g->filesize && nd < 4; off += 8) { size_t fi = mo.slice_off + g->fileoff + off; if (fi + 8 > klen) break; uint64_t v; memcpy(&v, kern + fi, 8);
+            if ((v & 0xffffffffull) != (tg[ti] & 0xffffffffull)) continue;
+            lw += (size_t)snprintf(ln + lw, sizeof ln - lw, " [0x%llx:", (unsigned long long)(g->vmaddr + off));
+            for (int64_t d = -8; d <= 8; d++) { int64_t o2 = (int64_t)off + d * 8; if (o2 < 0 || (uint64_t)o2 + 8 > g->filesize || mo.slice_off + g->fileoff + (uint64_t)o2 + 8 > klen) continue; uint64_t v2; memcpy(&v2, kern + mo.slice_off + g->fileoff + (uint64_t)o2, 8); lw += (size_t)snprintf(ln + lw, sizeof ln - lw, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)(v2 & 0xffffffffull)); }
+            lw += (size_t)snprintf(ln + lw, sizeof ln - lw, "]"); nd++; } }
+        LOG("%s (%d BL, %d data)\n", ln, nh2, nd); } }
     { /* 0.4.126 diagnostic (changes nothing): code that references the strings 'RAMDisk' and 'root-matching' (ADRP+ADD pairs); the first hit of each gets a code dump window */
       static const char *const xs[] = { "EndpointNN", "RTBuddyEndpointService" };   /* 0.4.529 */
       for (int xi = 0; xi < 2; xi++) { size_t kl = strlen(xs[xi]) + 1; uint64_t sva = 0;
