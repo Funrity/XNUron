@@ -299,6 +299,13 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
+          static const uint64_t tgs[3] = { 0x0089a7690ull, 0x0089a7744ull, 0x0089a7574ull };
+          for (int ti = 0; ti < 3; ti++) { int hits = 0;
+            for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 8; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
+              for (uint32_t o = 8; o + 16 <= 0x100000 && hits < 8; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != tgs[ti] || (v >> 36) == 0) continue;
+                fprintf(stderr, "[cbscan] %llx stored at pa %llx; words -3..+3:", (unsigned long long)tgs[ti], (unsigned long long)(pa + o));
+                for (int d = -3; d <= 3; d++) { uint64_t w; memcpy(&w, q + o + d * 8, 8); fprintf(stderr, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } } fprintf(stderr, "[cbscan] %llx: %d hit(s)\n", (unsigned long long)tgs[ti], hits); } }
         { /* 0.4.541 diagnostic (changes nothing): references to PMGR callback 0x89a7690 / waiter 0x89a7740 in the RUN-TIME kernel image (the kernel has applied its own chained fixups by now): BL/B callers and 8-byte data words whose low 36 bits equal the address, with neighbouring words */
           static const uint64_t tg[2] = { 0x0089a7690ull, 0x0089a7740ull };
           for (int ti = 0; ti < 2; ti++) { int nb = 0, nd = 0;
