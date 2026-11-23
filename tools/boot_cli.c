@@ -316,6 +316,13 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.556 diagnostic (changes nothing): ApplePMP::start stores the resolved wrapper 0x89a7504 at [obj+184] with obj=[this+456]. Find that heap word (low 36 bits 0x89a7504), derive obj = pa-184 and print the object's first words + words around +184 (vtable of the object tells its class) */
+          int hits = 0;
+          for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 4; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
+            for (uint32_t o = 192; o + 16 <= 0x100000 && hits < 4; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != 0x089a7504ull || (v >> 36) == 0) continue;
+              fprintf(stderr, "[obj184] wrapper stored at pa %llx; obj first words:", (unsigned long long)(pa + o)); for (int d = 0; d < 8; d++) { uint64_t w; memcpy(&w, q + o - 184 + d * 8, 8); fprintf(stderr, " %llx", (unsigned long long)(w & 0xfffffffffull ? w : w)); }
+              fprintf(stderr, " | +168..+216:"); for (int d = 21; d <= 27; d++) { uint64_t w; memcpy(&w, q + o - 184 + d * 8, 8); fprintf(stderr, " %llx", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } }
+          fprintf(stderr, "[obj184] %d hit(s)\n", hits); }
         { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
           static const uint64_t tgs[3] = { 0x0089a7690ull, 0x0089a7744ull, 0x0089a7574ull };
           for (int ti = 0; ti < 3; ti++) { int hits = 0;
