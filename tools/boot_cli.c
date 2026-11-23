@@ -320,8 +320,8 @@ int main(int argc, char **argv) {
           uint64_t ob = 0xffffffe000d1fc00ull, pa9, vt = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, ob, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&vt, q9, 8); uint64_t vl = vt & 0xfffffffffull;
           fprintf(stderr, "[reqpow] RTBuddy(PMP) obj %llx vtable %llx; slot offsets: 0x785dcf8-> %llx, 0x7861a78-> %llx\n", (unsigned long long)ob, (unsigned long long)vl, (unsigned long long)(0x785dcf8ull - vl), (unsigned long long)(0x7861a78ull - vl));
           for (int ci = 0; ci < 2; ci++) { uint64_t off = (ci ? 0x7861a78ull : 0x785dcf8ull) - vl; if (!vl || off > 0x2000) continue; int nh = 0;
-            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 30; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
-              for (uint32_t o = 0; o < 0x1000 && nh < 30; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); int hit = 0;
+            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 80; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000 && nh < 80; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); int hit = 0; { uint64_t lo = (pg + o) & 0xfffffffffull; if (!((lo >= 0x8060000ull && lo < 0x8330000ull) || (lo >= 0x89a0000ull && lo < 0x89c0000ull))) continue; } /* 0.4.569: only PM/RTBuddy/PMP regions */
                 if ((w & 0xffa00400u) == 0xf8200400u) { int32_t imm9 = (int32_t)((w >> 12) & 0x1ff); int sg = (w >> 22) & 1; int32_t im = (sg ? imm9 - 512 : imm9) * 8; if ((uint64_t)(int64_t)im == off) hit = 1; }
                 if ((w & 0xffc00000u) == 0xf9400000u && (((w >> 10) & 0xfff) * 8ull) == off) hit = 1;
                 if (!hit) continue; fprintf(stderr, "[reqpow] slot %d (OFF %llx) loaded at %llx\n", ci, (unsigned long long)off, (unsigned long long)((pg + o) & 0xfffffffffull)); nh++; } } } }
