@@ -268,6 +268,9 @@ int main(int argc, char **argv) {
           for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
+          for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15; /* 0.4.582 diagnostic: holder object fields +40 (active), +80, +184 (callback), +192 */
+            fprintf(stderr, "[holder%u] x0=%llx x1=%llx lr=%llx f40/80/184/192:", k, (unsigned long long)c7->wp_x0[k], (unsigned long long)c7->wp_x1[k], (unsigned long long)c7->wp_lr[k] & 0xfffffffffull);
+            static const int fo[4] = { 40, 80, 184, 192 }; for (int i = 0; i < 4; i++) { uint64_t pa9, v9 = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, c7->wp_x0[k] + (uint64_t)fo[i], &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&v9, q9, 8); fprintf(stderr, " %llx", (unsigned long long)v9); } fprintf(stderr, "\n"); }
           for (unsigned kk = c7->wp_n > 16 ? c7->wp_n - 16 : 0; kk < c7->wp_n; kk++) { unsigned k = kk & 15;
             fprintf(stderr, "[wait%u] x0=%llx x1=%llx lr=%llx:", k, (unsigned long long)c7->wp_x0[k], (unsigned long long)c7->wp_x1[k], (unsigned long long)c7->wp_lr[k] & 0xfffffffffull);
             uint64_t root = c7->wp_x0[k]; uint64_t l1[8], l2[8], l3[8];
