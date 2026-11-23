@@ -299,6 +299,16 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.551 diagnostic (changes nothing): code that addresses the static pointer table around 0x90c2540..0x90c2600 (which holds 0x89a7744 ... 0x89a7690): ADRP followed within 4 instructions by ADD/LDR with an offset that lands in that range */
+          int nh = 0;
+          for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 24; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o + 20 <= 0x1000 && nh < 24; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0x9f000000u) != 0x90000000u) continue;
+              int64_t imm = (int64_t)((((w >> 5) & 0x7ffffu) << 2) | ((w >> 29) & 3)); if (imm & 0x100000) imm -= 0x200000; uint64_t base = ((pg + o) & ~0xfffull) + (uint64_t)(imm << 12); if ((base & 0xfffffffffull) != 0x90c2000ull) continue; unsigned rd = w & 31;
+              for (int k2 = 1; k2 <= 4; k2++) { uint32_t x; if (o + 4 * (uint32_t)k2 + 4 > 0x1000) break; memcpy(&x, q8 + o + 4 * k2, 4); uint64_t off = 0; int ok = 0;
+                if ((x & 0xffc00000u) == 0x91000000u && ((x >> 5) & 31) == rd) { off = (x >> 10) & 0xfff; ok = 1; }
+                if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
+                if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
+          fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
         { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
           static const uint64_t tgs[3] = { 0x0089a7690ull, 0x0089a7744ull, 0x0089a7574ull };
           for (int ti = 0; ti < 3; ti++) { int hits = 0;
