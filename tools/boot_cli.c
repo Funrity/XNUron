@@ -299,6 +299,13 @@ int main(int argc, char **argv) {
           fprintf(stderr, "[stk] %llx depth %d from +%llx:", (unsigned long long)(sb & 0xfffffffffull), best, (unsigned long long)bestA); uint64_t cur = bestA;
             for (int d = 0; d < best; d++) { uint64_t fp, lr; memcpy(&fp, stk + cur, 8); memcpy(&lr, stk + cur + 8, 8); fprintf(stderr, " %llx", (unsigned long long)(lr & 0xfffffffffull)); { int f = 0; for (int u = 0; u < nul; u++) if (ul[u] == (lr & 0xfffffffffull)) f = 1; if (!f && nul < 600) ul[nul++] = lr & 0xfffffffffull; } if (!fp) break; cur = fp - sb; }
             fprintf(stderr, "\n"); } }
+        { /* 0.4.553 diagnostic (changes nothing): ApplePMP::start stores the (resolved) wrapper 0x89a7504 at [this+456]+184. Who calls through a [reg,#184] pointer? LDR x,[x,#184] followed within 8 instructions by BLR/BLRAA, in the RTBuddy area 0x82c0000..0x8330000 and elsewhere in 0x8000000..0x8a00000 */
+          int nh = 0;
+          for (uint64_t pg = 0xfffffff008000000ull; pg < 0xfffffff0089a0000ull && nh < 40; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o + 36 <= 0x1000 && nh < 40; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != 0xf9400000u || ((w >> 10) & 0xfff) != 23) continue; unsigned rt = w & 31;
+              for (int k2 = 1; k2 <= 8; k2++) { uint32_t x; memcpy(&x, q8 + o + 4 * k2, 4); int call = ((x & 0xfffffc1fu) == 0xd63f0000u && ((x >> 5) & 31) == rt) || ((x & 0xfffffc00u) == 0xd73f0800u && ((x >> 5) & 31) == rt);
+                if (call) { int w1 = 0; for (int b2 = 1; b2 <= 8 && (int)o - b2 * 4 >= 0; b2++) { uint32_t y; memcpy(&y, q8 + o - b2 * 4, 4); } fprintf(stderr, "[cb184] ldr [#184] at %llx, call at %llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), (unsigned long long)((pg + o + 4 * k2) & 0xfffffffffull)); nh++; break; } } } }
+          fprintf(stderr, "[cb184] %d hit(s)\n", nh); }
         { /* 0.4.551 diagnostic (changes nothing): code that addresses the static pointer table around 0x90c2540..0x90c2600 (which holds 0x89a7744 ... 0x89a7690): ADRP followed within 4 instructions by ADD/LDR with an offset that lands in that range */
           int nh = 0;
           for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 24; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
