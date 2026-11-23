@@ -316,6 +316,9 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.576 diagnostic (changes nothing): dump the RTBuddy(PMP) object 0xffffffe000d1fc00 fields +184..+232 (state fields: +200, +204, +216, +220), +288..+312, +400..+424 */
+          uint64_t ob = 0xffffffe000d1fc00ull; static const int rg2[3][2] = { {184, 232}, {288, 312}, {400, 424} };
+          for (int r = 0; r < 3; r++) { fprintf(stderr, "[rtbobj] +%d:", rg2[r][0]); for (int o = rg2[r][0]; o < rg2[r][1]; o += 8) { uint64_t pa9, v9 = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, ob + (uint64_t)o, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&v9, q9, 8); fprintf(stderr, " %llx", (unsigned long long)v9); } fprintf(stderr, "\n"); } }
         { /* 0.4.568 diagnostic (changes nothing): 0x82e9a50 (requests power state 3) sits in vtable slots at 0x785dcf8 and 0x7861a78. RTBuddy(PMP) object 0xffffffe000d1fc00: read its vtable pointer, compute the slot offset(s), and list every kernel instruction that loads a function pointer at that offset (LDRAA/LDRAB pre-index or LDR) */
           uint64_t ob = 0xffffffe000d1fc00ull, pa9, vt = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, ob, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&vt, q9, 8); uint64_t vl = vt & 0xfffffffffull;
           fprintf(stderr, "[reqpow] RTBuddy(PMP) obj %llx vtable %llx; slot offsets: 0x785dcf8-> %llx, 0x7861a78-> %llx\n", (unsigned long long)ob, (unsigned long long)vl, (unsigned long long)(0x785dcf8ull - vl), (unsigned long long)(0x7861a78ull - vl));
