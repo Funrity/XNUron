@@ -316,6 +316,11 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.577 diagnostic (changes nothing): RTBuddy::notify (0x82e9eb0) returns early when byte [this+290]==0 (observed 0 at end of run, [this+291]==1). List kernel code that stores a byte at [reg,#290]/[reg,#291] (STRB imm, 0x39000000) and loads the byte at 290 (LDRB 0x39400000) */
+          for (int ci = 0; ci < 4; ci++) { uint32_t base = ci < 2 ? 0x39000000u : 0x39400000u; uint32_t im = (ci & 1) ? 291u : 290u; int nh = 0;
+            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 40; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000 && nh < 40; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != base || ((w >> 10) & 0xfff) != im) continue; uint64_t lo = (pg + o) & 0xfffffffffull; if (lo < 0x8060000ull || lo > 0x8a00000ull) continue;
+                fprintf(stderr, "[b290] %s byte[+%u] at %llx\n", ci < 2 ? "STRB" : "LDRB", im, (unsigned long long)lo); nh++; } } } }
         { /* 0.4.576 diagnostic (changes nothing): dump the RTBuddy(PMP) object 0xffffffe000d1fc00 fields +184..+232 (state fields: +200, +204, +216, +220), +288..+312, +400..+424 */
           uint64_t ob = 0xffffffe000d1fc00ull; static const int rg2[3][2] = { {184, 232}, {288, 312}, {400, 424} };
           for (int r = 0; r < 3; r++) { fprintf(stderr, "[rtbobj] +%d:", rg2[r][0]); for (int o = rg2[r][0]; o < rg2[r][1]; o += 8) { uint64_t pa9, v9 = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, ob + (uint64_t)o, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&v9, q9, 8); fprintf(stderr, " %llx", (unsigned long long)v9); } fprintf(stderr, "\n"); } }
