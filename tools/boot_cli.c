@@ -316,6 +316,15 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.568 diagnostic (changes nothing): 0x82e9a50 (requests power state 3) sits in vtable slots at 0x785dcf8 and 0x7861a78. RTBuddy(PMP) object 0xffffffe000d1fc00: read its vtable pointer, compute the slot offset(s), and list every kernel instruction that loads a function pointer at that offset (LDRAA/LDRAB pre-index or LDR) */
+          uint64_t ob = 0xffffffe000d1fc00ull, pa9, vt = 0; uint8_t *q9; if (!a64_virt_to_phys(c7, ob, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&vt, q9, 8); uint64_t vl = vt & 0xfffffffffull;
+          fprintf(stderr, "[reqpow] RTBuddy(PMP) obj %llx vtable %llx; slot offsets: 0x785dcf8-> %llx, 0x7861a78-> %llx\n", (unsigned long long)ob, (unsigned long long)vl, (unsigned long long)(0x785dcf8ull - vl), (unsigned long long)(0x7861a78ull - vl));
+          for (int ci = 0; ci < 2; ci++) { uint64_t off = (ci ? 0x7861a78ull : 0x785dcf8ull) - vl; if (!vl || off > 0x2000) continue; int nh = 0;
+            for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 30; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000 && nh < 30; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); int hit = 0;
+                if ((w & 0xffa00400u) == 0xf8200400u) { int32_t imm9 = (int32_t)((w >> 12) & 0x1ff); int sg = (w >> 22) & 1; int32_t im = (sg ? imm9 - 512 : imm9) * 8; if ((uint64_t)(int64_t)im == off) hit = 1; }
+                if ((w & 0xffc00000u) == 0xf9400000u && (((w >> 10) & 0xfff) * 8ull) == off) hit = 1;
+                if (!hit) continue; fprintf(stderr, "[reqpow] slot %d (OFF %llx) loaded at %llx\n", ci, (unsigned long long)off, (unsigned long long)((pg + o) & 0xfffffffffull)); nh++; } } } }
         { /* 0.4.557 diagnostic (changes nothing): the callback holder object has vtable 0x785e0b8: print 90 words of it (low 36 bits) to identify the class by its method addresses */
           uint64_t vb = 0xfffffff00785e0b8ull; fprintf(stderr, "[holdervt] words:"); for (int w = -2; w < 90; w++) { uint64_t pa9; uint8_t *q9; if (a64_virt_to_phys(c7, vb + (uint64_t)(int64_t)(w * 8), &pa9) || !(q9 = a64m_ram_at(m, pa9, 8))) { fprintf(stderr, " ?"); continue; } uint64_t v9; memcpy(&v9, q9, 8); fprintf(stderr, " %llx", (unsigned long long)(v9 & 0xfffffffffull)); } fprintf(stderr, "\n"); }
         { /* 0.4.556 diagnostic (changes nothing): ApplePMP::start stores the resolved wrapper 0x89a7504 at [obj+184] with obj=[this+456]. Find that heap word (low 36 bits 0x89a7504), derive obj = pa-184 and print the object's first words + words around +184 (vtable of the object tells its class) */
