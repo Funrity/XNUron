@@ -319,6 +319,11 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.585 diagnostic (changes nothing): who writes ApplePMP state at [this+136]? list STR w/x/b [reg,#136] in 0x89a0000..0x89c0000 */
+          for (int ci = 0; ci < 3; ci++) { uint32_t base = ci == 0 ? 0xb9000000u : ci == 1 ? 0xf9000000u : 0x39000000u; uint32_t im = ci == 0 ? 34u : ci == 1 ? 17u : 136u;
+            for (uint64_t pg = 0xfffffff0089a0000ull; pg < 0xfffffff0089c0000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+              for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != base || ((w >> 10) & 0xfff) != im) continue;
+                fprintf(stderr, "[st136] %s [x%u,#136] at %llx\n", ci == 0 ? "STR w" : ci == 1 ? "STR x" : "STRB", (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } } }
         { /* 0.4.577 diagnostic (changes nothing): RTBuddy::notify (0x82e9eb0) returns early when byte [this+290]==0 (observed 0 at end of run, [this+291]==1). List kernel code that stores a byte at [reg,#290]/[reg,#291] (STRB imm, 0x39000000) and loads the byte at 290 (LDRB 0x39400000) */
           for (int ci = 0; ci < 4; ci++) { uint32_t base = ci < 2 ? 0x39000000u : 0x39400000u; uint32_t im = (ci & 1) ? 291u : 290u; int nh = 0;
             for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && nh < 40; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
