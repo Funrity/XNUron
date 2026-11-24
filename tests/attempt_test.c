@@ -184,6 +184,12 @@ int main(int argc, char **argv) {
           a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x830, 0, &v0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x834, 0, &v1); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x838, 0, &w0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x83c, 0, &w1);
           CHECK((v1 >> 20) == 2 && (v0 | (v1 & 0xfffff) << 32) == 0 && (w0 & 0xff) == 6, "0.4.593: the type-1 reply is answered by a type-2 message on endpoint 6: %llx %llx", (unsigned long long)(v0 | v1 << 32), (unsigned long long)w0);
         }
+        { /* 0.4.595 MODELLED PMP request/reply (type 9 -> type 10) after the handshake */
+          uint64_t v0 = 0, v1 = 0, w0 = 0, w1 = 0; uint64_t req = (6ull << 56) | (9ull << 52) | (0ull << 47) | (3ull << 44) | (1ull << 40) | (1ull << 20) | 3ull;
+          a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x800, (uint32_t)req, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x804, (uint32_t)(req >> 32), NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x808, 6u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x80c, 0, NULL);
+          a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x830, 0, &v0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x834, 0, &v1); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x838, 0, &w0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x83c, 0, &w1);
+          { uint64_t r = v0 | (v1 << 32); CHECK(((r >> 52) & 0xf) == 10 && ((r >> 47) & 0x1f) == 1 && ((r >> 44) & 7) == 3 && ((r >> 40) & 0xf) == 1 && ((r >> 56) & 0xf) == 6 && (r & 0xffffffffffull) == 0 && (w0 & 0xff) == 6, "0.4.595: request type 9 (cmd 0, slot 3, arg 1) is answered by type 10, cmd 1, same slot/arg, payload 0: %llx", (unsigned long long)r); }
+        }
         { uint64_t st = 99; CHECK(a64m_add_unknown_mmio_named(m, 0x235100000ull, 0x4000, "i2c9") == 0, "0.4.218: i2c block added");
           a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: idle i2c status has only bit 24 (SCL level) set");
           a64m_unknown_rw(m, 0x235100000ull, 1, 0x14, 0x01000000u, NULL); a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: the SCL level bit survives a write-1-to-clear");
