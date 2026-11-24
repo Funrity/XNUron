@@ -324,8 +324,8 @@ int main(int argc, char **argv) {
               for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != 0xf9400000u || ((w >> 10) & 0xfff) != im) continue; fprintf(stderr, "[ld168] LDR x%u,[x%u,#%u] at %llx\n", w & 31, (w >> 5) & 31, im * 8, (unsigned long long)((pg + o) & 0xfffffffffull)); } } } }
         { /* 0.4.612 diagnostic (changes nothing): find ALL RTBuddy objects (heap qwords whose low 36 bits equal the RTBuddyV2 vtable 0x7861808 / RTBuddy 0x785dcf8+16...) and print their state fields. pa-based scan of guest RAM */
           static const uint64_t vts[2] = { 0x7861808ull, 0x785dd08ull }; int nf = 0;
-          for (uint64_t pa = 0x800000000ull; pa < 0x810000000ull && nf < 24; pa += 0x1000) { uint8_t *q = a64m_ram_at(m, pa, 0x1000); if (!q) continue;
-            for (uint32_t o = 0; o + 400 <= 0x1000 && nf < 24; o += 16) { uint64_t w; memcpy(&w, q + o, 8); if ((w & 0xfffffffffull) != vts[0] && (w & 0xfffffffffull) != vts[1]) continue;
+          for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && nf < 24; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
+            for (uint32_t o = 0; o + 400 <= 0x100000 && nf < 24; o += 16) { uint64_t w; memcpy(&w, q + o, 8); if ((w & 0xfffffffffull) != vts[0] && (w & 0xfffffffffull) != vts[1]) continue;
               uint64_t f176, f184; uint32_t f204, f216; memcpy(&f176, q + o + 176, 8); memcpy(&f184, q + o + 184, 8); memcpy(&f204, q + o + 204, 4); memcpy(&f216, q + o + 216, 4);
               fprintf(stderr, "[rtb] pa %llx vt %llx f176=%llx f184=%llx f204=%u f216=%u b289..294=%u%u%u%u%u%u b339=%u f376=%llx\n", (unsigned long long)(pa + o), (unsigned long long)w, (unsigned long long)f176, (unsigned long long)f184, f204, f216, q[o + 289], q[o + 290], q[o + 291], q[o + 292], q[o + 293], q[o + 294], q[o + 339], 0ull); nf++; } } }
         { /* 0.4.603 diagnostic (changes nothing): provider (A7IOP object) of RTBuddy(PMP) 0xffffffe000d1fc00 at [+176]: its vtable and the slot offsets of 0x82e0674 (pa 8018597b8 / 80185a490), 0x82de868 (801856db8), 0x82dfbd8 (8018589b8) */
