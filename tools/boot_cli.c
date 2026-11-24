@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
               fprintf(stderr, " | +168..+216:"); for (int d = 21; d <= 27; d++) { uint64_t w; memcpy(&w, q + o - 184 + d * 8, 8); fprintf(stderr, " %llx", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } }
           fprintf(stderr, "[obj184] %d hit(s)\n", hits); }
         { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
-          static const uint64_t tgs[3] = { 0x0082e9a50ull, 0x0082e9640ull, 0x0082e96a8ull };
+          static const uint64_t tgs[3] = { 0x0082e0674ull, 0x0082de868ull, 0x0082dfbd8ull }; /* 0.4.602: ASC run-control functions (setCPUEnable variants) */
           for (int ti = 0; ti < 3; ti++) { int hits = 0;
             for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 8; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
               for (uint32_t o = 8; o + 16 <= 0x100000 && hits < 8; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != tgs[ti] || (v >> 36) == 0) continue;
