@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
                 fprintf(stderr, ") "); }
               fprintf(stderr, "}"); }
             fprintf(stderr, "\n"); } }
-        for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe040000000ull && shown < 90; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
+        for (uint64_t sb = 0xffffffe000000000ull; sb < 0xffffffe040000000ull && shown < 400; sb += 0x4000)   /* 0.4.346: scan from 0xffffffe000000000 (was 1a000000): the first (bootstrap) thread stack may be allocated lower */ { uint64_t pa7; uint8_t *q = NULL; uint8_t stk[0x4000]; int ok = 1;
           for (uint64_t o = 0; o < 0x4000 && ok; o += 0x1000) { if (a64_virt_to_phys(c7, sb + o, &pa7) || !(q = a64m_ram_at(m, pa7, 0x1000))) ok = 0; else memcpy(stk + o, q, 0x1000); }
           if (!ok) continue;
           int best = 0; uint64_t bestA = 0;
