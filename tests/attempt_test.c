@@ -174,6 +174,16 @@ int main(int argc, char **argv) {
           a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x800, 0x20u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x804, 0xbu << 20, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x808, 0, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x80c, 0, NULL);
           { uint64_t v0 = 0, v1 = 0; a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x830, 0, &v0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x834, 0, &v1); CHECK((((v1 << 32) | v0) >> 52) == 0xb && (v0 & 0xffffffffu) == 0x20u, "0.4.489: AP power state echoed as type 0xb: %llx %llx log=%s", (unsigned long long)v1, (unsigned long long)v0, a64m_asc_log()); }
 }
+        { /* 0.4.593 MODELLED PMP application handshake on endpoint 6 */
+          uint64_t v0 = 0, v1 = 0, w0 = 0, w1 = 0, v;
+          /* drain what is pending */ for (int k = 0; k < 8; k++) { uint64_t c = 0; a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x10c, 0, &c); if (c & 0x20000u) break; a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x838, 0, &v); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x83c, 0, &v); }
+          /* StartEP(6): type 5, endpoint in bits 39:32, flags 2 */ a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x800, 2u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x804, (5u << 20) | 6u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x808, 0, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x80c, 0, NULL);
+          a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x830, 0, &v0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x834, 0, &v1); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x838, 0, &w0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x83c, 0, &w1);
+          CHECK((v0 | v1 << 32) == 0 && (w0 & 0xff) == 6, "0.4.593: StartEP(6) is answered by a type-0 message with all fields 0 on endpoint 6: %llx %llx", (unsigned long long)(v0 | v1 << 32), (unsigned long long)w0);
+          /* the kernel's type-1 reply on endpoint 6 (payload: some physical address) */ a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x800, 0x12345000u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x804, 1u << 20, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x808, 6u, NULL); a64m_unknown_rw(m, 0x23bc08000ull, 1, 0x80c, 0, NULL);
+          a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x830, 0, &v0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x834, 0, &v1); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x838, 0, &w0); a64m_unknown_rw(m, 0x23bc08000ull, 0, 0x83c, 0, &w1);
+          CHECK((v1 >> 20) == 2 && (v0 | (v1 & 0xfffff) << 32) == 0 && (w0 & 0xff) == 6, "0.4.593: the type-1 reply is answered by a type-2 message on endpoint 6: %llx %llx", (unsigned long long)(v0 | v1 << 32), (unsigned long long)w0);
+        }
         { uint64_t st = 99; CHECK(a64m_add_unknown_mmio_named(m, 0x235100000ull, 0x4000, "i2c9") == 0, "0.4.218: i2c block added");
           a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: idle i2c status has only bit 24 (SCL level) set");
           a64m_unknown_rw(m, 0x235100000ull, 1, 0x14, 0x01000000u, NULL); a64m_unknown_rw(m, 0x235100000ull, 0, 0x14, 0, &st); CHECK(st == 0x01000000u, "0.4.219: the SCL level bit survives a write-1-to-clear");
