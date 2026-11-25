@@ -332,7 +332,9 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "[rtbf] pa %llx:", (unsigned long long)(pa + o));
                 for (uint32_t fo2 = 8; fo2 < 0x1d0; fo2 += 8) { uint64_t v; memcpy(&v, q + o + fo2, 8); if (!v) continue; fprintf(stderr, " %x:%llx", fo2, (unsigned long long)v);
                   if ((v >> 36) == 0xfffffffull ? 0 : ((v >> 28) == 0xffffffe00ull || (v >> 32) == 0xffffffe0ull)) { uint64_t pa8, vv = 0; uint8_t *q8b; if (!a64_virt_to_phys(c7, v, &pa8) && (q8b = a64m_ram_at(m, pa8, 8))) { memcpy(&vv, q8b, 8); fprintf(stderr, ">%llx", (unsigned long long)(vv & 0xfffffffffull)); } } }
-                fprintf(stderr, "\n"); } } } }
+                fprintf(stderr, "\n");
+                for (int gi = 0; gi < 2; gi++) { uint64_t gp, pa8; memcpy(&gp, q + o + (gi ? 0x20 : 0x18), 8); uint8_t *q8b; fprintf(stderr, "[rtbg] obj %llx +%x:", (unsigned long long)(pa + o), gi ? 0x20 : 0x18);   /* 0.4.629: qwords of the two same-class objects at +0x18/+0x20 (command gate? event source?) */
+                  if (!a64_virt_to_phys(c7, gp, &pa8) && (q8b = a64m_ram_at(m, pa8, 0x60))) for (int w8 = 0; w8 < 12; w8++) { uint64_t v; memcpy(&v, q8b + 8 * w8, 8); fprintf(stderr, " %x:%llx", w8 * 8, (unsigned long long)v); } fprintf(stderr, "\n"); } } } } }
         { /* 0.4.603 diagnostic (changes nothing): provider (A7IOP object) of RTBuddy(PMP) 0xffffffe000d1fc00 at [+176]: its vtable and the slot offsets of 0x82e0674 (pa 8018597b8 / 80185a490), 0x82de868 (801856db8), 0x82dfbd8 (8018589b8) */
           uint64_t ob = 0xffffffe000d1fc00ull, pr = 0, vt = 0, pa9; uint8_t *q9;
           if (!a64_virt_to_phys(c7, ob + 176, &pa9) && (q9 = a64m_ram_at(m, pa9, 8))) memcpy(&pr, q9, 8);
