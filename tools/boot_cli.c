@@ -264,7 +264,7 @@ int main(int argc, char **argv) {
           for (unsigned q = 0; q < c7->fn_n; q++) fprintf(stderr, "[fname%u] %s\n", q, c7->fn_s[q]);
           for (unsigned q = 0; q < c7->fq_n; q++) fprintf(stderr, "[fset%u] x0=%llx x1=%llx x2=%llx lr=%llx s1=\"%s\"\n", q, (unsigned long long)c7->fq_x0[q], (unsigned long long)c7->fq_x1[q], (unsigned long long)c7->fq_x2[q], (unsigned long long)c7->fq_lr[q], c7->fq_s[q]);
           for (unsigned q = 0; q < c7->fp_n; q++) fprintf(stderr, "[fparent%u] provider=%llx x1=%llx lr=%llx name=\"%s\"\n", q, (unsigned long long)c7->fp_x0[q], (unsigned long long)c7->fp_x1[q], (unsigned long long)c7->fp_lr[q], c7->fp_s[q]);
-          fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n); fprintf(stderr, "[rt] MODELLED runAction retries (0.4.634): %u\n", c7->rt_n);
+          fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
           for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
@@ -323,6 +323,10 @@ int main(int argc, char **argv) {
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
               fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
+        { /* 0.4.638 diagnostic (changes nothing): who writes / reads RTBuddy qword [this+304]? (setPowerStateGated returns NotReady while it is 0) STR/LDR x imm 304 in 0x82c0000..0x8330000 */
+          for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0xf9000000u && t != 0xf9400000u) || ((w >> 10) & 0xfff) != 38u) continue;
+              fprintf(stderr, "[q304] %s x%u,[x%u,#304] at %llx\n", t == 0xf9000000u ? "STR" : "LDR", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
         { /* 0.4.589 diagnostic (changes nothing): ApplePMP callback table: +168 = 0x89a6a2c never executed (coverage 0.4.588). Who calls the holder's [obj+168]? list LDR x,[reg,#168] and #176 in 0x82c0000..0x8330000 */
           for (int ci = 0; ci < 2; ci++) { uint32_t im = ci ? 22u : 21u; for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
               for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != 0xf9400000u || ((w >> 10) & 0xfff) != im) continue; fprintf(stderr, "[ld168] LDR x%u,[x%u,#%u] at %llx\n", w & 31, (w >> 5) & 31, im * 8, (unsigned long long)((pg + o) & 0xfffffffffull)); } } } }
