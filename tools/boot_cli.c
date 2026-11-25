@@ -387,14 +387,14 @@ int main(int argc, char **argv) {
               fprintf(stderr, " | +168..+216:"); for (int d = 21; d <= 27; d++) { uint64_t w; memcpy(&w, q + o - 184 + d * 8, 8); fprintf(stderr, " %llx", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } }
           fprintf(stderr, "[obj184] %d hit(s)\n", hits); }
         { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
-          static const uint64_t tgs[3] = { 0x0082ea3d8ull, 0x0082ea010ull, 0x0082ea3c8ull }; /* 0.4.602: ASC run-control functions (setCPUEnable variants) */
+          static const uint64_t tgs[3] = { 0x0082e991cull, 0x0082e9d50ull, 0x0082ea010ull }; /* 0.4.602: ASC run-control functions (setCPUEnable variants) */
           for (int ti = 0; ti < 3; ti++) { int hits = 0;
             for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 8; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
               for (uint32_t o = 8; o + 16 <= 0x100000 && hits < 8; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != tgs[ti] || (v >> 36) == 0) continue;
                 fprintf(stderr, "[cbscan] %llx stored at pa %llx; words -3..+3:", (unsigned long long)tgs[ti], (unsigned long long)(pa + o));
                 for (int d = -3; d <= 3; d++) { uint64_t w; memcpy(&w, q + o + d * 8, 8); fprintf(stderr, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } } fprintf(stderr, "[cbscan] %llx: %d hit(s)\n", (unsigned long long)tgs[ti], hits); } }
         { /* 0.4.541 diagnostic (changes nothing): references to PMGR callback 0x89a7690 / waiter 0x89a7740 in the RUN-TIME kernel image (the kernel has applied its own chained fixups by now): BL/B callers and 8-byte data words whose low 36 bits equal the address, with neighbouring words */
-          static const uint64_t tg[2] = { 0x0082ea3d8ull, 0x0082ea010ull }; /* 0.4.616: callPF+request-state-1 function */
+          static const uint64_t tg[2] = { 0x0082e991cull, 0x0082e9d50ull }; /* 0.4.616: callPF+request-state-1 function */
           for (int ti = 0; ti < 2; ti++) { int nb = 0, nd = 0;
             for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && (nb < 12 || nd < 6); pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
               for (uint32_t o = 0; o < 0x1000 && nb < 12; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0x7c000000u) != 0x14000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
@@ -447,7 +447,7 @@ int main(int argc, char **argv) {
               if (kp && !a64_virt_to_phys(c7, kp, &pp) && (kq = a64m_ram_at(m, pp, 40))) { memcpy(ks, kq, 40); ks[40] = 0; for (int z = 0; z < 40 && ks[z]; z++) if ((unsigned char)ks[z] < 32 || (unsigned char)ks[z] > 126) ks[z] = '.'; }
               fprintf(stderr, "[fnwait] stack %llx key obj %llx \"%s\" nub %llx\n", (unsigned long long)(sb2 & 0xfffffffffull), (unsigned long long)x19, ks, (unsigned long long)x21); ns++; } }
           (void)seen; (void)ns; }
-        { static const uint64_t ex[] = { 0x83a3cacull, 0x82f0ac8ull, 0x82f019cull, 0x82f06b8ull, 0x82f044cull, 0x82f001cull, 0x82f10acull, 0x807c2e8ull, 0x82e9628ull }; for (unsigned e = 0; e < sizeof ex / sizeof ex[0]; e++) if (nul < 600) ul[nul++] = ex[e]; } /* 0.4.630: strings near the (previously unexamined) callers of RTBuddy paths A/B and of setPowerState */
+        { static const uint64_t ex[] = { 0x82e99b8ull, 0x82e9a30ull, 0x82ea230ull, 0x82e9e34ull }; for (unsigned e = 0; e < sizeof ex / sizeof ex[0]; e++) if (nul < 600) ul[nul++] = ex[e]; } /* 0.4.630: strings near the (previously unexamined) callers of RTBuddy paths A/B and of setPowerState */
         for (int u = 0; u < nul; u++) { uint64_t t = 0xfffffff000000000ull | ul[u]; int cnt = 0; char out[600]; size_t on = 0; out[0] = 0;
           for (uint64_t a = t - 0x400; a < t && cnt < 4; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
             if (a64_virt_to_phys(c7, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c7, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
