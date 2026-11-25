@@ -319,6 +319,10 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.647 diagnostic (changes nothing): who loads the member-function table entries used as runAction actions? LDR x1,[xn,#N] for N=2096..2232 (setPowerState uses 2144 = 0x82e9d50 and 2152 = 0x82ea154) in 0x82c0000..0x8330000 */
+          for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc0001fu) != 0xf9400001u) continue; uint32_t im = (w >> 10) & 0xfff; if (im < 262 || im > 279) continue;
+              fprintf(stderr, "[mft] LDR x1,[x%u,#%u] at %llx\n", (w >> 5) & 31, im * 8, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
         { /* 0.4.641 diagnostic (changes nothing): class-like strings "Apple...Firmware..." in the kernel image (which firmware-service classes exist: PMP has AppleT8020PMPFirmware; is there one for ANS?) */
           int nfw = 0; for (uint64_t pa8 = 0x801004000ull; pa8 < 0x801004000ull + 0x2400000ull && nfw < 160; pa8 += 0x1000) { uint8_t *q8 = a64m_ram_at(m, pa8, 0x1000); if (!q8) continue;
             for (uint32_t o = 0; o + 12 < 0x1000 && nfw < 160; o++) { if (memcmp(q8 + o, "Apple", 5) || (o && q8[o - 1])) continue; uint32_t l = 0; while (o + l < 0x1000 && q8[o + l] >= 0x20 && q8[o + l] < 0x7f && l < 60) l++; if (o + l >= 0x1000 || q8[o + l] || l < 14) continue;
