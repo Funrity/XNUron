@@ -1258,7 +1258,7 @@ static int step(A64 *c) {
     /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
     if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
     if (__builtin_expect(c->ct_arm_pc != 0, 0) && !c->ct_done) {
-        if (!c->ct_on && pc == c->ct_arm_pc) { uint64_t q = 0; if (!rt_rd(c, c->x[0] + c->ct_off, &q) && (q & 0xffffffull) == c->ct_val) { c->ct_on = 1; c->ct_sp_page = c->sp >> 14; c->ct_last = 0; c->ct_cnt = 0; } }
+        if (!c->ct_on && pc == c->ct_arm_pc) { uint64_t q = 0; if ((c->ct_off == ~0ull ? (q = c->x[0], 0) : rt_rd(c, c->x[0] + c->ct_off, &q)) == 0 && (q & 0xffffffull) == c->ct_val) { c->ct_on = 1; c->ct_sp_page = c->sp >> 14; c->ct_last = 0; c->ct_cnt = 0; } }
         if (c->ct_on && (c->sp >> 14) == c->ct_sp_page) { if (pc != c->ct_last + 4 && c->ct_n < c->ct_cap && c->ct_n < 4096) c->ct_buf[c->ct_n++] = pc; c->ct_last = pc; if (++c->ct_cnt > c->ct_max || c->ct_n >= c->ct_cap) { c->ct_on = 0; c->ct_done = 1; } }
     }
     if (__builtin_expect(c->jmp_pc != 0, 0) && pc == c->jmp_pc) { c->jmp_n++; c->pc = c->jmp_to; c->steps++; return 0; }
