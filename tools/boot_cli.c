@@ -462,7 +462,7 @@ int main(int argc, char **argv) {
               if (kp && !a64_virt_to_phys(c7, kp, &pp) && (kq = a64m_ram_at(m, pp, 40))) { memcpy(ks, kq, 40); ks[40] = 0; for (int z = 0; z < 40 && ks[z]; z++) if ((unsigned char)ks[z] < 32 || (unsigned char)ks[z] > 126) ks[z] = '.'; }
               fprintf(stderr, "[fnwait] stack %llx key obj %llx \"%s\" nub %llx\n", (unsigned long long)(sb2 & 0xfffffffffull), (unsigned long long)x19, ks, (unsigned long long)x21); ns++; } }
           (void)seen; (void)ns; }
-        { static const uint64_t ex[] = { 0x82e9438ull, 0x82e8a18ull, 0x82ecaacull, 0x82ecd54ull, 0x82f0744ull }; for (unsigned e = 0; e < sizeof ex / sizeof ex[0]; e++) if (nul < 600) ul[nul++] = ex[e]; } /* 0.4.630: strings near the (previously unexamined) callers of RTBuddy paths A/B and of setPowerState */
+        { static const uint64_t ex[] = { 0x82e8300ull, 0x82e8400ull, 0x82e8500ull, 0x82e8600ull, 0x82e8700ull, 0x82e8800ull, 0x82e8900ull, 0x82e8a00ull }; for (unsigned e = 0; e < sizeof ex / sizeof ex[0]; e++) if (nul < 600) ul[nul++] = ex[e]; } /* 0.4.630: strings near the (previously unexamined) callers of RTBuddy paths A/B and of setPowerState */
         for (int u = 0; u < nul; u++) { uint64_t t = 0xfffffff000000000ull | ul[u]; int cnt = 0; char out[600]; size_t on = 0; out[0] = 0;
           for (uint64_t a = t - 0x400; a < t && cnt < 4; a += 4) { uint32_t i1 = 0, i2 = 0; uint64_t p1, p2; uint8_t *r1, *r2;
             if (a64_virt_to_phys(c7, a, &p1) || !(r1 = a64m_ram_at(m, p1, 4)) || a64_virt_to_phys(c7, a + 4, &p2) || !(r2 = a64m_ram_at(m, p2, 4))) continue; memcpy(&i1, r1, 4); memcpy(&i2, r2, 4);
