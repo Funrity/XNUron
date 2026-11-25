@@ -372,14 +372,14 @@ int main(int argc, char **argv) {
               fprintf(stderr, " | +168..+216:"); for (int d = 21; d <= 27; d++) { uint64_t w; memcpy(&w, q + o - 184 + d * 8, 8); fprintf(stderr, " %llx", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } }
           fprintf(stderr, "[obj184] %d hit(s)\n", hits); }
         { /* 0.4.550 diagnostic (changes nothing): where is the callback 0x89a7690 (and 0x89a7744) stored in RAM at run time, outside the kernel image? Scans all RAM for 8-byte words whose low 36 bits match (PAC bits ignored), printing the physical address and the 6 words around it */
-          static const uint64_t tgs[3] = { 0x0082f0a70ull, 0x0082f0130ull, 0x0082e94a0ull }; /* 0.4.602: ASC run-control functions (setCPUEnable variants) */
+          static const uint64_t tgs[3] = { 0x0082ea3c8ull, 0x0082e9580ull, 0x0082e9ac0ull }; /* 0.4.602: ASC run-control functions (setCPUEnable variants) */
           for (int ti = 0; ti < 3; ti++) { int hits = 0;
             for (uint64_t pa = 0x800000000ull; pa < 0x800000000ull + (3ull << 30) && hits < 8; pa += 0x100000) { uint8_t *q = a64m_ram_at(m, pa, 0x100000); if (!q) break;
               for (uint32_t o = 8; o + 16 <= 0x100000 && hits < 8; o += 8) { uint64_t v; memcpy(&v, q + o, 8); if ((v & 0xfffffffffull) != tgs[ti] || (v >> 36) == 0) continue;
                 fprintf(stderr, "[cbscan] %llx stored at pa %llx; words -3..+3:", (unsigned long long)tgs[ti], (unsigned long long)(pa + o));
                 for (int d = -3; d <= 3; d++) { uint64_t w; memcpy(&w, q + o + d * 8, 8); fprintf(stderr, "%s%llx", d == 0 ? " >" : " ", (unsigned long long)w); } fprintf(stderr, "\n"); hits++; } } fprintf(stderr, "[cbscan] %llx: %d hit(s)\n", (unsigned long long)tgs[ti], hits); } }
         { /* 0.4.541 diagnostic (changes nothing): references to PMGR callback 0x89a7690 / waiter 0x89a7740 in the RUN-TIME kernel image (the kernel has applied its own chained fixups by now): BL/B callers and 8-byte data words whose low 36 bits equal the address, with neighbouring words */
-          static const uint64_t tg[2] = { 0x0082f0a70ull, 0x0082f0130ull }; /* 0.4.616: callPF+request-state-1 function */
+          static const uint64_t tg[2] = { 0x0082ea3c8ull, 0x0082e9580ull }; /* 0.4.616: callPF+request-state-1 function */
           for (int ti = 0; ti < 2; ti++) { int nb = 0, nd = 0;
             for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff00a800000ull && (nb < 12 || nd < 6); pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
               for (uint32_t o = 0; o < 0x1000 && nb < 12; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0x7c000000u) != 0x14000000u) continue; int64_t im = (int64_t)(w & 0x3ffffffu); if (im & 0x2000000) im -= 0x4000000;
