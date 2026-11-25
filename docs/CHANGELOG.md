@@ -2711,3 +2711,8 @@ NAND-путь не изменён; журнал по-прежнему не за�
 - Поток контроллера ANS (AppleNVMe, "( 0 != providerRole )") ждёт в 806cb60; второй ANS-поток — _requestFirmwareUpdateCallbackGated («dynamic reloading», запрос прошивки у FUD).
 - У PMP прошивку нашёл встроенный в ядро сервис **AppleT8020PMPFirmware** ("Found firmware t8020pmp for PMP", → путь A). Для ANS такой сервис — неизвестно.
 - 0.4.641: список строк-имён классов «Apple…Firmware/ANS…» в образе ядра — есть ли сервис прошивки для ANS.
+
+## 0.4.641 — РЕЗУЛЬТАТ и 0.4.642
+- Классы «Apple…Firmware/ANS…» в ядре: AppleANS2NVMeController, AppleANS2CGNVMeController, AppleT8020PMPFirmware/ApplePMPFirmware, AppleSPUFirmwareService, AppleSEPFirmware, AppleFirmwareUpdateKext/UserClient, AppleFirmwareDecodeImage4, AppleAudioFirmwareDownloader, … **Сервиса прошивки для ANS в ядре нет.** Значит, ANS-RTBuddy получает прошивку/состояние иначе (DT region-base/size, iBoot, или контроллером).
+- DT: у iop-pmp-nub заданы firmware-name, region-base 0x23b500000, region-size 0x40000; у iop-ans-nub region-base/size = 0 (в IPSW DT их заполняет iBoot).
+- 0.4.642: дамп кода ANS-контроллера перед ожиданием (0x8cbf8c0–0x8cbfca0) и строки вокруг, чтобы увидеть, что именно он ждёт/запрашивает у RTBuddy.
