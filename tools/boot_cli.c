@@ -319,6 +319,10 @@ int main(int argc, char **argv) {
                 if ((x & 0xffc00000u) == 0xf9400000u && ((x >> 5) & 31) == rd) { off = ((x >> 10) & 0xfff) * 8; ok = 1; }
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
+        { /* 0.4.636 diagnostic (changes nothing): who writes / reads RTBuddy byte [this+220] ("transition busy" flag: setPowerStateGated sleeps while it is 1)? STRB/LDRB imm 220 in 0x82c0000..0x8330000 */
+          for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
+              fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
         { /* 0.4.589 diagnostic (changes nothing): ApplePMP callback table: +168 = 0x89a6a2c never executed (coverage 0.4.588). Who calls the holder's [obj+168]? list LDR x,[reg,#168] and #176 in 0x82c0000..0x8330000 */
           for (int ci = 0; ci < 2; ci++) { uint32_t im = ci ? 22u : 21u; for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
               for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); if ((w & 0xffc00000u) != 0xf9400000u || ((w >> 10) & 0xfff) != im) continue; fprintf(stderr, "[ld168] LDR x%u,[x%u,#%u] at %llx\n", w & 31, (w >> 5) & 31, im * 8, (unsigned long long)((pg + o) & 0xfffffffffull)); } } } }
