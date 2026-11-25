@@ -66,13 +66,18 @@ int main(void) {
     memset(&a, 0, sizeof a);
     a_movz(&a, 19, 0x2000); a.w[a.n++] = 0x91000421u; /* add x1,x1,#1 (retry target 0x1004) */ a_movz(&a, 0, 5); a_movz(&a, 2, 9); a_movz(&a, 8, 93); a_svc(&a, 0); a_finish(&a);
     a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem);
-    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.rt_pc = 0x100c; c.rt_to = 0x1004; c.rt_val = 5; c.rt_reg = 19; c.rt_off = 0; c.rt_max = 3;
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.rt_pc = 0x100c; c.rt_to = 0x1004; c.rt_val = 5; c.rt_reg = 19; c.rt_off = 0; c.rt_off2 = 8; c.rt_max = 3;
     rc = a64_run(&c, 200);
     CHECK(rc == 0 && c.x[1] == 4 && c.rt_n == 3 && c.x[2] == 9, "retry hook repeats the block rt_max times, then continues");
     a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem); mem[0x2000] = 1;
-    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.rt_pc = 0x100c; c.rt_to = 0x1004; c.rt_val = 5; c.rt_reg = 19; c.rt_off = 0; c.rt_max = 3;
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.rt_pc = 0x100c; c.rt_to = 0x1004; c.rt_val = 5; c.rt_reg = 19; c.rt_off = 0; c.rt_off2 = 8; c.rt_max = 3;
     rc = a64_run(&c, 200);
     CHECK(rc == 0 && c.x[1] == 1 && c.rt_n == 0 && c.x[2] == 9, "retry hook does nothing when the guard byte is non-zero");
+
+    a64_init(&c, mem, 0, sizeof mem); memset(mem, 0, sizeof mem); mem[0x2008] = 1;
+    memcpy(mem + 0x1000, a.w, a.n * 4); c.pc = 0x1000; c.rt_pc = 0x100c; c.rt_to = 0x1004; c.rt_val = 5; c.rt_reg = 19; c.rt_off = 0; c.rt_off2 = 8; c.rt_max = 3;
+    rc = a64_run(&c, 200);
+    CHECK(rc == 0 && c.x[1] == 1 && c.rt_n == 0, "retry hook does nothing when the second guard byte is non-zero (action already ran)");
 
     /* 6. 0.4.378 MODELLED redirect: the instruction at jmp_pc is skipped and execution continues at jmp_to */
     memset(&a, 0, sizeof a);
