@@ -708,6 +708,10 @@ static int wp_rd(A64 *c, uint64_t a, uint64_t *out) {   /* 0.4.444 diagnostic re
     uint64_t pa; if (MMU_ON(c)) { int f = xlate(c, a, &pa); if (f >= 0) return -1; } else pa = a;
     uint8_t *p = ptr(c, pa, 8); if (!p) return -1; memcpy(out, p, 8); return 0;
 }
+static int rt_rd(A64 *c, uint64_t a, uint64_t *out) {   /* 0.4.634 retry-hook read of one aligned qword, no abort side effects (any address) */
+    uint64_t pa; if (MMU_ON(c)) { int f = xlate(c, a, &pa); if (f >= 0) return -1; } else pa = a;
+    uint8_t *p = ptr(c, pa, 8); if (!p) return -1; memcpy(out, p, 8); return 0;
+}
 static int wp_str(A64 *c, uint64_t a, char *o, int n) { /* printable C string of >=3 chars at a */
     for (int k = 0; k < n - 1; k++) { uint64_t v; if (wp_rd(c, (a + (uint64_t)k) & ~7ull, &v)) return 0; unsigned char ch = (unsigned char)(v >> (8 * ((a + (uint64_t)k) & 7))); if (ch == 0) { o[k] = 0; return k >= 3; } if (ch < 32 || ch > 126) return 0; o[k] = (char)ch; }
     o[n - 1] = 0; return 1;
@@ -1253,6 +1257,7 @@ static int step(A64 *c) {
     if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; c->wp_lr[k] = (pc == 0xfffffff0082e9becull) ? c->x[19] : c->x[30]; }   /* 0.4.429 diagnostic only; 0.4.627: at 0x82e9bec (after runAction in RTBuddy::setPowerState) x0=return value, "lr" slot = object x19 */
     /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
     if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
+    if (__builtin_expect(c->rt_pc != 0, 0) && pc == c->rt_pc && (uint32_t)c->x[0] == c->rt_val && c->rt_n < c->rt_max) { uint64_t q = 0; uint64_t ea = c->x[c->rt_reg & 31] + c->rt_off; if (!rt_rd(c, ea & ~7ull, &q) && ((q >> (8 * (ea & 7))) & 0xff) == 0) { c->rt_n++; c->pc = c->rt_to; c->steps++; return 0; } }
     if (__builtin_expect(c->jmp_pc != 0, 0) && pc == c->jmp_pc) { c->jmp_n++; c->pc = c->jmp_to; c->steps++; return 0; }
     if (c->cov) {
         uint64_t co = pc - c->cov_base; if (co < c->cov_len) { uint8_t bm = (uint8_t)(1u << ((co >> 2) & 7)); if (!(c->cov[co >> 5] & bm)) { unsigned q = c->nw_n++ % 96; c->nw_pc[q] = pc; c->nw_step[q] = c->steps; c->nw_x0[q] = c->x[0]; c->nw_x1[q] = c->x[1]; c->nw_lr[q] = c->x[30]; } c->cov[co >> 5] |= bm; }

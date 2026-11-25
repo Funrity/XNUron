@@ -264,7 +264,7 @@ int main(int argc, char **argv) {
           for (unsigned q = 0; q < c7->fn_n; q++) fprintf(stderr, "[fname%u] %s\n", q, c7->fn_s[q]);
           for (unsigned q = 0; q < c7->fq_n; q++) fprintf(stderr, "[fset%u] x0=%llx x1=%llx x2=%llx lr=%llx s1=\"%s\"\n", q, (unsigned long long)c7->fq_x0[q], (unsigned long long)c7->fq_x1[q], (unsigned long long)c7->fq_x2[q], (unsigned long long)c7->fq_lr[q], c7->fq_s[q]);
           for (unsigned q = 0; q < c7->fp_n; q++) fprintf(stderr, "[fparent%u] provider=%llx x1=%llx lr=%llx name=\"%s\"\n", q, (unsigned long long)c7->fp_x0[q], (unsigned long long)c7->fp_x1[q], (unsigned long long)c7->fp_lr[q], c7->fp_s[q]);
-          fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n);
+          fprintf(stderr, "[wait-calls] %u calls\n", c7->wp_n); fprintf(stderr, "[rt] MODELLED runAction retries (0.4.634): %u\n", c7->rt_n);
           for (unsigned q = 0; q < c7->wp_sn_n; q++) fprintf(stderr, "[wait-res%u] x0=%llx:%s\n", q, (unsigned long long)c7->wp_sn_lr2[q], c7->wp_sn[q]);
           fprintf(stderr, "[wait-8075e84-snapshot] (first call with lr=0x8075e84):%s\n", c7->wp_snap2_done ? c7->wp_snap2 : " none");
           fprintf(stderr, "[wait-pmgr-snapshot] (x0 of the first call with lr=0x814a9f0, strings up to 4 levels):%s\n", c7->wp_snap_done ? c7->wp_snap : " none");
