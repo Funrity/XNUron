@@ -2716,3 +2716,7 @@ NAND-путь не изменён; журнал по-прежнему не за�
 - Классы «Apple…Firmware/ANS…» в ядре: AppleANS2NVMeController, AppleANS2CGNVMeController, AppleT8020PMPFirmware/ApplePMPFirmware, AppleSPUFirmwareService, AppleSEPFirmware, AppleFirmwareUpdateKext/UserClient, AppleFirmwareDecodeImage4, AppleAudioFirmwareDownloader, … **Сервиса прошивки для ANS в ядре нет.** Значит, ANS-RTBuddy получает прошивку/состояние иначе (DT region-base/size, iBoot, или контроллером).
 - DT: у iop-pmp-nub заданы firmware-name, region-base 0x23b500000, region-size 0x40000; у iop-ans-nub region-base/size = 0 (в IPSW DT их заполняет iBoot).
 - 0.4.642: дамп кода ANS-контроллера перед ожиданием (0x8cbf8c0–0x8cbfca0) и строки вокруг, чтобы увидеть, что именно он ждёт/запрашивает у RTBuddy.
+
+## 0.4.642 — РЕЗУЛЬТАТ и 0.4.643
+- Поток, висящий на 0x8cbfc8c, — это **AppleANS2NVMeController::probe** (не start): строки «role», «ANS2», «( 0 != providerRole )», «AppleEmbeddedNVMeNVRAM». Код: на 0x8cbfc68 берётся имя-строка (VA 0xfffffff0072a2433), создаётся словарь совпадения (0x8cbfc74), и вызывается ожидание службы **с бесконечным таймаутом** (x1=-1, bl → 0x806cb60 = waitForMatchingService); возвращённый объект кладётся в x20 и дальше используется (probe продолжается). Т.е. probe ждёт появления какой-то службы, имя которой лежит в строке 0x72a2433.
+- 0.4.643: дамп строки 0x72a2400–0x72a2480, чтобы узнать, чего именно ждёт probe.
