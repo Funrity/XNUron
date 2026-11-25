@@ -949,6 +949,8 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
     a64m_cpu(m)->wp_pc = 0xfffffff0082e9becull; /* 0.4.565: entry of RTBuddy power-state method (setPowerState(state=x1, device=x2)); was the IOFunctionParent setter hook */ (void)0;   /* 0.4.459 diagnostic: entry of the IOFunctionParent setter (x0 = DT nub, x1 = service); snapshots only for the call from ApplePMGR::start (lr 0x816bdcc) */
     a64m_cpu(m)->hk_pc = 0xfffffff008151c9cull;
     LOG("[boot] MODELLED hook (ASSUMPTION, 0.4.378): because the root is answered as NOT verified secure, the kernel's IOSecureBSDRoot would call its 'remove all memory devices' loop (at 0xfffffff0080eaaac), deleting md0 - the RAM disk that is the kernel root - so every later read of it fails with ENXIO (0.4.375 dump). The emulator SKIPS that loop and keeps md0. The root is still NOT claimed to be secure; no check is passed and no cryptography is faked.\n");
+    /* 0.4.645 diagnostic (changes nothing): trace the first RTBuddy::setPowerState call whose object has [+176] low 24 bits 0x94abc0 (the ANS2 RTBuddy of this DeviceTree) */
+    { A64 *cr = a64m_cpu(m); cr->ct_arm_pc = 0xfffffff0082e9ac0ull; cr->ct_off = 176; cr->ct_val = 0x94abc0ull; cr->ct_cap = 1500; cr->ct_max = 400000; }
     a64m_cpu(m)->jmp_pc = 0xfffffff0080eaaacull; a64m_cpu(m)->jmp_to = 0xfffffff0080eaaf0ull;
     uint64_t kphys = A64M_IOS_RAM_BASE + kbase_off;
     for (int i = 0; i < mo.nseg; i++) {

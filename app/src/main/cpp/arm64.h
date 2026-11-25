@@ -119,6 +119,8 @@ typedef struct {
     unsigned fn_n; char fn_s[200][40];   /* 0.4.512 diagnostic: names built by 0x814a870 */   /* 0.4.507 diagnostic: calls of 0x814a7a0 (function-property setter) */   /* 0.4.467 diagnostic: calls of waitForFunctionParent 0x814a8f0 */
     uint64_t wp_pc; unsigned wp_n; uint64_t wp_x0[16], wp_x1[16], wp_lr[16];   /* 0.4.429 watch: first 16 entries at wp_pc */
     uint64_t ch_pc, ch_target, ch_x1, ch_x2; unsigned ch_n;   /* 0.4.414 MODELLED one-shot call */
+    /* 0.4.645 diagnostic (changes nothing): control-flow trace of ONE call. Armed when pc==ct_arm_pc and the qword at [x0+ct_off] has low 24 bits ct_val; then records the start of every straight-line run on the same 16 KB stack (the calling thread only) up to ct_cap entries / ct_max instructions */
+    uint64_t ct_arm_pc, ct_off, ct_val, ct_last, ct_sp_page, ct_cnt, ct_max; unsigned ct_on, ct_done, ct_n, ct_cap; uint64_t ct_buf[4096];
     uint64_t jmp_pc, jmp_to; unsigned jmp_n;   /* 0.4.378 MODELLED redirect: when pc==jmp_pc the instruction is NOT executed and execution continues at jmp_to */
     uint64_t hk_pc; unsigned hk_n;   /* 0.4.354 MODELLED hook: when pc==hk_pc, store byte [x19+0x10b]=1 and [x19+0x10c]=0 (see attempt.c; used for the missing SEP key store answer) */
     uint64_t wpc[4], wtg[4], wx0[4], wx1[4]; unsigned wn[4];   /* 0.4.306 diagnostic: for an indirect call at pc==wpc[i] remember the last target (low 36 bits) and the number of executions */
