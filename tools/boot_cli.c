@@ -338,6 +338,11 @@ int main(int argc, char **argv) {
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
               fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
+        { /* 0.4.669 diagnostic (changes nothing): the DT property names RTBuddy::start reads into [+291],[+292],[+289],[+290],[+294],[+293],... and [+336] (adrp page 0x7516000 + offsets taken from the code at 0x82e8c9c..0x82e8e78) */
+          static const unsigned so[] = { 746, 760, 990, 999, 1011, 1023, 1039, 1060, 1068, 1080 };
+          for (unsigned k = 0; k < sizeof so / sizeof so[0]; k++) { uint64_t va = 0xfffffff007516000ull + so[k], pa8; uint8_t *q8; char sb[48] = "?";
+            if (!a64_virt_to_phys(c7, va, &pa8) && (q8 = a64m_ram_at(m, pa8, 48))) { memcpy(sb, q8, 47); sb[47] = 0; for (int z = 0; z < 47; z++) if ((unsigned char)sb[z] < 32 && sb[z]) { sb[z] = 0; break; } }
+            fprintf(stderr, "[dtflag] off %u -> \"%s\"\n", so[k], sb); } }
         { /* 0.4.659 diagnostic (changes nothing): setPowerStateGated (0x82e9d50) returns NotReady when dword [this+216]-1 > 6 (i.e. 0 or >7). Who writes/reads [this+216]? STR/LDR w imm 216 on x19/x20 in 0x82c0000..0x8330000 */
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0xb9000000u && t != 0xb9400000u) || ((w >> 10) & 0xfff) != 54u) continue;
