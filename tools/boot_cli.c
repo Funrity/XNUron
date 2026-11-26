@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
                 if (ok && off >= 0x540 && off <= 0x600) { fprintf(stderr, "[tblref] ADRP at %llx + instr %d (%08x) -> 0x90c2%03llx\n", (unsigned long long)((pg + o) & 0xfffffffffull), k2, x, (unsigned long long)off); nh++; break; } } } }
           fprintf(stderr, "[tblref] %d hit(s)\n", nh); }
         { /* 0.4.648 diagnostic (changes nothing): entry (nearest preceding PACIBSP) and callers (BL/B + data words) of the functions using table entries 2096, 2104(0x82e83ec), 2120 (_loadFirmwareGated user) */
-          static const uint64_t fx[3] = { 0x82e2b1cull, 0x82e2d44ull, 0x82e2f04ull };
+          static const uint64_t fx[3] = { 0x82eca88ull, 0x82f0b44ull, 0x82ec9c0ull };
           for (int fi = 0; fi < 3; fi++) { uint64_t ent = 0; for (uint64_t a8 = fx[fi]; a8 > fx[fi] - 0x600; a8 -= 4) { uint64_t pa8; uint8_t *q8; uint32_t w; if (a64_virt_to_phys(c7, 0xfffffff000000000ull | a8, &pa8) || !(q8 = a64m_ram_at(m, pa8, 4))) break; memcpy(&w, q8, 4); if (w == 0xd503237fu) { ent = a8; break; } }
             fprintf(stderr, "[fnref] site %llx entry %llx\n", (unsigned long long)fx[fi], (unsigned long long)ent); if (!ent) continue;
             for (uint64_t pg = 0xfffffff007000000ull; pg < 0xfffffff008e00000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
