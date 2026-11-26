@@ -338,6 +338,7 @@ int main(int argc, char **argv) {
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
               fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
+        fprintf(stderr, "[boot-req] 0.4.675 modelled boot request: state %u (0 not issued, 1 issued, 2 returned) rtbuddy %llx\n", c7->bt_n, (unsigned long long)c7->bt_obj);
         { /* 0.4.669 diagnostic (changes nothing): the DT property names RTBuddy::start reads into [+291],[+292],[+289],[+290],[+294],[+293],... and [+336] (adrp page 0x7516000 + offsets taken from the code at 0x82e8c9c..0x82e8e78) */
           static const unsigned so[] = { 1080, 1091 };
           { uint64_t va = 0xfffffff0074d4cd6ull, pa8; uint8_t *q8; char sb[48] = "?"; if (!a64_virt_to_phys(c7, va, &pa8) && (q8 = a64m_ram_at(m, pa8, 48))) { memcpy(sb, q8, 47); sb[47] = 0; } fprintf(stderr, "[dtflag] [+337] property -> \"%s\"\n", sb); }

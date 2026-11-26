@@ -1257,6 +1257,13 @@ static int step(A64 *c) {
     if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; if (pc == 0xfffffff0082e9becull) { uint64_t q = 0; if (!rt_rd(c, c->sp + 40, &q)) c->wp_x1[k] = q >> 32; /* requested state ([sp+44]) */ } c->wp_lr[k] = (pc == 0xfffffff0082e9becull) ? c->x[19] : c->x[30]; }   /* 0.4.429 diagnostic only; 0.4.627: at 0x82e9bec (after runAction in RTBuddy::setPowerState) x0=return value, "lr" slot = object x19 */
     /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
     if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
+    /* 0.4.675 MODELLED one-shot call (ASSUMPTION): at pc == bt_pc (entry of RTBuddy::setPowerState) with x0 = an RTBuddy whose DT flags look like ANS2 (bytes 289..294 = 0,0,1,0,0,1; [+336]==0; [+304]==0), the emulator issues ONE call bt_target(x0, 0, 0) - the kernel's own code that RTBuddyUserClient runs when a userspace daemon asks an IOP to boot without a firmware name. x0..x18 are saved and restored around it; the call returns to the same pc. */
+    if (__builtin_expect(c->bt_pc != 0, 0) && pc == c->bt_pc) {
+        if (c->bt_n == 0) { uint64_t q8 = 0, q3 = 0, q4 = 0;
+            if (!rt_rd(c, c->x[0] + 288, &q8) && !rt_rd(c, c->x[0] + 304, &q3) && !rt_rd(c, c->x[0] + 336, &q4) && ((q8 >> 8) & 0xffffffffffffull) == 0x010000010000ull && q3 == 0 && (q4 & 0xff) == 0) {
+                c->bt_n = 1; c->bt_obj = c->x[0]; memcpy(c->bt_save, c->x, sizeof c->bt_save); c->bt_sp = c->sp; c->x[1] = 0; c->x[2] = 0; c->x[30] = pc; c->pc = c->bt_target; c->steps++; return 0; } }
+        else if (c->bt_n == 1 && c->sp == c->bt_sp) { memcpy(c->x, c->bt_save, sizeof c->bt_save); c->bt_n = 2; }   /* the call returned: registers back, the original instruction runs next */
+    }
     if (__builtin_expect(c->ct_arm_pc != 0, 0) && !c->ct_done) {
         if (!c->ct_on && pc == c->ct_arm_pc) { uint64_t q = 0; if ((c->ct_off == ~0ull ? (q = c->x[0], 0) : rt_rd(c, c->x[0] + c->ct_off, &q)) == 0 && (q & 0xffffffull) == c->ct_val) { c->ct_on = 1; c->ct_sp_page = c->sp >> 14; c->ct_last = 0; c->ct_cnt = 0; } }
         if (c->ct_on && (c->sp >> 14) == c->ct_sp_page) { if (pc != c->ct_last + 4 && c->ct_n < c->ct_cap && c->ct_n < 4096) c->ct_buf[c->ct_n++] = pc; c->ct_last = pc; if (++c->ct_cnt > c->ct_max || c->ct_n >= c->ct_cap) { c->ct_on = 0; c->ct_done = 1; } }
