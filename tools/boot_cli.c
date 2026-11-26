@@ -338,6 +338,10 @@ int main(int argc, char **argv) {
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
               fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
+        { /* 0.4.659 diagnostic (changes nothing): setPowerStateGated (0x82e9d50) returns NotReady when dword [this+216]-1 > 6 (i.e. 0 or >7). Who writes/reads [this+216]? STR/LDR w imm 216 on x19/x20 in 0x82c0000..0x8330000 */
+          for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
+            for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0xb9000000u && t != 0xb9400000u) || ((w >> 10) & 0xfff) != 54u) continue;
+              fprintf(stderr, "[w216] %s w%u,[x%u,#216] at %llx\n", t == 0xb9000000u ? "STR" : "LDR", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
         { /* 0.4.638 diagnostic (changes nothing): who writes / reads RTBuddy qword [this+304]? (setPowerStateGated returns NotReady while it is 0) STR/LDR x imm 304 in 0x82c0000..0x8330000 */
           for (uint64_t pg = 0xfffffff0082c0000ull; pg < 0xfffffff008330000ull; pg += 0x1000) { uint64_t pa8; uint8_t *q8; if (a64_virt_to_phys(c7, pg, &pa8) || !(q8 = a64m_ram_at(m, pa8, 0x1000))) continue;
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0xf9000000u && t != 0xf9400000u) || ((w >> 10) & 0xfff) != 38u || (((w >> 5) & 31) != 19 && ((w >> 5) & 31) != 20)) continue;  /* 0.4.639: only x19/x20-based (this) accesses */
