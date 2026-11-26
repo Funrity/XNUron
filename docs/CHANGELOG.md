@@ -2813,3 +2813,7 @@ NAND-путь не изменён; журнал по-прежнему не за�
 - Вывод строк около 0x82e84a8–0x82e8a68 малоинформативен: там только «role», «NULL != (_akfNub = OSDynamicCast(AppleA7IOPNub, provider))», «_akf->getProperty("role")», __TIME__/__DATE__ — имён DT-флагов (quiesced, stand-alone…) в этом участке нет, они читаются позже.
 - Подтверждено по IPSW (список файлов): отдельного образа прошивки ANS нет; она, видимо, внутри LLB/iBoot (зашифрованы — не трогаем). В DT у iop-ans-nub только no-shutdown, power-managed=1, region-base/size=0.
 - 0.4.663: те же строки для 0x82e8a68–0x82e93e4 (тут должны быть имена DT-флагов).
+
+## 0.4.663 — РЕЗУЛЬТАТ и 0.4.664
+- Нашёл в RTBuddy::start имена конфигурации: DT-флаги **pre-loaded**, **running**, **no-firmware-service**, quiesced, stand-alone, no-shutdown, watchdog-enable, power-managed/user-power-managed (взаимоисключающие), «disable-in-restore» и boot-arg'и **rtb_disable_fw_load**, rtb_allow_all_fw, rtb_force_dram. «pre-loaded»/«running» — это режим «прошивку уже загрузил и запустил iBoot».
+- 0.4.664 (MODELLED, ASSUMPTION): добавляю в DT узел iop-ans-nub нулевые флаги `pre-loaded` и `running` — предполагается, что iBoot (которому нужен NAND для загрузки ядра) сам стартует ANS. Прошивки ANS у нас нет и она не исполняется; сторона IOP остаётся скриптовой моделью. Реальные добавления iBoot неизвестны; эффект смотрим, не утверждаем.
