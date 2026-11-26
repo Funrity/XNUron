@@ -2817,3 +2817,7 @@ NAND-путь не изменён; журнал по-прежнему не за�
 ## 0.4.663 — РЕЗУЛЬТАТ и 0.4.664
 - Нашёл в RTBuddy::start имена конфигурации: DT-флаги **pre-loaded**, **running**, **no-firmware-service**, quiesced, stand-alone, no-shutdown, watchdog-enable, power-managed/user-power-managed (взаимоисключающие), «disable-in-restore» и boot-arg'и **rtb_disable_fw_load**, rtb_allow_all_fw, rtb_force_dram. «pre-loaded»/«running» — это режим «прошивку уже загрузил и запустил iBoot».
 - 0.4.664 (MODELLED, ASSUMPTION): добавляю в DT узел iop-ans-nub нулевые флаги `pre-loaded` и `running` — предполагается, что iBoot (которому нужен NAND для загрузки ядра) сам стартует ANS. Прошивки ANS у нас нет и она не исполняется; сторона IOP остаётся скриптовой моделью. Реальные добавления iBoot неизвестны; эффект смотрим, не утверждаем.
+
+## 0.4.664 — РЕЗУЛЬТАТ и 0.4.665
+- Флаги pre-loaded/running добавлены в DT (лог: «(1) и (1)»), но видимого эффекта нет: ASC ANS по-прежнему run=0, сообщений 0, [trace] setPowerState(ANS2) — 0 исполненных инструкций. Либо флаги читаются, но не меняют нужное нам ветвление, либо значение/тип (zero-length) неверны.
+- 0.4.665: дамп кода чтения флагов 0x82e9180–0x82e9400 — что именно делают pre-loaded/running.
