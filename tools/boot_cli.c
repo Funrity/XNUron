@@ -347,6 +347,14 @@ int main(int argc, char **argv) {
                 if (++cnt[k] <= 5) { char sb[100]; unsigned b0 = o >= 40 ? 40 : o; size_t cl = 0; for (unsigned z = 0; z < b0 + L + 48 && cl < 99; z++) { unsigned char ch = q8[o - b0 + z]; sb[cl++] = (ch >= 32 && ch < 127) ? (char)ch : '.'; } sb[cl] = 0;
                   fprintf(stderr, "[kstr] \"%s\" at %llx: %s\n", nd[k], (unsigned long long)(pa8 + o + 0xfffffff007004000ull - 0x801004000ull), sb); } } } }
           for (unsigned k = 0; k < sizeof nd / sizeof nd[0]; k++) fprintf(stderr, "[kstr-count] \"%s\" = %u\n", nd[k], cnt[k]); }
+        { /* 0.4.684 diagnostic (changes nothing): what does restored wait for? Scan ALL guest RAM (0x800000000..0x900000000) for restored's strings around "NAND service" and the IOKit class names it may match (the restore ramdisk / its pages in RAM). Prints physical address + 160 bytes of context. */
+          static const char *nd[] = { "Waiting for NAND service", "AppleANS2", "AppleNANDFTL", "AppleEmbeddedNVMe", "EmbeddedStorage", "IOBlockStorageDevice", "IOMedia", "/dev/disk0", "NAND service", "IONAND", "AppleNAND", "AppleANS" };
+          unsigned cnt[sizeof nd / sizeof nd[0]] = { 0 };
+          for (uint64_t pa8 = 0x800000000ull; pa8 < 0x900000000ull; pa8 += 0x100000) { uint8_t *q8 = a64m_ram_at(m, pa8, 0x100100); if (!q8) continue;
+            for (uint32_t o = 0; o < 0x100000; o++) { for (unsigned k = 0; k < sizeof nd / sizeof nd[0]; k++) { size_t L = strlen(nd[k]); if (q8[o] != (uint8_t)nd[k][0] || memcmp(q8 + o, nd[k], L)) continue;
+                if (++cnt[k] <= 4) { char sb[220]; unsigned b0 = o >= 80 ? 80 : o; size_t cl = 0; for (unsigned z = 0; z < b0 + L + 80 && cl < 219; z++) { unsigned char ch = q8[o - b0 + z]; sb[cl++] = (ch >= 32 && ch < 127) ? (char)ch : '.'; } sb[cl] = 0;
+                  fprintf(stderr, "[rstr] \"%s\" at pa %llx: %s\n", nd[k], (unsigned long long)(pa8 + o), sb); } } } }
+          for (unsigned k = 0; k < sizeof nd / sizeof nd[0]; k++) fprintf(stderr, "[rstr-count] \"%s\" = %u\n", nd[k], cnt[k]); }
         { /* 0.4.669 diagnostic (changes nothing): the DT property names RTBuddy::start reads into [+291],[+292],[+289],[+290],[+294],[+293],... and [+336] (adrp page 0x7516000 + offsets taken from the code at 0x82e8c9c..0x82e8e78) */
           static const unsigned so[] = { 1080, 1091 };
           { uint64_t va = 0xfffffff0074d4cd6ull, pa8; uint8_t *q8; char sb[48] = "?"; if (!a64_virt_to_phys(c7, va, &pa8) && (q8 = a64m_ram_at(m, pa8, 48))) { memcpy(sb, q8, 47); sb[47] = 0; } fprintf(stderr, "[dtflag] [+337] property -> \"%s\"\n", sb); }
