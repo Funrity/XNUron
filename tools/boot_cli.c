@@ -339,6 +339,14 @@ int main(int argc, char **argv) {
             for (uint32_t o = 0; o < 0x1000; o += 4) { uint32_t w; memcpy(&w, q8 + o, 4); uint32_t t = w & 0xffc00000u; if ((t != 0x39000000u && t != 0x39400000u) || ((w >> 10) & 0xfff) != 220u) continue;
               fprintf(stderr, "[b220] %s w%u,[x%u,#220] at %llx\n", t == 0x39000000u ? "STRB" : "LDRB", w & 31, (w >> 5) & 31, (unsigned long long)((pg + o) & 0xfffffffffull)); } } }
         fprintf(stderr, "[boot-req] 0.4.675 modelled boot request: state %u (0 not issued, 1 issued, 2 returned) rtbuddy %llx\n", c7->bt_n, (unsigned long long)c7->bt_obj);
+        { /* 0.4.681 diagnostic (changes nothing): is a generic NVMe stack inside the kernelcache? is there a kext resource request? Scan the kernel image area of RAM for these strings and print VA + context (VA = PA + 0xfffffff007004000 - 0x801004000). */
+          static const char *nd[] = { "IONVMeFamily", "IONVMeController", "IONVMe", "AppleNVMe", "AppleANS2NVMeController", "AppleANS2CGNVMeController", "ANS2Endpoint", "OSKextRequestResource", "equestResource", "requested resource", "kextd", "apcie", "AppleT8020PCIe", "IOPCIFamily", "NAND service", "RTBuddyFirmwareBundle", "ans,", "nvme" };
+          unsigned cnt[sizeof nd / sizeof nd[0]] = { 0 };
+          for (uint64_t pa8 = 0x801000000ull; pa8 < 0x80a000000ull; pa8 += 0x10000) { uint8_t *q8 = a64m_ram_at(m, pa8, 0x10040); if (!q8) continue;
+            for (uint32_t o = 0; o < 0x10000; o++) { for (unsigned k = 0; k < sizeof nd / sizeof nd[0]; k++) { size_t L = strlen(nd[k]); if (q8[o] != (uint8_t)nd[k][0] || memcmp(q8 + o, nd[k], L)) continue;
+                if (++cnt[k] <= 5) { char sb[100]; unsigned b0 = o >= 40 ? 40 : o; size_t cl = 0; for (unsigned z = 0; z < b0 + L + 48 && cl < 99; z++) { unsigned char ch = q8[o - b0 + z]; sb[cl++] = (ch >= 32 && ch < 127) ? (char)ch : '.'; } sb[cl] = 0;
+                  fprintf(stderr, "[kstr] \"%s\" at %llx: %s\n", nd[k], (unsigned long long)(pa8 + o + 0xfffffff007004000ull - 0x801004000ull), sb); } } } }
+          for (unsigned k = 0; k < sizeof nd / sizeof nd[0]; k++) fprintf(stderr, "[kstr-count] \"%s\" = %u\n", nd[k], cnt[k]); }
         { /* 0.4.669 diagnostic (changes nothing): the DT property names RTBuddy::start reads into [+291],[+292],[+289],[+290],[+294],[+293],... and [+336] (adrp page 0x7516000 + offsets taken from the code at 0x82e8c9c..0x82e8e78) */
           static const unsigned so[] = { 1080, 1091 };
           { uint64_t va = 0xfffffff0074d4cd6ull, pa8; uint8_t *q8; char sb[48] = "?"; if (!a64_virt_to_phys(c7, va, &pa8) && (q8 = a64m_ram_at(m, pa8, 48))) { memcpy(sb, q8, 47); sb[47] = 0; } fprintf(stderr, "[dtflag] [+337] property -> \"%s\"\n", sb); }
