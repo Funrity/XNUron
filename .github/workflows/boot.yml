@@ -11,6 +11,9 @@ on:
       max_msteps:
         description: "Step limit, millions"
         default: "4000"
+      profile:
+        description: "gprof build (-pg), appends the flat profile to boot.err"
+        default: "false"
 permissions:
   contents: write   # publish the log as a release asset
 concurrency:
@@ -27,7 +30,8 @@ jobs:
       - name: Build the headless runner (same C sources as the APK)
         run: |
           C=app/src/main/cpp; LZ=$C/lzfse
-          gcc -O2 -w -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
+          PG=''; [ "${{ inputs.profile }}" = true ] && PG=-pg
+          gcc -O2 -w $PG -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
             $LZ/lzfse_decode.c $LZ/lzfse_decode_base.c $LZ/lzfse_fse.c $LZ/lzvn_decode_base.c -lm -lz -lpthread
       - name: IPSW cache (only to save download time; the file comes from Apple's public server)
         uses: actions/cache@v4
@@ -44,6 +48,7 @@ jobs:
         run: |
           set +e
           ./boot_cli ipsw.zip "${{ inputs.max_msteps }}" > boot.log 2> boot.err
+          if [ "${{ inputs.profile }}" = true ] && [ -f gmon.out ]; then echo "=== gprof flat profile ===" >> boot.err; gprof -b -p -z boot_cli gmon.out 2>/dev/null | head -45 >> boot.err; fi
           cat boot.err; wc -c boot.log
       - name: "IPSW report (read-only; names, sizes, KBAG presence)"
         run: python3 tools/ipsw_report.py ipsw.zip > ipsw.txt 2>&1 || true

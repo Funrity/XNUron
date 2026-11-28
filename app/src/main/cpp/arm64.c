@@ -163,9 +163,9 @@ static int abort_data(A64 *c, uint64_t addr, bool wr, unsigned fsc) {
 static uint8_t *ptr(A64 *c, uint64_t a, uint64_t n);
 #define MMU_ON(c) ((c)->mode == A64_MODE_SYSTEM && ((c)->sctlr_el1 & 1))
 
-static void tlb_flush(A64 *c) { memset(c->tlb_tag, 0, sizeof c->tlb_tag); c->if_valid = false; }
+static void tlb_flush(A64 *c) { c->pf_flush++; memset(c->tlb_tag, 0, sizeof c->tlb_tag); c->if_valid = false; }
 
-static int walk(A64 *c, uint64_t va, uint64_t *pa, bool update, uint8_t *ro) {
+__attribute__((noinline)) static int walk(A64 *c, uint64_t va, uint64_t *pa, bool update, uint8_t *ro) {
     uint64_t tcr = c->tcr_el1;
     int sel = (int)((va >> 55) & 1);
     int tsz = (int)(sel ? (tcr >> 16) & 63 : tcr & 63);
@@ -212,7 +212,8 @@ static int xlate(A64 *c, uint64_t va, uint64_t *pa) {
     if (((va >> 55) & 1) ? ((tcr >> 38) & 1) : ((tcr >> 37) & 1)) v = ((va >> 55) & 1) ? (va | 0xFF00000000000000ull) : (va & 0x00FFFFFFFFFFFFFFull);
     unsigned slot = (unsigned)((v >> 12) & 255);
     uint64_t tag = (v >> 12) | (1ull << 63);
-    if (c->tlb_tag[slot] == tag) { *pa = c->tlb_pa[slot] | (v & 0xFFF); c->last_ro = c->tlb_ro[slot]; return -1; }
+    if (c->tlb_tag[slot] == tag) { c->pf_hit++; *pa = c->tlb_pa[slot] | (v & 0xFFF); c->last_ro = c->tlb_ro[slot]; return -1; }
+    c->pf_miss++;
     uint64_t out; uint8_t ro = 0; int f = walk(c, v, &out, true, &ro);
     if (f >= 0) return f;
     c->last_ro = ro; c->tlb_ro[slot] = ro;
