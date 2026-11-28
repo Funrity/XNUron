@@ -1224,8 +1224,15 @@ static int step(A64 *c) {
     uint64_t ppc = pc; int ffsc = 0x04;
     uint8_t *p = NULL;
     if (MMU_ON(c)) {
-        int f = xlate(c, pc, &ppc);
-        if (f >= 0) ffsc = f; else p = ptr(c, ppc, 4);
+        if (__builtin_expect(c->if_valid && (pc >> 12) == c->if_pg, 1)) { p = c->if_host + (pc & 0xfff); c->pf_ifhit++; }
+        else {
+            int f = xlate(c, pc, &ppc);
+            if (f >= 0) ffsc = f; else {
+                p = ptr(c, ppc, 4);
+                uint8_t *b = p ? ptr(c, ppc & ~0xfffull, 4096) : NULL;
+                if (b && !(pc & 3)) { c->if_valid = true; c->if_pg = pc >> 12; c->if_host = b; }
+            }
+        }
     } else p = ptr(c, pc, 4);
     if (!p || (pc & 3)) {
         if (c->mode != A64_MODE_SYSTEM) return fatal(c, "bad instruction fetch", pc);
