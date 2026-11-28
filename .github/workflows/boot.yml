@@ -31,7 +31,7 @@ jobs:
         run: |
           C=app/src/main/cpp; LZ=$C/lzfse
           PG=''; [ "${{ inputs.profile }}" = true ] && PG=-pg
-          gcc -O2 -w $PG -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
+          gcc -O3 -flto -w $PG -I$C -o boot_cli tools/boot_cli.c $C/attempt.c $C/macho.c $C/machine.c $C/arm64.c $C/inspect.c $C/img4.c $C/zipinfo.c \
             $LZ/lzfse_decode.c $LZ/lzfse_decode_base.c $LZ/lzfse_fse.c $LZ/lzvn_decode_base.c -lm -lz -lpthread
       - name: IPSW cache (only to save download time; the file comes from Apple's public server)
         uses: actions/cache@v4

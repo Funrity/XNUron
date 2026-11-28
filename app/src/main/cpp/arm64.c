@@ -1208,6 +1208,48 @@ static int exec(A64 *c, uint32_t i, uint64_t *next) {
     }
 }
 
+/* 0.4.688: rarely-armed diagnostic hooks moved out of the hot path of step(): they run only when pc hits a registered address (bloom filter) or a data-dependent hook is active. Behaviour unchanged. Returns 1 when the step was consumed (jmp hook). */
+__attribute__((noinline)) static int step_hooks_a(A64 *c, uint64_t pc, uint32_t i) {
+    if (__builtin_expect(c->e6_pc != 0, 0) && pc == 0xfffffff007ed1ca8ull) c->e6_arm = 1;   /* armed when load_init_program starts */
+    if (__builtin_expect(c->e6_pc != 0, 0) && c->e6_arm && !c->e6_n && (i & 0xffc00000u) == 0xb9000000u && ((i >> 10) & 0xfff) == 21 && (i & 31) != 31 && ((i >> 5) & 31) != 31 && ((i >> 5) & 31) != 29 && (uint32_t)c->x[i & 31] == 6 && pc >= 0xfffffff007000000ull && pc < 0xfffffff00a800000ull) { c->e6_n = 1; c->e6_lr = c->x[30]; c->e6_x0 = pc; memcpy(c->e6_reg, c->x, sizeof c->e6_reg); for (unsigned hi = 0; hi < 64; hi++) c->e6_hist[hi] = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 64 + hi) % A64_PC_HIST]; }  /* 0.4.370: first kernel-text 32-bit store of 6 to [xN,#84] (b_error = ENXIO); e6_x0 holds the store pc */
+    if (__builtin_expect(c->cap_pc != 0, 0) && pc == c->cap_pc && !c->cap_n) { c->cap_n = 1; for (int ci = 0; ci < 4; ci++) c->cap_x[ci] = c->x[ci]; for (unsigned hi = 0; hi < 512; hi++) { c->ret_snap_pc[hi] = c->ret_pc[(c->ret_i + hi) & 511]; c->ret_snap_x0[hi] = c->ret_x0[(c->ret_i + hi) & 511]; } for (unsigned hi = 0; hi < A64_PC_HIST; hi++) c->cap_hist[hi] = c->pc_hist[(c->pc_hist_i + hi) % A64_PC_HIST]; }
+    if (__builtin_expect(c->hk_pc != 0, 0) && pc == c->hk_pc && c->x[19] >= 0x1000) { c->hk_n++; (void)st(c, c->x[19] + 0x10b, 1, 1); (void)st(c, c->x[19] + 0x10c, 1, 0); }   /* 0.4.354 MODELLED hook */
+    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_pm_x0 && (c->x[30] & 0xfffffffffull) == 0x814a9f0ull) c->wp_pm_x0 = c->x[0];   /* 0.4.463 */
+    if (__builtin_expect(c->fp_pc != 0, 0) && pc == 0xfffffff00814a8c0ull && c->fn_n < 200) { unsigned k = c->fn_n++; c->fn_s[k][0] = 0; if (!wp_str(c, c->x[0], c->fn_s[k], 32)) snprintf(c->fn_s[k], 32, "?"); else { size_t l = strlen(c->fn_s[k]); if (l + 8 < 40) snprintf(c->fn_s[k] + l, 40 - l, "@%x", ({ uint64_t sl = 0; wp_rd(c, c->x[29] + 8, &sl); (unsigned)(sl & 0xfffffu); })); } }   /* 0.4.515 +lr; 0.4.512 diagnostic only */
+    if (__builtin_expect(c->fp_pc != 0, 0) && pc == 0xfffffff00814a7a0ull && c->fq_n < 16 && (c->x[30] & 0xfffffffffull) >= 0x82c0000ull && (c->x[30] & 0xfffffffffull) < 0x8330000ull) { unsigned k = c->fq_n++; c->fq_x0[k] = c->x[0]; c->fq_x1[k] = c->x[1]; c->fq_x2[k] = c->x[2]; c->fq_lr[k] = c->x[30]; c->fq_s[k][0] = 0; { size_t nn = 0; for (unsigned off = 0; off < 0x400 && nn < 100; off += 8) { uint64_t w, sp; char t[24]; if (wp_rd(c, c->x[0] + off, &w) || w < 0xffffffe000000000ull || wp_rd(c, w + 0x10, &sp) || sp < 0xffffffe000000000ull) continue; if (wp_str(c, sp, t, sizeof t)) nn += (size_t)snprintf(c->fq_s[k] + nn, sizeof c->fq_s[k] - nn, "%x=%s ", off, t); } } }   /* 0.4.510 diagnostic only: A7IOP-zone callers of publishFunctionParent(nub, RTBuddy); fq_s = role of x1 */
+    if (__builtin_expect(c->fp_pc != 0, 0) && pc == c->fp_pc && c->fp_n < 6 && (c->x[30] & 0xfffffffffull) == 0x8178864ull) { unsigned k = c->fp_n++; c->fp_x0[k] = c->x[0]; c->fp_x1[k] = c->x[1]; c->fp_lr[k] = c->x[30]; c->fp_s[k][0] = 0; if (!wp_str(c, c->x[1], c->fp_s[k], 48)) c->fp_s[k][0] = 0; }   /* 0.4.467 diagnostic only */
+    if (__builtin_expect(c->wp2_pc != 0, 0) && pc == c->wp2_pc && c->wp2_n < 8) { unsigned k = c->wp2_n++; c->wp2_x0[k] = c->x[0]; c->wp2_x19[k] = c->x[19]; c->wp2_x22[k] = c->x[22]; }   /* 0.4.460 diagnostic only */
+    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_snap_done && (c->x[30] & 0xfffffffffull) == 0x816bdccull) { c->wp_snap_done = 1; wp_snapshot(c, c->x[0], 0); }   /* 0.4.444: PMGR wait */
+    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && pc == 0xfffffff0082e94dcull) {   /* 0.4.506 diagnostic: RTBuddy::start before the firmware-service wait: this+192 = role object; x0 field shows 'this' */ c->wp_sn[c->wp_sn_n][0] = 0; wp_snapshot(c, c->x[19] + 192, 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[19]; c->wp_sn_n++; }
+    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && ((pc == c->wp_pc && (c->x[30] & 0xfffffffffull) == 0x816bdccull) || (pc == 0xfffffff008075e48ull && (c->x[30] & 0xfffffffffull) == 0x82e94ecull))) {   /* 0.4.492: also the wait of RTBuddy (0x8075e48 called from 0x82e94e8) */ c->wp_snap2_done = 1; c->wp_sn[c->wp_sn_n][0] = 0; wp_snapshot(c, c->x[0], 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[0]; c->wp_sn_n++; }   /* 0.4.449: every resource wait (up to 24) */   /* 0.4.446: second waiter (thread via 81613c0) */
+    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; if (pc == 0xfffffff0082e9becull) { uint64_t q = 0; if (!rt_rd(c, c->sp + 40, &q)) c->wp_x1[k] = q >> 32; /* requested state ([sp+44]) */ } c->wp_lr[k] = (pc == 0xfffffff0082e9becull) ? c->x[19] : c->x[30]; }   /* 0.4.429 diagnostic only; 0.4.627: at 0x82e9bec (after runAction in RTBuddy::setPowerState) x0=return value, "lr" slot = object x19 */
+    /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
+    if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 1; }
+    /* 0.4.675 MODELLED one-shot call (ASSUMPTION): at pc == bt_pc (entry of RTBuddy::setPowerState) with x0 = an RTBuddy whose DT flags look like ANS2 (bytes 289..294 = 0,0,1,0,0,1; [+336]==0; [+304]==0), the emulator issues ONE call bt_target(x0, 0, 0) - the kernel's own code that RTBuddyUserClient runs when a userspace daemon asks an IOP to boot without a firmware name. x0..x18 are saved and restored around it; the call returns to the same pc. */
+    if (__builtin_expect(c->bt_pc != 0, 0) && pc == c->bt_pc) {
+        if (c->bt_n == 0) { uint64_t q8 = 0, q3 = 0, q4 = 0;
+            if (!rt_rd(c, c->x[0] + 288, &q8) && !rt_rd(c, c->x[0] + 304, &q3) && !rt_rd(c, c->x[0] + 336, &q4) && ((q8 >> 8) & 0xffffffffffffull) == 0x010000010000ull && q3 == 0 && (q4 & 0xff) == 0) {
+                c->bt_n = 1; c->bt_obj = c->x[0]; memcpy(c->bt_save, c->x, sizeof c->bt_save); c->bt_sp = c->sp; c->x[1] = 0; c->x[2] = 0; c->x[30] = pc; c->pc = c->bt_target; c->steps++; return 1; } }
+        else if (c->bt_n == 1 && c->sp == c->bt_sp) { memcpy(c->x, c->bt_save, sizeof c->bt_save); c->bt_n = 2; }   /* the call returned: registers back, the original instruction runs next */
+    }
+    if (__builtin_expect(c->ct_arm_pc != 0, 0) && !c->ct_done) {
+        if (!c->ct_on && pc == c->ct_arm_pc) { uint64_t q = 0; if ((c->ct_off == ~0ull ? (q = c->x[0], 0) : rt_rd(c, c->x[0] + c->ct_off, &q)) == 0 && (q & 0xffffffull) == c->ct_val) { c->ct_on = 1; c->ct_sp_page = c->sp >> 14; c->ct_last = 0; c->ct_cnt = 0; } }
+        if (c->ct_on && (c->sp >> 14) == c->ct_sp_page) { if (pc != c->ct_last + 4 && c->ct_n < c->ct_cap && c->ct_n < 4096) c->ct_buf[c->ct_n++] = pc; c->ct_last = pc; if (++c->ct_cnt > c->ct_max || c->ct_n >= c->ct_cap) { c->ct_on = 0; c->ct_done = 1; } }
+    }
+    if (__builtin_expect(c->jmp_pc != 0, 0) && pc == c->jmp_pc) { c->jmp_n++; c->pc = c->jmp_to; c->steps++; return 1; }
+    return 0;
+}
+__attribute__((noinline)) static void step_hooks_b(A64 *c, uint64_t pc, uint32_t i) {
+    if (c->pp2_pc && pc == c->pp2_pc && !c->pp2_hit && c->x[c->pp2_reg & 31] == c->pp2_val) { c->pp2_hit = 1; memcpy(c->pp2_x, c->x, sizeof c->x); c->pp2_sp = c->sp; }
+    if (c->pp_pc && pc == c->pp_pc && !c->pp_hit && c->x[c->pp_reg & 31] == c->pp_val) { c->pp_hit = 1; memcpy(c->pp_x, c->x, sizeof c->x); c->pp_sp = c->sp; }
+    if (c->tr_pc) { if (!c->tr_on && pc == c->tr_pc) c->tr_on = 1; if (c->tr_on && c->tr_n < 400) c->tr_pcs[c->tr_n++] = pc; }
+    if (c->cr_on && (i & 0xfc000000u) == 0x94000000u && (c->daif & 3) == 0 && c->el == 1) { int64_t dd = (int64_t)(i & 0x3ffffffu); if (dd & 0x2000000) dd -= 0x4000000; unsigned q = c->cr_n++ % 64; c->cr_pc[q] = pc; c->cr_tg[q] = pc + (uint64_t)(dd * 4); }
+    if (c->snap_pc && pc == c->snap_pc && !c->snap_n) { c->snap_n = 1; c->snap_fp = c->x[29]; c->snap_lr = c->x[30]; c->snap_sp = c->sp; c->snap_x0 = c->x[0]; c->snap_step = c->steps; }   /* 0.4.212 diagnostic: first entry into the panic function */
+    if (c->hist_pc && pc == c->hist_pc) { unsigned q = 0; while (q < c->hist_n && !(c->hist_lr[q] == c->x[30] && c->hist_x1[q] == c->x[1])) q++; if (q < c->hist_n) c->hist_cnt[q]++; else if (c->hist_n < 24) { c->hist_lr[q] = c->x[30]; c->hist_x1[q] = c->x[1]; c->hist_cnt[q] = 1; c->hist_n++; } else c->hist_other++; }
+    if (c->ctr_pc && pc == c->ctr_pc && c->ctr_mode == 1) { static const int rr[8] = {0, 8, 9, 10, 24, 25, 26, 27}; unsigned slot = c->ctr_total % 40; for (int q = 0; q < 8; q++) c->ctr[slot][q] = c->x[rr[q]]; c->ctr_total++; }
+    else if (c->ctr_pc && pc == c->ctr_pc && c->ctr_n < 40 && c->x[2] != 0) { for (int q = 0; q < 7; q++) c->ctr[c->ctr_n][q] = c->x[q]; c->ctr[c->ctr_n][7] = c->x[30]; c->ctr_n++; }
+}
+
 static int step(A64 *c) {
     if (c->mode == A64_MODE_SYSTEM && (c->el == 0 || !(c->daif & 2)) && a64_irq_asserted(c)) {
         take_exc(c, 1, 0, c->pc);
@@ -1250,33 +1292,7 @@ static int step(A64 *c) {
     }
     uint32_t i; memcpy(&i, p, 4);
     c->pc_hist[c->pc_hist_i++ % A64_PC_HIST] = pc;
-    if (__builtin_expect(c->e6_pc != 0, 0) && pc == 0xfffffff007ed1ca8ull) c->e6_arm = 1;   /* armed when load_init_program starts */
-    if (__builtin_expect(c->e6_pc != 0, 0) && c->e6_arm && !c->e6_n && (i & 0xffc00000u) == 0xb9000000u && ((i >> 10) & 0xfff) == 21 && (i & 31) != 31 && ((i >> 5) & 31) != 31 && ((i >> 5) & 31) != 29 && (uint32_t)c->x[i & 31] == 6 && pc >= 0xfffffff007000000ull && pc < 0xfffffff00a800000ull) { c->e6_n = 1; c->e6_lr = c->x[30]; c->e6_x0 = pc; memcpy(c->e6_reg, c->x, sizeof c->e6_reg); for (unsigned hi = 0; hi < 64; hi++) c->e6_hist[hi] = c->pc_hist[(c->pc_hist_i + A64_PC_HIST - 64 + hi) % A64_PC_HIST]; }  /* 0.4.370: first kernel-text 32-bit store of 6 to [xN,#84] (b_error = ENXIO); e6_x0 holds the store pc */
-    if (__builtin_expect(c->cap_pc != 0, 0) && pc == c->cap_pc && !c->cap_n) { c->cap_n = 1; for (int ci = 0; ci < 4; ci++) c->cap_x[ci] = c->x[ci]; for (unsigned hi = 0; hi < 512; hi++) { c->ret_snap_pc[hi] = c->ret_pc[(c->ret_i + hi) & 511]; c->ret_snap_x0[hi] = c->ret_x0[(c->ret_i + hi) & 511]; } for (unsigned hi = 0; hi < A64_PC_HIST; hi++) c->cap_hist[hi] = c->pc_hist[(c->pc_hist_i + hi) % A64_PC_HIST]; }
-    if (__builtin_expect(c->hk_pc != 0, 0) && pc == c->hk_pc && c->x[19] >= 0x1000) { c->hk_n++; (void)st(c, c->x[19] + 0x10b, 1, 1); (void)st(c, c->x[19] + 0x10c, 1, 0); }   /* 0.4.354 MODELLED hook */
-    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_pm_x0 && (c->x[30] & 0xfffffffffull) == 0x814a9f0ull) c->wp_pm_x0 = c->x[0];   /* 0.4.463 */
-    if (__builtin_expect(c->fp_pc != 0, 0) && pc == 0xfffffff00814a8c0ull && c->fn_n < 200) { unsigned k = c->fn_n++; c->fn_s[k][0] = 0; if (!wp_str(c, c->x[0], c->fn_s[k], 32)) snprintf(c->fn_s[k], 32, "?"); else { size_t l = strlen(c->fn_s[k]); if (l + 8 < 40) snprintf(c->fn_s[k] + l, 40 - l, "@%x", ({ uint64_t sl = 0; wp_rd(c, c->x[29] + 8, &sl); (unsigned)(sl & 0xfffffu); })); } }   /* 0.4.515 +lr; 0.4.512 diagnostic only */
-    if (__builtin_expect(c->fp_pc != 0, 0) && pc == 0xfffffff00814a7a0ull && c->fq_n < 16 && (c->x[30] & 0xfffffffffull) >= 0x82c0000ull && (c->x[30] & 0xfffffffffull) < 0x8330000ull) { unsigned k = c->fq_n++; c->fq_x0[k] = c->x[0]; c->fq_x1[k] = c->x[1]; c->fq_x2[k] = c->x[2]; c->fq_lr[k] = c->x[30]; c->fq_s[k][0] = 0; { size_t nn = 0; for (unsigned off = 0; off < 0x400 && nn < 100; off += 8) { uint64_t w, sp; char t[24]; if (wp_rd(c, c->x[0] + off, &w) || w < 0xffffffe000000000ull || wp_rd(c, w + 0x10, &sp) || sp < 0xffffffe000000000ull) continue; if (wp_str(c, sp, t, sizeof t)) nn += (size_t)snprintf(c->fq_s[k] + nn, sizeof c->fq_s[k] - nn, "%x=%s ", off, t); } } }   /* 0.4.510 diagnostic only: A7IOP-zone callers of publishFunctionParent(nub, RTBuddy); fq_s = role of x1 */
-    if (__builtin_expect(c->fp_pc != 0, 0) && pc == c->fp_pc && c->fp_n < 6 && (c->x[30] & 0xfffffffffull) == 0x8178864ull) { unsigned k = c->fp_n++; c->fp_x0[k] = c->x[0]; c->fp_x1[k] = c->x[1]; c->fp_lr[k] = c->x[30]; c->fp_s[k][0] = 0; if (!wp_str(c, c->x[1], c->fp_s[k], 48)) c->fp_s[k][0] = 0; }   /* 0.4.467 diagnostic only */
-    if (__builtin_expect(c->wp2_pc != 0, 0) && pc == c->wp2_pc && c->wp2_n < 8) { unsigned k = c->wp2_n++; c->wp2_x0[k] = c->x[0]; c->wp2_x19[k] = c->x[19]; c->wp2_x22[k] = c->x[22]; }   /* 0.4.460 diagnostic only */
-    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc && !c->wp_snap_done && (c->x[30] & 0xfffffffffull) == 0x816bdccull) { c->wp_snap_done = 1; wp_snapshot(c, c->x[0], 0); }   /* 0.4.444: PMGR wait */
-    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && pc == 0xfffffff0082e94dcull) {   /* 0.4.506 diagnostic: RTBuddy::start before the firmware-service wait: this+192 = role object; x0 field shows 'this' */ c->wp_sn[c->wp_sn_n][0] = 0; wp_snapshot(c, c->x[19] + 192, 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[19]; c->wp_sn_n++; }
-    if (__builtin_expect(c->wp_pc != 0, 0) && c->wp_sn_n < 24 && ((pc == c->wp_pc && (c->x[30] & 0xfffffffffull) == 0x816bdccull) || (pc == 0xfffffff008075e48ull && (c->x[30] & 0xfffffffffull) == 0x82e94ecull))) {   /* 0.4.492: also the wait of RTBuddy (0x8075e48 called from 0x82e94e8) */ c->wp_snap2_done = 1; c->wp_sn[c->wp_sn_n][0] = 0; wp_snapshot(c, c->x[0], 2); c->wp_sn_lr2[c->wp_sn_n] = c->x[0]; c->wp_sn_n++; }   /* 0.4.449: every resource wait (up to 24) */   /* 0.4.446: second waiter (thread via 81613c0) */
-    if (__builtin_expect(c->wp_pc != 0, 0) && pc == c->wp_pc) { unsigned k = (c->wp_n++) & 15; c->wp_x0[k] = c->x[0]; c->wp_x1[k] = c->x[1]; if (pc == 0xfffffff0082e9becull) { uint64_t q = 0; if (!rt_rd(c, c->sp + 40, &q)) c->wp_x1[k] = q >> 32; /* requested state ([sp+44]) */ } c->wp_lr[k] = (pc == 0xfffffff0082e9becull) ? c->x[19] : c->x[30]; }   /* 0.4.429 diagnostic only; 0.4.627: at 0x82e9bec (after runAction in RTBuddy::setPowerState) x0=return value, "lr" slot = object x19 */
-    /* 0.4.414 MODELLED one-shot call: the first time pc == ch_pc, x1/x2 are set, x30 = pc (the call returns to the same instruction, which then executes normally) and execution continues at ch_target */
-    if (__builtin_expect(c->ch_pc != 0, 0) && pc == c->ch_pc && c->ch_n == 0) { c->ch_n = 1; c->x[1] = c->ch_x1; c->x[2] = c->ch_x2; c->x[30] = pc; c->pc = c->ch_target; c->steps++; return 0; }
-    /* 0.4.675 MODELLED one-shot call (ASSUMPTION): at pc == bt_pc (entry of RTBuddy::setPowerState) with x0 = an RTBuddy whose DT flags look like ANS2 (bytes 289..294 = 0,0,1,0,0,1; [+336]==0; [+304]==0), the emulator issues ONE call bt_target(x0, 0, 0) - the kernel's own code that RTBuddyUserClient runs when a userspace daemon asks an IOP to boot without a firmware name. x0..x18 are saved and restored around it; the call returns to the same pc. */
-    if (__builtin_expect(c->bt_pc != 0, 0) && pc == c->bt_pc) {
-        if (c->bt_n == 0) { uint64_t q8 = 0, q3 = 0, q4 = 0;
-            if (!rt_rd(c, c->x[0] + 288, &q8) && !rt_rd(c, c->x[0] + 304, &q3) && !rt_rd(c, c->x[0] + 336, &q4) && ((q8 >> 8) & 0xffffffffffffull) == 0x010000010000ull && q3 == 0 && (q4 & 0xff) == 0) {
-                c->bt_n = 1; c->bt_obj = c->x[0]; memcpy(c->bt_save, c->x, sizeof c->bt_save); c->bt_sp = c->sp; c->x[1] = 0; c->x[2] = 0; c->x[30] = pc; c->pc = c->bt_target; c->steps++; return 0; } }
-        else if (c->bt_n == 1 && c->sp == c->bt_sp) { memcpy(c->x, c->bt_save, sizeof c->bt_save); c->bt_n = 2; }   /* the call returned: registers back, the original instruction runs next */
-    }
-    if (__builtin_expect(c->ct_arm_pc != 0, 0) && !c->ct_done) {
-        if (!c->ct_on && pc == c->ct_arm_pc) { uint64_t q = 0; if ((c->ct_off == ~0ull ? (q = c->x[0], 0) : rt_rd(c, c->x[0] + c->ct_off, &q)) == 0 && (q & 0xffffffull) == c->ct_val) { c->ct_on = 1; c->ct_sp_page = c->sp >> 14; c->ct_last = 0; c->ct_cnt = 0; } }
-        if (c->ct_on && (c->sp >> 14) == c->ct_sp_page) { if (pc != c->ct_last + 4 && c->ct_n < c->ct_cap && c->ct_n < 4096) c->ct_buf[c->ct_n++] = pc; c->ct_last = pc; if (++c->ct_cnt > c->ct_max || c->ct_n >= c->ct_cap) { c->ct_on = 0; c->ct_done = 1; } }
-    }
-    if (__builtin_expect(c->jmp_pc != 0, 0) && pc == c->jmp_pc) { c->jmp_n++; c->pc = c->jmp_to; c->steps++; return 0; }
+    if (__builtin_expect(c->wb[(pc >> 2) & 4095] | (c->e6_arm & !c->e6_n) | (c->ct_arm_pc != 0), 0)) { if (step_hooks_a(c, pc, i)) return 0; }
     if (c->cov) {
         uint64_t co = pc - c->cov_base; if (co < c->cov_len) { uint8_t bm = (uint8_t)(1u << ((co >> 2) & 7)); if (!(c->cov[co >> 5] & bm)) { unsigned q = c->nw_n++ % 96; c->nw_pc[q] = pc; c->nw_step[q] = c->steps; c->nw_x0[q] = c->x[0]; c->nw_x1[q] = c->x[1]; c->nw_lr[q] = c->x[30]; } c->cov[co >> 5] |= bm; }
         if ((i & 0xfc000000u) == 0x94000000u) {   /* BL: remember the first call of every target, newest 160 kept */
@@ -1288,14 +1304,7 @@ static int step(A64 *c) {
         }
     }
     if (c->nm_on && ((i & 0xfc000000u) == 0x94000000u || (i & 0xfffffc1fu) == 0xd63f0000u || (i & 0xfffff800u) == 0xd73f0800u)) { nm_probe(c, c->x[1], pc); nm_probe(c, c->x[2], pc); }
-    if (c->pp2_pc && pc == c->pp2_pc && !c->pp2_hit && c->x[c->pp2_reg & 31] == c->pp2_val) { c->pp2_hit = 1; memcpy(c->pp2_x, c->x, sizeof c->x); c->pp2_sp = c->sp; }
-    if (c->pp_pc && pc == c->pp_pc && !c->pp_hit && c->x[c->pp_reg & 31] == c->pp_val) { c->pp_hit = 1; memcpy(c->pp_x, c->x, sizeof c->x); c->pp_sp = c->sp; }
-    if (c->tr_pc) { if (!c->tr_on && pc == c->tr_pc) c->tr_on = 1; if (c->tr_on && c->tr_n < 400) c->tr_pcs[c->tr_n++] = pc; }
-    if (c->cr_on && (i & 0xfc000000u) == 0x94000000u && (c->daif & 3) == 0 && c->el == 1) { int64_t dd = (int64_t)(i & 0x3ffffffu); if (dd & 0x2000000) dd -= 0x4000000; unsigned q = c->cr_n++ % 64; c->cr_pc[q] = pc; c->cr_tg[q] = pc + (uint64_t)(dd * 4); }
-    if (c->snap_pc && pc == c->snap_pc && !c->snap_n) { c->snap_n = 1; c->snap_fp = c->x[29]; c->snap_lr = c->x[30]; c->snap_sp = c->sp; c->snap_x0 = c->x[0]; c->snap_step = c->steps; }   /* 0.4.212 diagnostic: first entry into the panic function */
-    if (c->hist_pc && pc == c->hist_pc) { unsigned q = 0; while (q < c->hist_n && !(c->hist_lr[q] == c->x[30] && c->hist_x1[q] == c->x[1])) q++; if (q < c->hist_n) c->hist_cnt[q]++; else if (c->hist_n < 24) { c->hist_lr[q] = c->x[30]; c->hist_x1[q] = c->x[1]; c->hist_cnt[q] = 1; c->hist_n++; } else c->hist_other++; }
-    if (c->ctr_pc && pc == c->ctr_pc && c->ctr_mode == 1) { static const int rr[8] = {0, 8, 9, 10, 24, 25, 26, 27}; unsigned slot = c->ctr_total % 40; for (int q = 0; q < 8; q++) c->ctr[slot][q] = c->x[rr[q]]; c->ctr_total++; }
-    else if (c->ctr_pc && pc == c->ctr_pc && c->ctr_n < 40 && c->x[2] != 0) { for (int q = 0; q < 7; q++) c->ctr[c->ctr_n][q] = c->x[q]; c->ctr[c->ctr_n][7] = c->x[30]; c->ctr_n++; }
+    if (__builtin_expect(c->wb[(pc >> 2) & 4095] | (unsigned)c->tr_on, 0)) step_hooks_b(c, pc, i);
     if (c->aw_val && c->aw_n < 48) {
         uint32_t t6 = i >> 26; char kd = 0; uint64_t tg = 0;
         if (t6 == 0x25) { kd = 'C'; int64_t d = (int64_t)(i & 0x3ffffffu); if (d & 0x2000000) d -= 0x4000000; tg = pc + (uint64_t)(d * 4); }
@@ -1334,8 +1343,16 @@ int a64_add_device(A64 *c, const A64Dev *d) {
     return 0;
 }
 
+static void wb_rebuild(A64 *c) {
+    uint64_t l[] = { c->e6_pc ? 0xfffffff007ed1ca8ull : 0, c->cap_pc, c->hk_pc, c->wp_pc, c->wp_pc ? 0xfffffff0082e94dcull : 0, c->wp_pc ? 0xfffffff008075e48ull : 0, c->wp_pc ? 0xfffffff0082e9becull : 0,
+        c->fp_pc ? 0xfffffff00814a8c0ull : 0, c->fp_pc ? 0xfffffff00814a7a0ull : 0, c->fp_pc, c->wp2_pc, c->ch_pc, c->bt_pc, c->ct_arm_pc, c->jmp_pc, c->pp2_pc, c->pp_pc, c->tr_pc, c->snap_pc, c->hist_pc, c->ctr_pc };
+    memset(c->wb, 0, sizeof c->wb);
+    for (unsigned k = 0; k < sizeof l / sizeof l[0]; k++) if (l[k]) c->wb[(l[k] >> 2) & 4095] = 1;
+}
+
 int a64_run(A64 *c, uint64_t max_steps) {
     if (c->fault) return -1;
+    wb_rebuild(c);
     if (c->idle) {
         if (!a64_irq_asserted(c) && !fiq_asserted(c)) {
             c->idle_ticks = timer_wait_ticks(c);
