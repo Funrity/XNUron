@@ -924,10 +924,6 @@ A64Machine *a64_attempt_ipsw(A64ReadAt rd, void *ud, uint64_t total) {
                   else if (a5 != 0) LOG("[boot] WARNING: could not add 'clock-frequencies-nclk' to /arm-io (%d)\n", a5); } }
               if (a1 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, iBoot does this): added /chosen 'security-domain' = 1 (the production security domain: ApSecurityDomain 1 of retail iOS firmware). AppleImage4 requires it.\n");
               if (a2 == 1) LOG("[boot] DeviceTree fix-up (MODELLED, iBoot does this): added /chosen 'chip-epoch' = 0 (the name AppleImage4 looks up for CEPO, read from the kernel's own table). ASSUMPTION: the real value is a chip property that iBoot supplies; it is not in the IPSW and is unknown here, 0 is a placeholder. Nothing is verified against it in this emulator.\n");
-              { /* 0.4.685 PROBE (MODELLED; NOT a claim that the NAND works): restored (strings found in RAM, 0.4.684) loops "Searching for NAND service" -> registry iterator -> reads the property 'AppleNANDStatus' ("NAND status property missing" / "Waiting for NAND service to publish" / "NAND Status: %s. Waiting" / "Ready" / "Error"). The property is normally published by AppleANS2NVMeController. We put a DELIBERATELY NOT-READY text on the 'ans' DeviceTree node only to learn whether restored's iterator reads DeviceTree-derived registry properties; restored should then print "NAND Status: <this text>. Waiting" instead of "...to publish". Nothing here makes the NAND available. */
-                static const char st[] = "XNuron-probe-no-NAND-driver";
-                int pr = a64_dt_node_add_prop(dt, &dtlen, dtcap, "ans", "AppleNANDStatus", st, sizeof st);
-                LOG("[boot] DeviceTree PROBE (MODELLED, 0.4.685; NOT a ready NAND): 'ans' += AppleNANDStatus = \"%s\" (%d)\n", st, pr); }
               if (a1 < 0 || a2 < 0) LOG("[boot] DeviceTree: could not add the missing /chosen properties (tree malformed or no room)\n");
           }
         }
